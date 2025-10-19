@@ -22,6 +22,7 @@
 #include "Engine/Engine.h"
 #include "Blueprint/AIBlueprintHelperLibrary.h"
 #include "Engine/World.h"
+#include "Navigation/PathFollowingComponent.h"
 
 ARamdomItemDefenseCharacter::ARamdomItemDefenseCharacter()
 {
@@ -52,7 +53,7 @@ ARamdomItemDefenseCharacter::ARamdomItemDefenseCharacter()
 	TopDownCameraComponent->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
 	TopDownCameraComponent->bUsePawnControlRotation = false; // Camera does not rotate relative to arm
 
-	// Create ASC, AS 
+	// Create ASC, AS
 	AbilitySystemComponent = CreateDefaultSubobject<UAbilitySystemComponent>(TEXT("AbilitySystemComp"));
 	AbilitySystemComponent->SetIsReplicated(true);
 	AbilitySystemComponent->SetReplicationMode(EGameplayEffectReplicationMode::Mixed);
@@ -92,12 +93,21 @@ void ARamdomItemDefenseCharacter::BeginPlay()
 // AI 이동이 완료되면 자동으로 이 함수가 호출됩니다.
 void ARamdomItemDefenseCharacter::OnMoveCompleted(FAIRequestID RequestID, const FPathFollowingResult& Result)
 {
+	// 이동이 끝나면 콜백을 초기화합니다.
+	AAIController* AIController = UAIBlueprintHelperLibrary::GetAIController(this);
+	if (AIController)
+	{
+		if (UPathFollowingComponent* PathFollowingComp = AIController->GetPathFollowingComponent())
+		{
+			PathFollowingComp->OnRequestFinished.Clear();
+		}
+	}
+
 	// 이동 결과가 '성공(Success)'이고, '공격할 의도'가 있는 타겟이 존재할 때
 	if (Result.IsSuccess() && PendingManualTarget)
 	{
 		// '의도'를 '실제 공격 타겟'으로 승격시킵니다.
 		SetManualTarget(PendingManualTarget);
-		// PendingManualTarget은 SetManualTarget 내부에서 자동으로 null이 됩니다.
 	}
 	else
 	{
@@ -170,42 +180,90 @@ void ARamdomItemDefenseCharacter::GetLifetimeReplicatedProps(TArray<FLifetimePro
 
 void ARamdomItemDefenseCharacter::SetManualTarget(AActor* NewTarget)
 {
-	ClearAllTargets(); // TODO: 멀티플레이어를 위해 나중에 서버 RPC로 만들어야 합니다.
+	// 수동 타겟이 설정되면 다른 타겟들은 모두 초기화합니다.
 	ManualTarget = NewTarget;
+	PendingManualTarget = nullptr;
+	AutoTarget = nullptr;
 }
 
 void ARamdomItemDefenseCharacter::SetPendingManualTarget(AActor* NewTarget)
 {
-	// 공격 예정 타겟을 설정할 때는, 현재 공격 중인 타겟은 해제합니다.
-	ManualTarget = nullptr;
+	// 공격 예정 타겟이 설정되면 현재 공격 타겟은 초기화합니다.
 	PendingManualTarget = NewTarget;
+	ManualTarget = nullptr;
+	AutoTarget = nullptr;
 }
 
 void ARamdomItemDefenseCharacter::ClearAllTargets()
 {
 	ManualTarget = nullptr;
 	PendingManualTarget = nullptr;
-	AutoTarget = nullptr; // 자동 타겟도 함께 해제
+	AutoTarget = nullptr;
 }
 
-void ARamdomItemDefenseCharacter::ClearManualTarget()
+void ARamdomItemDefenseCharacter::OrderAttack(AActor* Target)
 {
-	// TODO: 멀티플레이어를 위해 나중에 서버 RPC로 만들어야 합니다.
-	ManualTarget = nullptr;
+	if (!Target || !AttributeSet || !HasAuthority())
+	{
+		return;
+	}
+
+	AController* MyController = GetController();
+	if (!MyController)
+	{
+		return;
+	}
+
+	const float CurrentAttackRange = AttributeSet->GetAttackRange();
+	const float DistanceToTarget = GetDistanceTo(Target);
+
+	// 1. 타겟이 공격 범위를 벗어났을 경우
+	if (DistanceToTarget > CurrentAttackRange)
+	{
+		// 공격 예정 타겟으로 설정합니다.
+		SetPendingManualTarget(Target);
+
+		// 목표 지점(공격 최대사거리)에 50만큼의 여유를 둡니다.
+		const float AttackRangeBuffer = 50.0f;
+		const float TargetDistance = FMath::Max(0.0f, CurrentAttackRange - AttackRangeBuffer);
+		const FVector MyLocation = GetActorLocation();
+		const FVector TargetLocation = Target->GetActorLocation();
+		const FVector Direction = (TargetLocation - MyLocation).GetSafeNormal();
+		const FVector Destination = TargetLocation - (Direction * TargetDistance);
+
+		// AI 컨트롤러를 가져와 이동 완료 콜백을 바인딩합니다.
+		AAIController* AIController = UAIBlueprintHelperLibrary::GetAIController(this);
+		if (AIController)
+		{
+			UPathFollowingComponent* PathFollowingComp = AIController->GetPathFollowingComponent();
+			if (PathFollowingComp)
+			{
+				PathFollowingComp->OnRequestFinished.Clear(); // 이전 바인딩 제거
+				PathFollowingComp->OnRequestFinished.AddUObject(this, &ARamdomItemDefenseCharacter::OnMoveCompleted);
+			}
+			// 계산된 목적지로 이동 명령을 내립니다.
+			UAIBlueprintHelperLibrary::SimpleMoveToLocation(MyController, Destination);
+		}
+	}
+	// 2. 타겟이 공격 범위 안에 있을 경우
+	else
+	{
+		// 즉시 수동 타겟으로 설정하고 정지합니다.
+		SetManualTarget(Target);
+		MyController->StopMovement();
+	}
 }
 
 void ARamdomItemDefenseCharacter::FindTarget()
 {
-	if (ManualTarget)
+	if (ManualTarget || PendingManualTarget)
 	{
 		AutoTarget = nullptr;
 		return;
 	}
 
-	// AttributeSet이 유효한지 먼저 확인합니다.
 	if (!AttributeSet) return;
 
-	// AttributeSet에서 직접 공격 사거리 값을 가져옵니다.
 	const float CurrentAttackRange = AttributeSet->GetAttackRange();
 
 	TArray<AActor*> OverlappedActors;
@@ -239,10 +297,10 @@ void ARamdomItemDefenseCharacter::FindTarget()
 
 void ARamdomItemDefenseCharacter::PerformAttack()
 {
-	// 1. 공격 대상 결정 (기존 로직과 동일)
+	if (!HasAuthority()) return;
+
 	AActor* TargetToAttack = ManualTarget ? ManualTarget : AutoTarget;
 
-	// 2. 최종 타겟이 있을 경우에만 아래 로직 실행
 	if (TargetToAttack)
 	{
 		if (!AttributeSet)
@@ -255,46 +313,41 @@ void ARamdomItemDefenseCharacter::PerformAttack()
 		const float DistanceToTarget = GetDistanceTo(TargetToAttack);
 
 		AController* MyController = GetController();
-
 		if (!MyController) return;
 
 		// A. 타겟이 공격 범위를 벗어났을 경우
 		if (DistanceToTarget > CurrentAttackRange)
 		{
-			// 목표 지점(공격 최대사거리)에 50만큼의 여유를 둡니다.
-			const float AttackRangeBuffer = 50.0f;
-			const float TargetDistance = FMath::Max(0.0f, CurrentAttackRange - AttackRangeBuffer);
-
-			const FVector MyLocation = GetActorLocation();
-			const FVector TargetLocation = TargetToAttack->GetActorLocation();
-			const FVector Direction = (TargetLocation - MyLocation).GetSafeNormal();
-
-			// 최종 목적지: 타겟 위치에서 반대 방향으로 (공격 사거리 - 여유 공간) 만큼 이동한 곳
-			const FVector Destination = TargetLocation - (Direction * TargetDistance);
-
-			// 계산된 목적지로 이동 명령을 내립니다.
-			UAIBlueprintHelperLibrary::SimpleMoveToLocation(MyController, Destination);
-
-			return; // 이번 프레임에는 이동만 하고 공격은 하지 않습니다.
+			// 수동 타겟일 경우에만 쫓아갑니다. 자동 타겟은 범위를 벗어나면 버립니다.
+			if (TargetToAttack == ManualTarget)
+			{
+				const float AttackRangeBuffer = 50.0f;
+				const float TargetDistance = FMath::Max(0.0f, CurrentAttackRange - AttackRangeBuffer);
+				const FVector MyLocation = GetActorLocation();
+				const FVector TargetLocation = TargetToAttack->GetActorLocation();
+				const FVector Direction = (TargetLocation - MyLocation).GetSafeNormal();
+				const FVector Destination = TargetLocation - (Direction * TargetDistance);
+				UAIBlueprintHelperLibrary::SimpleMoveToLocation(MyController, Destination);
+			}
+			else
+			{
+				AutoTarget = nullptr;
+			}
+			return;
 		}
 		// B. 타겟이 공격 범위 안에 있을 경우 -> "정지 후 공격"
 		else
 		{
-			// 진행 중이던 모든 이동을 멈춥니다.
 			MyController->StopMovement();
 
-			// 움직임이 완전히 멈춘 프레임에만 공격합니다.
 			if (GetVelocity().Size() > 1.0f)
 			{
 				return;
 			}
 
-			// 제자리에서 타겟을 바라봅니다.
-			FRotator NewRotation = GetActorRotation();
-			NewRotation.Yaw = UKismetMathLibrary::FindLookAtRotation(GetActorLocation(), TargetToAttack->GetActorLocation()).Yaw;
-			SetActorRotation(NewRotation);
+			FRotator NewRotation = UKismetMathLibrary::FindLookAtRotation(GetActorLocation(), TargetToAttack->GetActorLocation());
+			GetController()->SetControlRotation(NewRotation);
 
-			// 공격 이벤트를 보냅니다.
 			if (AbilitySystemComponent)
 			{
 				FGameplayEventData Payload;
@@ -302,7 +355,6 @@ void ARamdomItemDefenseCharacter::PerformAttack()
 				FGameplayTag EventTag = FGameplayTag::RequestGameplayTag(FName("Event.Attack.Perform"));
 				UAbilitySystemBlueprintLibrary::SendGameplayEventToActor(this, EventTag, Payload);
 
-				// ... 디버그 메시지 ...
 				if (GEngine)
 				{
 					FString DebugMes = FString::Printf(TEXT("Attacking -> %s"), *TargetToAttack->GetName());

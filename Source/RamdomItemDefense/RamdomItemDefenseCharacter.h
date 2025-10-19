@@ -31,15 +31,12 @@ public:
 	virtual void PossessedBy(AController* NewController) override;
 	virtual void OnRep_PlayerState() override; // PlayerState 복제 시 여전히 필요할 수 있습니다.
 
-	// 블루프린트나 컨트롤러에서 호출할 타겟 설정/해제 함수
+	// 컨트롤러에서 호출할 새로운 통합 공격 명령 함수
 	UFUNCTION(BlueprintCallable, Category = "Combat")
-	void SetManualTarget(AActor* NewTarget);
+	void OrderAttack(AActor* Target);
 
+	// 컨트롤러가 호출할 모든 타겟 해제 함수
 	UFUNCTION(BlueprintCallable, Category = "Combat")
-	void ClearManualTarget();
-
-	// 컨트롤러가 호출할 새로운 함수들
-	void SetPendingManualTarget(AActor* NewTarget);
 	void ClearAllTargets();
 
 	// AI 이동이 완료되면 호출될 함수
@@ -84,6 +81,10 @@ protected:
 	void FindTarget();
 	void PerformAttack();
 	void ApplyDefaultStats();
+
+	// -- 타겟 설정 내부 함수 --
+	void SetManualTarget(AActor* NewTarget);
+	void SetPendingManualTarget(AActor* NewTarget);
 
 	// 변수 복제를 위해 GetLifetimeReplicatedProps 함수 재정의
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
