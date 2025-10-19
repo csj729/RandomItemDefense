@@ -39,9 +39,6 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Combat")
 	void ClearAllTargets();
 
-	// AI 이동이 완료되면 호출될 함수
-	void OnMoveCompleted(FAIRequestID RequestID, const FPathFollowingResult& Result);
-
 	FORCEINLINE const UMyAttributeSet* GetAttributeSet() const { return AttributeSet; }
 
 
