@@ -1,19 +1,23 @@
-// MonsterBaseCharacter.cpp
-
 #include "MonsterBaseCharacter.h"
 #include "MonsterAttributeSet.h"
+#include "MonsterSpawner.h"
 
 AMonsterBaseCharacter::AMonsterBaseCharacter()
 {
-    PrimaryActorTick.bCanEverTick = false; // 특별한 경우가 아니면 몬스터 틱은 꺼두는 것이 성능에 좋습니다.
+    PrimaryActorTick.bCanEverTick = false;
 
     AbilitySystemComponent = CreateDefaultSubobject<UAbilitySystemComponent>(TEXT("AbilitySystemComponent"));
     AbilitySystemComponent->SetIsReplicated(true);
-    AbilitySystemComponent->SetReplicationMode(EGameplayEffectReplicationMode::Minimal); // AI는 Minimal 모드로 충분합니다.
+    AbilitySystemComponent->SetReplicationMode(EGameplayEffectReplicationMode::Minimal);
 
     AttributeSet = CreateDefaultSubobject<UMonsterAttributeSet>(TEXT("AttributeSet"));
 
-    GoldOnDeath = 10; // 기본 골드값
+    GoldOnDeath = 10;
+
+    // ================== [코드 추가] ==================
+    // 이 폰(Pawn)이 월드에 배치되거나 스폰될 때 AI 컨트롤러를 자동으로 갖도록 설정합니다.
+    AutoPossessAI = EAutoPossessAI::PlacedInWorldOrSpawned;
+    // ===============================================
 }
 
 UAbilitySystemComponent* AMonsterBaseCharacter::GetAbilitySystemComponent() const
@@ -29,7 +33,7 @@ void AMonsterBaseCharacter::BeginPlay()
     {
         AbilitySystemComponent->InitAbilityActorInfo(this, this);
 
-        if (AttributeSet) // AttributeSet이 유효한지 확인
+        if (AttributeSet)
         {
             AbilitySystemComponent->GetGameplayAttributeValueChangeDelegate(AttributeSet->GetHealthAttribute()).AddUObject(this, &AMonsterBaseCharacter::HandleHealthChanged);
         }
@@ -41,10 +45,21 @@ void AMonsterBaseCharacter::HandleHealthChanged(const FOnAttributeChangeData& Da
     // 체력이 0 이하로 떨어졌을 때 죽음 로직을 실행합니다.
     if (Data.NewValue <= 0.f)
     {
+        // 나를 생성한 스포너가 있다면, 죽음을 알립니다.
+        if (MySpawner)
+        {
+            MySpawner->OnMonsterKilled();
+        }
+
         // TODO: 사망 애니메이션, 이펙트 재생 로직 추가
 
         // TODO: GameMode나 PlayerState에 골드 획득을 요청하는 로직 추가
 
-        Destroy(); // 액터를 파괴합니다.
+        Destroy();
     }
+}
+
+void AMonsterBaseCharacter::SetSpawner(AMonsterSpawner* InSpawner)
+{
+    MySpawner = InSpawner;
 }

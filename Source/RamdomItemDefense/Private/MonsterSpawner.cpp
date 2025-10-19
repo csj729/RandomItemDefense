@@ -1,0 +1,116 @@
+#include "MonsterSpawner.h"
+#include "MonsterBaseCharacter.h"
+#include "Engine/World.h"
+#include "DrawDebugHelpers.h"
+#include "Engine/Engine.h"
+
+AMonsterSpawner::AMonsterSpawner()
+{
+	PrimaryActorTick.bCanEverTick = false;
+	TotalToSpawn = 0;
+	SpawnCounter = 0;
+	bEnableDebug = true;
+	CurrentMonsterCount = 0;
+	bIsGameOver = false;
+}
+
+void AMonsterSpawner::BeginPlay()
+{
+	Super::BeginPlay();
+}
+
+void AMonsterSpawner::BeginSpawning(TSubclassOf<AMonsterBaseCharacter> MonsterClass, int32 Count)
+{
+	// 만약 이 스테이지가 게임오버 상태라면, 아무것도 하지 않고 즉시 함수를 종료합니다.
+	if (bIsGameOver)
+	{
+		return;
+	}
+
+	MonsterClassToSpawn = MonsterClass;
+	TotalToSpawn = Count;
+	SpawnCounter = 0;
+
+	if (bEnableDebug && GEngine)
+	{
+		FString MonsterName = GetNameSafe(MonsterClassToSpawn);
+		FString DebugMessage = FString::Printf(TEXT("Spawner '%s' received command: Spawn %d of '%s'."), *GetName(), Count, *MonsterName);
+		GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Cyan, DebugMessage);
+	}
+
+	if (MonsterClassToSpawn && TotalToSpawn > 0)
+	{
+		GetWorld()->GetTimerManager().SetTimer(
+			SpawnTimerHandle,
+			this,
+			&AMonsterSpawner::SpawnMonster,
+			1.0f,
+			true,
+			0.0f
+		);
+	}
+}
+
+void AMonsterSpawner::SpawnMonster()
+{
+	if (SpawnCounter < TotalToSpawn && MonsterClassToSpawn)
+	{
+		UWorld* World = GetWorld();
+		if (World)
+		{
+			FActorSpawnParameters SpawnParams;
+			SpawnParams.Owner = this;
+			SpawnParams.Instigator = GetInstigator();
+
+			AMonsterBaseCharacter* SpawnedMonster = World->SpawnActor<AMonsterBaseCharacter>(MonsterClassToSpawn, GetActorLocation(), GetActorRotation(), SpawnParams);
+
+			if (SpawnedMonster)
+			{
+				// 스폰된 몬스터에게 "너를 스폰한 스포너는 나야" 라고 알려줍니다.
+				SpawnedMonster->SetSpawner(this);
+				CurrentMonsterCount++; // 스폰 성공 시 카운트 증가
+			}
+
+			SpawnCounter++;
+
+			if (bEnableDebug)
+			{
+				if (GEngine)
+				{
+					FString DebugMessage = FString::Printf(TEXT("Spawner '%s' spawned monster #%d/%d. (Live: %d)"), *GetName(), SpawnCounter, TotalToSpawn, CurrentMonsterCount);
+					GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Green, DebugMessage);
+				}
+				DrawDebugSphere(GetWorld(), GetActorLocation(), 100.0f, 12, FColor::Green, false, 2.0f);
+			}
+		}
+	}
+	else
+	{
+		if (bEnableDebug && GEngine)
+		{
+			FString DebugMessage = FString::Printf(TEXT("Spawner '%s' finished spawning wave."), *GetName());
+			GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::White, DebugMessage);
+		}
+		GetWorld()->GetTimerManager().ClearTimer(SpawnTimerHandle);
+	}
+}
+
+void AMonsterSpawner::OnMonsterKilled()
+{
+	if (CurrentMonsterCount > 0)
+	{
+		CurrentMonsterCount--;
+	}
+}
+
+void AMonsterSpawner::SetGameOver()
+{
+	bIsGameOver = true;
+	GetWorld()->GetTimerManager().ClearTimer(SpawnTimerHandle);
+
+	if (bEnableDebug && GEngine)
+	{
+		FString GameOverMsg = FString::Printf(TEXT("Spawner '%s' is now in GAME OVER state."), *GetName());
+		GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Magenta, GameOverMsg);
+	}
+}

@@ -1,0 +1,64 @@
+#include "MonsterAIController.h"
+#include "BehaviorTree/BehaviorTree.h"
+#include "BehaviorTree/BlackboardComponent.h"
+#include "MonsterBaseCharacter.h"
+#include "Kismet/GameplayStatics.h"
+#include "Engine/Engine.h" // GEngine 사용
+
+// 생성자는 이전과 동일
+AMonsterAIController::AMonsterAIController()
+{
+	BlackboardComponent = CreateDefaultSubobject<UBlackboardComponent>(TEXT("BlackboardComponent"));
+}
+
+// OnPossess 함수를 아래와 같이 수정합니다.
+void AMonsterAIController::OnPossess(APawn* InPawn)
+{
+	Super::OnPossess(InPawn);
+
+	// ================== [AI 디버깅 1-1] ==================
+	// 컨트롤러가 폰에 빙의되었는지 확인
+	if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 10.f, FColor::Cyan, TEXT("AIController: OnPossess called."));
+
+	if (BehaviorTree)
+	{
+		// 블랙보드를 초기화하고 비헤이비어 트리를 실행합니다.
+		BlackboardComponent->InitializeBlackboard(*BehaviorTree->BlackboardAsset);
+
+		// ================== [AI 디버깅 1-2] ==================
+		// 월드에 배치된 BP_MonsterPath 액터를 찾습니다.
+		// BP_MonsterPath의 부모인 Actor 클래스로 찾고, 태그를 이용해 더 정확히 찾습니다.
+		// (레벨에 있는 BP_MonsterPath 액터의 디테일 패널에서 Actor > Tags에 "MonsterPath" 태그를 추가해주세요.)
+		TArray<AActor*> FoundPaths;
+		UGameplayStatics::GetAllActorsWithTag(GetWorld(), FName("MonsterPath"), FoundPaths);
+
+		AActor* PathActor = nullptr;
+		if (FoundPaths.Num() > 0)
+		{
+			PathActor = FoundPaths[0];
+			FString PathName = GetNameSafe(PathActor);
+			if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 10.f, FColor::Green, FString::Printf(TEXT("AIController: Found Path Actor '%s'."), *PathName));
+		}
+		else
+		{
+			if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 10.f, FColor::Red, TEXT("AIController: ERROR! Could not find Actor with tag 'MonsterPath'."));
+		}
+		// =======================================================
+
+		if (PathActor)
+		{
+			// 블랙보드에 경로 액터와 시작 인덱스를 저장합니다.
+			BlackboardComponent->SetValueAsObject(TEXT("PathToFollow"), PathActor);
+			BlackboardComponent->SetValueAsInt(TEXT("CurrentSplinePointIndex"), 0);
+
+			if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 10.f, FColor::Green, TEXT("AIController: Set 'PathToFollow' on Blackboard."));
+		}
+
+		RunBehaviorTree(BehaviorTree);
+		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 10.f, FColor::Cyan, TEXT("AIController: RunBehaviorTree called."));
+	}
+	else
+	{
+		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 10.f, FColor::Red, TEXT("AIController: ERROR! BehaviorTree is NOT assigned."));
+	}
+}
