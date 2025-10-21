@@ -6,6 +6,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "MonsterWaveData.h"
 #include "MonsterSpawner.h"
+#include "GameFramework/PlayerState.h"
 #include "Engine/Engine.h"
 
 ARamdomItemDefenseGameMode::ARamdomItemDefenseGameMode()
@@ -28,29 +29,95 @@ void ARamdomItemDefenseGameMode::BeginPlay()
 		GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Yellow, TEXT("GameMode BeginPlay called. Game has started!"));
 	}
 
-	// 레벨에 있는 모든 MonsterSpawner 액터를 찾아서 MonsterSpawners 배열에 추가합니다.
-	TArray<AActor*> FoundSpawners;
-	UGameplayStatics::GetAllActorsOfClass(GetWorld(), AMonsterSpawner::StaticClass(), FoundSpawners);
-
-	for (AActor* SpawnerActor : FoundSpawners)
-	{
-		AMonsterSpawner* Spawner = Cast<AMonsterSpawner>(SpawnerActor);
-		if (Spawner)
-		{
-			MonsterSpawners.Add(Spawner);
-		}
-	}
-
-	if (GEngine)
-	{
-		FString SpawnerCountMsg = FString::Printf(TEXT("Dynamically found %d Spawners in the level."), MonsterSpawners.Num());
-		GEngine->AddOnScreenDebugMessage(-1, 10.0f, FColor::Magenta, SpawnerCountMsg);
-	}
-	// ===============================================
+	// --- [코드 이동] ---
+	// 스포너를 찾는 로직을 OnPostLogin으로 이동시킵니다.
+	// (BeginPlay에서는 타이머만 설정합니다)
+	// ------------------
 
 	FTimerHandle FirstWaveStartTimer;
 	GetWorld()->GetTimerManager().SetTimer(FirstWaveStartTimer, this, &ARamdomItemDefenseGameMode::StartNextWave, 3.0f, false);
 	GetWorld()->GetTimerManager().SetTimer(GameOverCheckTimerHandle, this, &ARamdomItemDefenseGameMode::CheckGameOver, 0.5f, true);
+}
+
+void ARamdomItemDefenseGameMode::OnPostLogin(AController* NewPlayer)
+{
+	Super::OnPostLogin(NewPlayer); // 부모 함수를 먼저 호출합니다.
+
+	// 서버에서만, 그리고 스포너 목록이 비어있을 때 딱 한 번만 실행합니다.
+	if (HasAuthority() && MonsterSpawners.Num() == 0)
+	{
+		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 10.f, FColor::Magenta, TEXT("First player logged in. Finding Spawners..."));
+
+		TArray<AActor*> FoundSpawners;
+		UGameplayStatics::GetAllActorsOfClass(GetWorld(), AMonsterSpawner::StaticClass(), FoundSpawners);
+
+		for (AActor* SpawnerActor : FoundSpawners)
+		{
+			AMonsterSpawner* Spawner = Cast<AMonsterSpawner>(SpawnerActor);
+			if (Spawner)
+			{
+				MonsterSpawners.Add(Spawner);
+			}
+		}
+
+		if (GEngine)
+		{
+			FString SpawnerCountMsg = FString::Printf(TEXT("Dynamically found %d Spawners in the level."), MonsterSpawners.Num());
+			GEngine->AddOnScreenDebugMessage(-1, 10.0f, FColor::Magenta, SpawnerCountMsg);
+		}
+
+		// (선택 사항: 스포너를 이름순으로 정렬하여 인덱스를 고정시킬 수 있습니다)
+		 MonsterSpawners.Sort([](const TObjectPtr<AMonsterSpawner>& A, const TObjectPtr<AMonsterSpawner>& B) {
+		 	return A->GetName() < B->GetName();
+		 });
+	}
+
+	if (NewPlayer == nullptr) return;
+
+	// 새로 접속한 플레이어의 PlayerState를 가져옵니다.
+	AMyPlayerState* MyPS = NewPlayer->GetPlayerState<AMyPlayerState>();
+	if (MyPS == nullptr) return;
+
+	// GameState를 가져옵니다. (OnPostLogin 시점에는 GameState가 항상 유효합니다)
+	AMyGameState* MyGameState = GetGameState<AMyGameState>();
+	if (MyGameState == nullptr) return;
+
+	// GameState의 PlayerArray에서 방금 접속한 플레이어의 인덱스(순서)를 찾습니다.
+	// (호스트 = 0, 첫 번째 클라이언트 = 1, ...)
+	int32 PlayerIndex = MyGameState->PlayerArray.Find(MyPS);
+
+	if (GEngine)
+	{
+		FString Msg = FString::Printf(TEXT("Player %s logged in. Assigned PlayerIndex: %d"), *MyPS->GetPlayerName(), PlayerIndex);
+		GEngine->AddOnScreenDebugMessage(-1, 10.f, FColor::Cyan, Msg);
+	}
+
+	// MonsterSpawners 배열에 해당 인덱스가 유효한지 확인합니다.
+	if (MonsterSpawners.IsValidIndex(PlayerIndex))
+	{
+		// 이 플레이어의 PlayerState에 해당 인덱스의 스포너를 할당합니다.
+		MyPS->MySpawner = MonsterSpawners[PlayerIndex];
+
+		// MySpawner 변수는 Replicated 변수이므로,
+		// 서버가 이 값을 설정하면 자동으로 해당 클라이언트에게 복제됩니다.
+		// 클라이언트에서는 OnRep_MySpawner가 호출되고, UI 바인딩이 일어납니다.
+
+		if (GEngine)
+		{
+			FString SpawnerName = GetNameSafe(MyPS->MySpawner);
+			FString Msg = FString::Printf(TEXT("Assigned Spawner '%s' to PlayerIndex %d"), *SpawnerName, PlayerIndex);
+			GEngine->AddOnScreenDebugMessage(-1, 10.f, FColor::Green, Msg);
+		}
+	}
+	else
+	{
+		// 맵에 배치된 스포너 수보다 많은 플레이어가 접속한 경우
+		if (GEngine)
+		{
+			FString Msg = FString::Printf(TEXT("ERROR: No valid spawner found at index %d for player %s."), PlayerIndex, *MyPS->GetPlayerName());
+			GEngine->AddOnScreenDebugMessage(-1, 10.f, FColor::Red, Msg);
+		}
+	}
 }
 
 void ARamdomItemDefenseGameMode::StartNextWave()

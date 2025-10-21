@@ -20,6 +20,9 @@ public:
 protected:
 	virtual void BeginPlay() override;
 
+	/** 플레이어가 성공적으로 로그인했을 때 서버에서 호출됩니다. (PIE, Listen, Dedicated 모두) */
+	virtual void OnPostLogin(AController* NewPlayer) override;
+
 private:
 	void StartNextWave();
 	void CheckGameOver();
