@@ -20,6 +20,9 @@ void UMyAttributeSet::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutL
 
     // 아이템 전용 스탯
     DOREPLIFETIME_CONDITION_NOTIFY(UMyAttributeSet, CritChance, COND_None, REPNOTIFY_Always);
+    DOREPLIFETIME_CONDITION_NOTIFY(UMyAttributeSet, StunChance, COND_None, REPNOTIFY_Always);
+
+    // 캐릭터 고정 스탯
     DOREPLIFETIME_CONDITION_NOTIFY(UMyAttributeSet, AttackRange, COND_None, REPNOTIFY_Always);
 
 }
@@ -59,6 +62,11 @@ void UMyAttributeSet::OnRep_SkillActivationChance(const FGameplayAttributeData& 
 void UMyAttributeSet::OnRep_CritChance(const FGameplayAttributeData& OldValue)
 {
     GAMEPLAYATTRIBUTE_REPNOTIFY(UMyAttributeSet, CritChance, OldValue);
+}
+
+void UMyAttributeSet::OnRep_StunChance(const FGameplayAttributeData& OldValue)
+{
+    GAMEPLAYATTRIBUTE_REPNOTIFY(UMyAttributeSet, StunChance, OldValue);
 }
 
 void UMyAttributeSet::OnRep_AttackRange(const FGameplayAttributeData& OldValue)

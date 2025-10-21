@@ -2,6 +2,8 @@
 #include "Net/UnrealNetwork.h"
 #include "Engine/Engine.h"
 #include "MonsterSpawner.h"
+#include "RamdomItemDefenseCharacter.h"
+#include "InventoryComponent.h"
 
 AMyPlayerState::AMyPlayerState()
 {
@@ -78,7 +80,14 @@ void AMyPlayerState::Server_UseRoundChoice_Implementation(bool bChoseItemGacha)
 
 	if (bChoseItemGacha)
 	{
-		// TODO: 아이템 뽑기 로직 (인벤토리 컴포넌트에 아이템 추가)
+		// 이 PlayerState가 소유한 폰(캐릭터)을 가져옵니다.
+		ARamdomItemDefenseCharacter* Character = GetPawn<ARamdomItemDefenseCharacter>();
+		if (Character && Character->GetInventoryComponent())
+		{
+			// 캐릭터의 인벤토리 컴포넌트에게 무작위 아이템을 추가하라고 명령합니다.
+			Character->GetInventoryComponent()->AddRandomItem();
+		}
+
 		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Cyan, TEXT("Player chose: Item Gacha"));
 	}
 	else

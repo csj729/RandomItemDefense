@@ -14,6 +14,7 @@
 // 델리게이트 선언을 이 공용 파일에 *한 번만* 합니다.
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnIntChangedDelegate, int32, NewValue);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnFloatChangedDelegate, float, NewValue);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnInventoryUpdatedDelegate);
 // ------------------
 
 // 아이템 등급 열거형
@@ -41,7 +42,25 @@ enum class EItemStatType : uint8
     CritChance            UMETA(DisplayName = "치명타 확률"),
     ArmorReduction        UMETA(DisplayName = "방어력 감소"),
     MoveSpeedReduction    UMETA(DisplayName = "이동 속도 감소"),
+    StunChance            UMETA(DisplayName = "스턴 확률"),
     SkillActivationChance UMETA(DisplayName = "스킬 발동 확률")
+};
+
+/**
+ * @brief SetByCaller GE에 주입할 스탯 데이터 (데이터 테이블 편집용)
+ */
+USTRUCT(BlueprintType)
+struct FItemStatData
+{
+    GENERATED_BODY()
+
+    /** 이 아이템이 변경할 스탯의 종류입니다. */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    EItemStatType StatType;
+
+    /** 스탯에 더할 값입니다. (예: 10, 0.05) */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    float Value;
 };
 
 // 아이템 데이터 구조체
@@ -62,8 +81,9 @@ struct RAMDOMITEMDEFENSE_API FItemData : public FTableRowBase // 여기에 API 매크
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Item Data")
     EItemGrade Grade;
 
+    /** (SetByCaller) 이 아이템이 제공하는 기본 스탯 목록입니다. */
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "GAS")
-    TSubclassOf<UGameplayEffect> StatEffect;
+    TArray<FItemStatData> BaseStats;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "GAS")
     TSubclassOf<UGameplayAbility> GrantedAbility;

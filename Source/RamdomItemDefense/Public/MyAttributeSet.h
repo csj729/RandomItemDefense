@@ -56,6 +56,10 @@ public:
     FGameplayAttributeData CritChance;
     ATTRIBUTE_ACCESSORS(UMyAttributeSet, CritChance);
 
+    UPROPERTY(BlueprintReadOnly, Category = "Attributes", ReplicatedUsing = OnRep_StunChance)
+    FGameplayAttributeData StunChance;
+    ATTRIBUTE_ACCESSORS(UMyAttributeSet, StunChance);
+
     // --- 고정 스탯 (캐릭터마다 정해진 고정값) ---
     UPROPERTY(BlueprintReadOnly, Category = "Attributes", ReplicatedUsing = OnRep_AttackRange)
     FGameplayAttributeData AttackRange;
@@ -77,6 +81,8 @@ protected:
     virtual void OnRep_SkillActivationChance(const FGameplayAttributeData& OldValue);
     UFUNCTION()
     virtual void OnRep_CritChance(const FGameplayAttributeData& OldValue);
+    UFUNCTION()
+    virtual void OnRep_StunChance(const FGameplayAttributeData& OldValue);
     UFUNCTION()
     virtual void OnRep_AttackRange(const FGameplayAttributeData& OldValue);
 };

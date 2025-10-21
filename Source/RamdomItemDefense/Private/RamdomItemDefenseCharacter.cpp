@@ -12,6 +12,7 @@
 #include "AbilitySystemComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "AttackComponent.h"
+#include "InventoryComponent.h"
 
 ARamdomItemDefenseCharacter::ARamdomItemDefenseCharacter()
 {
@@ -50,6 +51,7 @@ ARamdomItemDefenseCharacter::ARamdomItemDefenseCharacter()
 	AttributeSet = CreateDefaultSubobject<UMyAttributeSet>(TEXT("AttributeSet"));
 
 	AttackComponent = CreateDefaultSubobject<UAttackComponent>(TEXT("AttackComponent"));
+	InventoryComponent = CreateDefaultSubobject<UInventoryComponent>(TEXT("InventoryComponent"));
 
 	// Activate ticking in order to update the cursor every frame.
 	PrimaryActorTick.bCanEverTick = true;
@@ -97,6 +99,11 @@ void ARamdomItemDefenseCharacter::PossessedBy(AController* NewController)
 			AbilitySystemComponent->GiveAbility(FGameplayAbilitySpec(DefaultAttackAbility));
 		}
 	}
+
+	if (InventoryComponent)
+	{
+		InventoryComponent->Initialize(AbilitySystemComponent);
+	}
 }
 
 void ARamdomItemDefenseCharacter::OnRep_PlayerState()
@@ -107,6 +114,11 @@ void ARamdomItemDefenseCharacter::OnRep_PlayerState()
 	{
 		AbilitySystemComponent->InitAbilityActorInfo(this, this);
 		ApplyDefaultStats();
+	}
+
+	if (InventoryComponent)
+	{
+		InventoryComponent->Initialize(AbilitySystemComponent);
 	}
 }
 

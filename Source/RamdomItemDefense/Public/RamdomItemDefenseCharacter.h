@@ -11,6 +11,7 @@
 
 // 전방 선언
 class UAttackComponent;
+class UInventoryComponent;
 
 UCLASS(Blueprintable)
 class ARamdomItemDefenseCharacter : public ACharacter, public IAbilitySystemInterface
@@ -29,12 +30,16 @@ public:
 
 	FORCEINLINE const UMyAttributeSet* GetAttributeSet() const { return AttributeSet; }
 	FORCEINLINE UAttackComponent* GetAttackComponent() const { return AttackComponent; }
+	FORCEINLINE UInventoryComponent* GetInventoryComponent() const { return InventoryComponent; }
 
 protected:
 	virtual void BeginPlay() override;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UAttackComponent> AttackComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TObjectPtr<UInventoryComponent> InventoryComponent;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "GAS", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UAbilitySystemComponent> AbilitySystemComponent;
