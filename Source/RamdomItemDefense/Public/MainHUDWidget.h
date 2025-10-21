@@ -35,23 +35,11 @@ protected:
 	UFUNCTION(BlueprintImplementableEvent, Category = "UI Events")
 	void OnGoldChanged(int32 NewGold);
 
-	/** (WBP_MainHUD에서 구현) 라운드 선택 횟수가 변경될 때 호출됩니다. (패널 보이기/숨기기 처리) */
-	UFUNCTION(BlueprintImplementableEvent, Category = "UI Events")
-	void OnChoiceCountChanged(int32 NewCount);
-
 	/** (WBP_MainHUD에서 구현) 몬스터 수가 변경될 때 호출됩니다. */
 	UFUNCTION(BlueprintImplementableEvent, Category = "UI Events")
 	void OnMonsterCountChanged(int32 NewCount, int32 MaxCount);
 
 	// --- 블루프린트(UMG)의 버튼이 클릭할 함수 ---
-
-		/** (WBP_MainHUD의 '아이템 뽑기' 버튼에 연결) */
-	UFUNCTION(BlueprintCallable, Category = "UI Actions")
-	void HandleItemGachaClicked();
-
-	/** (WBP_MainHUD의 '골드 도박' 버튼에 연결) */
-	UFUNCTION(BlueprintCallable, Category = "UI Actions")
-	void HandleGoldGambleClicked();
 
 	/** (WBP_MainHUD의 '스탯 강화' 버튼에 연결) */
 	UFUNCTION(BlueprintCallable, Category = "UI Actions")

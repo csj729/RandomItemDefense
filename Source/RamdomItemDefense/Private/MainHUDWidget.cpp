@@ -44,12 +44,10 @@ void UMainHUDWidget::BindPlayerStateEvents()
 	{
 		// PlayerState의 C++ 델리게이트에 이 위젯의 UFUNCTION을 바인딩합니다.
 		MyPlayerState->OnGoldChangedDelegate.AddDynamic(this, &UMainHUDWidget::OnGoldChanged);
-		MyPlayerState->OnChoiceCountChangedDelegate.AddDynamic(this, &UMainHUDWidget::OnChoiceCountChanged);
 		MyPlayerState->OnSpawnerAssignedDelegate.AddDynamic(this, &UMainHUDWidget::HandleSpawnerAssigned);
 
 		// 바인딩 직후, 현재 값으로 UI를 즉시 업데이트하도록 이벤트를 호출합니다.
 		OnGoldChanged(MyPlayerState->GetGold());
-		OnChoiceCountChanged(MyPlayerState->GetChoiceCount());
 
 		if (MyPlayerState->MySpawner)
 		{
@@ -71,25 +69,6 @@ void UMainHUDWidget::BindSpawnerEvents()
 }
 
 // --- 버튼 클릭 핸들러 ---
-
-void UMainHUDWidget::HandleItemGachaClicked()
-{
-	if (MyPlayerState)
-	{
-		// 서버에 "아이템 뽑기"를 선택했다고 알립니다.
-		MyPlayerState->Server_UseRoundChoice(true);
-	}
-}
-
-void UMainHUDWidget::HandleGoldGambleClicked()
-{
-	if (MyPlayerState)
-	{
-		// 서버에 "골드 도박"을 선택했다고 알립니다.
-		MyPlayerState->Server_UseRoundChoice(false);
-	}
-}
-
 void UMainHUDWidget::HandleStatUpgradeClicked()
 {
 	 if (MyPlayerController)

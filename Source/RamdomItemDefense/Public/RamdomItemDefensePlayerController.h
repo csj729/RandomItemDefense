@@ -16,6 +16,8 @@ class UInputAction;
 class UMainHUDWidget;
 class UStatUpgradeWidget;
 class UInventoryWidget;
+class URoundChoiceWidget;
+class AMyPlayerState;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
 
@@ -62,6 +64,11 @@ protected:
 
 	// To add mapping context
 	virtual void BeginPlay();
+	virtual void OnPossess(APawn* InPawn) override;
+
+	/** PlayerState의 ChoiceCount 변경 시 호출될 함수 */
+	UFUNCTION()
+	void OnPlayerChoiceCountChanged(int32 NewCount);
 
 	/** Input handlers for SetDestination action. */
 	void OnInputStarted();
@@ -82,6 +89,10 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "UI")
 	TSubclassOf<UUserWidget> InventoryWidgetClass; // 부모를 UInventoryWidget으로 해도 됩니다.
 
+	/** WBP_RoundChoice 블루프린트 클래스 */
+	UPROPERTY(EditDefaultsOnly, Category = "UI")
+	TSubclassOf<URoundChoiceWidget> RoundChoiceWidgetClass;
+
 	/** 실제 생성된 메인 HUD 위젯 인스턴스 */
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "UI")
 	TObjectPtr<UMainHUDWidget> MainHUDInstance;
@@ -93,6 +104,13 @@ protected:
 	/** 실제 생성된 인벤토리 위젯 인스턴스 */
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "UI")
 	TObjectPtr<UUserWidget> InventoryInstance;
+
+	/** 생성된 라운드 선택 위젯 인스턴스 */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "UI")
+	TObjectPtr<URoundChoiceWidget> RoundChoiceInstance;
+
+	UPROPERTY()
+	TObjectPtr<AMyPlayerState> MyPlayerStateRef;
 
 private:
 	FVector CachedDestination;

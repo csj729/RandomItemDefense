@@ -1,4 +1,4 @@
-// ItemTypes.h
+ï»¿// ItemTypes.h
 
 #pragma once
 
@@ -10,62 +10,61 @@
 
 #define GAMEOVER_MONSTER_NUM 60
 
-
-// µ¨¸®°ÔÀÌÆ® ¼±¾ğÀ» ÀÌ °ø¿ë ÆÄÀÏ¿¡ *ÇÑ ¹ø¸¸* ÇÕ´Ï´Ù.
+// ë¸ë¦¬ê²Œì´íŠ¸ ì„ ì–¸
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnIntChangedDelegate, int32, NewValue);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnFloatChangedDelegate, float, NewValue);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnInventoryUpdatedDelegate);
-// ------------------
 
-// ¾ÆÀÌÅÛ µî±Ş ¿­°ÅÇü
+
+// ì•„ì´í…œ ë“±ê¸‰ ì—´ê±°í˜•
 UENUM(BlueprintType)
 enum class EItemGrade : uint8
 {
-    Common       UMETA(DisplayName = "ÈçÇÔ"),
-    Uncommon     UMETA(DisplayName = "¾ÈÈçÇÔ"),
-    Special      UMETA(DisplayName = "Æ¯º°ÇÔ"),
-    Rare         UMETA(DisplayName = "Èñ±ÍÇÔ"),
-    Legendary    UMETA(DisplayName = "Àü¼³ÀûÀÎ"),
-    Hidden       UMETA(DisplayName = "È÷µç"),
-    Transcendent UMETA(DisplayName = "ÃÊ¿ùÀûÀÎ"),
-    Immortal     UMETA(DisplayName = "ºÒ¸êÀÇ"),
-    Eternal      UMETA(DisplayName = "¿µ¿øÇÔ")
+    Common       UMETA(DisplayName = "í”í•¨"),
+    Uncommon     UMETA(DisplayName = "ì•ˆí”í•¨"),
+    Special      UMETA(DisplayName = "íŠ¹ë³„í•¨"),
+    Rare         UMETA(DisplayName = "í¬ê·€í•¨"),
+    Legendary    UMETA(DisplayName = "ì „ì„¤ì ì¸"),
+    Hidden       UMETA(DisplayName = "íˆë“ "),
+    Transcendent UMETA(DisplayName = "ì´ˆì›”ì ì¸"),
+    Immortal     UMETA(DisplayName = "ë¶ˆë©¸ì˜"),
+    Eternal      UMETA(DisplayName = "ì˜ì›í•¨")
 };
 
-// ½ºÅÈ Á¾·ù ¿­°ÅÇü
+// ìŠ¤íƒ¯ ì¢…ë¥˜ ì—´ê±°í˜•
 UENUM(BlueprintType)
 enum class EItemStatType : uint8
 {
-    AttackDamage          UMETA(DisplayName = "°ø°İ·Â"),
-    AttackSpeed           UMETA(DisplayName = "°ø°İ ¼Óµµ"),
-    CritDamage            UMETA(DisplayName = "Ä¡¸íÅ¸ ÇÇÇØ"),
-    CritChance            UMETA(DisplayName = "Ä¡¸íÅ¸ È®·ü"),
-    ArmorReduction        UMETA(DisplayName = "¹æ¾î·Â °¨¼Ò"),
-    MoveSpeedReduction    UMETA(DisplayName = "ÀÌµ¿ ¼Óµµ °¨¼Ò"),
-    StunChance            UMETA(DisplayName = "½ºÅÏ È®·ü"),
-    SkillActivationChance UMETA(DisplayName = "½ºÅ³ ¹ßµ¿ È®·ü")
+    AttackDamage          UMETA(DisplayName = "ê³µê²©ë ¥"),
+    AttackSpeed           UMETA(DisplayName = "ê³µê²© ì†ë„"),
+    CritDamage            UMETA(DisplayName = "ì¹˜ëª…íƒ€ í”¼í•´"),
+    CritChance            UMETA(DisplayName = "ì¹˜ëª…íƒ€ í™•ë¥ "),
+    ArmorReduction        UMETA(DisplayName = "ë°©ì–´ë ¥ ê°ì†Œ"),
+    MoveSpeedReduction    UMETA(DisplayName = "ì´ë™ ì†ë„ ê°ì†Œ"),
+    StunChance            UMETA(DisplayName = "ìŠ¤í„´ í™•ë¥ "), // MyAttributeSetì—ë„ ìˆì–´ì•¼ í•¨
+    SkillActivationChance UMETA(DisplayName = "ìŠ¤í‚¬ ë°œë™ í™•ë¥ ")
 };
 
 /**
- * @brief SetByCaller GE¿¡ ÁÖÀÔÇÒ ½ºÅÈ µ¥ÀÌÅÍ (µ¥ÀÌÅÍ Å×ÀÌºí ÆíÁı¿ë)
+ * @brief SetByCaller GEì— ì£¼ì…í•  ìŠ¤íƒ¯ ë°ì´í„° (ë°ì´í„° í…Œì´ë¸” í¸ì§‘ìš©)
  */
 USTRUCT(BlueprintType)
 struct FItemStatData
 {
     GENERATED_BODY()
 
-    /** ÀÌ ¾ÆÀÌÅÛÀÌ º¯°æÇÒ ½ºÅÈÀÇ Á¾·ùÀÔ´Ï´Ù. */
+    /** ì´ ì•„ì´í…œì´ ë³€ê²½í•  ìŠ¤íƒ¯ì˜ ì¢…ë¥˜ì…ë‹ˆë‹¤. */
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
     EItemStatType StatType;
 
-    /** ½ºÅÈ¿¡ ´õÇÒ °ªÀÔ´Ï´Ù. (¿¹: 10, 0.05) */
+    /** ìŠ¤íƒ¯ì— ë”í•  ê°’ì…ë‹ˆë‹¤. (ì˜ˆ: 10, 0.05) */
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
     float Value;
 };
 
-// ¾ÆÀÌÅÛ µ¥ÀÌÅÍ ±¸Á¶Ã¼
+// ì•„ì´í…œ ë°ì´í„° êµ¬ì¡°ì²´
 USTRUCT(BlueprintType)
-struct RAMDOMITEMDEFENSE_API FItemData : public FTableRowBase // ¿©±â¿¡ API ¸ÅÅ©·Î Ãß°¡
+struct RAMDOMITEMDEFENSE_API FItemData : public FTableRowBase
 {
     GENERATED_BODY()
 
@@ -81,7 +80,7 @@ struct RAMDOMITEMDEFENSE_API FItemData : public FTableRowBase // ¿©±â¿¡ API ¸ÅÅ©
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Item Data")
     EItemGrade Grade;
 
-    /** (SetByCaller) ÀÌ ¾ÆÀÌÅÛÀÌ Á¦°øÇÏ´Â ±âº» ½ºÅÈ ¸ñ·ÏÀÔ´Ï´Ù. */
+    /** (SetByCaller) ì´ ì•„ì´í…œì´ ì œê³µí•˜ëŠ” ê¸°ë³¸ ìŠ¤íƒ¯ ëª©ë¡ì…ë‹ˆë‹¤. */
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "GAS")
     TArray<FItemStatData> BaseStats;
 
@@ -92,9 +91,9 @@ struct RAMDOMITEMDEFENSE_API FItemData : public FTableRowBase // ¿©±â¿¡ API ¸ÅÅ©
     FText AbilityDescription;
 };
 
-// Á¶ÇÕ¹ı µ¥ÀÌÅÍ ±¸Á¶Ã¼
+// ì¡°í•©ë²• ë°ì´í„° êµ¬ì¡°ì²´
 USTRUCT(BlueprintType)
-struct RAMDOMITEMDEFENSE_API FRecipeData : public FTableRowBase // ¿©±â¿¡ API ¸ÅÅ©·Î Ãß°¡
+struct RAMDOMITEMDEFENSE_API FRecipeData : public FTableRowBase
 {
     GENERATED_BODY()
 

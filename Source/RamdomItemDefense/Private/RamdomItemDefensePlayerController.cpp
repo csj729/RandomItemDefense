@@ -16,6 +16,8 @@
 #include "NavigationSystem.h"
 #include "Blueprint/UserWidget.h"
 #include "MainHUDWidget.h"
+#include "RoundChoiceWidget.h"
+#include "MyPlayerState.h"
 #include "Engine/LocalPlayer.h"
 
 
@@ -66,6 +68,44 @@ void ARamdomItemDefensePlayerController::BeginPlay()
 			{
 				InventoryInstance = CreateWidget<UUserWidget>(this, InventoryWidgetClass);
 			}
+
+			// 4. 라운드 선택 위젯 생성 (화면에 바로 추가하지 않음)
+			if (RoundChoiceWidgetClass)
+			{
+				RoundChoiceInstance = CreateWidget<URoundChoiceWidget>(this, RoundChoiceWidgetClass);
+			}
+		}
+	}
+}
+
+void ARamdomItemDefensePlayerController::OnPossess(APawn* InPawn)
+{
+	Super::OnPossess(InPawn);
+
+	// 로컬 플레이어 컨트롤러인 경우에만 PlayerState 델리게이트 바인딩
+	if (IsLocalPlayerController())
+	{
+		MyPlayerStateRef = GetPlayerState<AMyPlayerState>();
+		if (MyPlayerStateRef)
+		{
+			// PlayerState의 선택 횟수 변경 델리게이트에 컨트롤러 함수 바인딩
+			MyPlayerStateRef->OnChoiceCountChangedDelegate.AddDynamic(this, &ARamdomItemDefensePlayerController::OnPlayerChoiceCountChanged);
+
+			// 초기 상태 반영 (게임 시작 시 ChoiceCount가 0 이상일 경우 대비)
+			OnPlayerChoiceCountChanged(MyPlayerStateRef->GetChoiceCount());
+		}
+		else
+		{
+			// 아직 PlayerState가 준비되지 않았다면 잠시 후 재시도
+			// (보통 OnPossess 시점에는 유효하지만 안전하게 처리)
+			GetWorld()->GetTimerManager().SetTimerForNextTick([this]() {
+				MyPlayerStateRef = GetPlayerState<AMyPlayerState>();
+				if (MyPlayerStateRef)
+				{
+					MyPlayerStateRef->OnChoiceCountChangedDelegate.AddDynamic(this, &ARamdomItemDefensePlayerController::OnPlayerChoiceCountChanged);
+					OnPlayerChoiceCountChanged(MyPlayerStateRef->GetChoiceCount());
+				}
+				});
 		}
 	}
 }
@@ -193,6 +233,28 @@ void ARamdomItemDefensePlayerController::ToggleInventoryWidget()
 		else
 		{
 			InventoryInstance->AddToViewport();
+		}
+	}
+}
+
+void ARamdomItemDefensePlayerController::OnPlayerChoiceCountChanged(int32 NewCount)
+{
+	if (!IsLocalPlayerController() || !RoundChoiceInstance) return;
+
+	if (NewCount > 0)
+	{
+		// 선택 횟수가 0보다 크면 위젯을 화면에 추가 (이미 있다면 아무 동작 안 함)
+		if (!RoundChoiceInstance->IsInViewport())
+		{
+			RoundChoiceInstance->AddToViewport();
+		}
+	}
+	else
+	{
+		// 선택 횟수가 0 이하면 위젯을 화면에서 제거 (이미 없다면 아무 동작 안 함)
+		if (RoundChoiceInstance->IsInViewport())
+		{
+			RoundChoiceInstance->RemoveFromParent();
 		}
 	}
 }
