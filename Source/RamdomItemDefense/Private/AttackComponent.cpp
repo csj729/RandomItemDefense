@@ -135,6 +135,12 @@ void UAttackComponent::FindTarget()
 
 	for (AActor* Actor : OverlappedActors)
 	{
+		AMonsterBaseCharacter* Monster = Cast<AMonsterBaseCharacter>(Actor);
+		if (Monster && Monster->IsDying())
+		{
+			continue; // 죽어가는 몬스터는 타겟 목록에서 제외합니다.
+		}
+
 		float Distance = OwnerCharacter->GetDistanceTo(Actor);
 		if (Distance < MinDistance)
 		{
@@ -153,6 +159,19 @@ void UAttackComponent::PerformAttack()
 
 	if (TargetToAttack)
 	{
+		// 공격 직전, 타겟이 몬스터이고 죽어가는 상태인지 마지막으로 확인합니다.
+		AMonsterBaseCharacter* TargetMonster = Cast<AMonsterBaseCharacter>(TargetToAttack);
+		if (TargetMonster && TargetMonster->IsDying())
+		{
+			// 타겟이 죽었다면, 더 이상 공격하지 않도록 타겟을 해제합니다.
+			if (TargetToAttack == ManualTarget)
+			{
+				ManualTarget = nullptr;
+			}
+			AutoTarget = nullptr;
+			return; // 공격 로직을 즉시 중단합니다.
+		}
+
 		if (!AttributeSet)
 		{
 			if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("ERROR: AttributeSet is NULL!"));

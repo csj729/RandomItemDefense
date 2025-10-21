@@ -16,6 +16,7 @@ AMonsterBaseCharacter::AMonsterBaseCharacter()
     AttributeSet = CreateDefaultSubobject<UMonsterAttributeSet>(TEXT("AttributeSet"));
 
     GoldOnDeath = 10;
+    bIsDying = false;
 
     // 이 폰(Pawn)이 월드에 배치되거나 스폰될 때 AI 컨트롤러를 자동으로 갖도록 설정합니다.
     AutoPossessAI = EAutoPossessAI::PlacedInWorldOrSpawned;
@@ -60,18 +61,16 @@ void AMonsterBaseCharacter::SetSpawner(AMonsterSpawner* InSpawner)
 
 void AMonsterBaseCharacter::Die(AActor* Killer)
 {
+    if (bIsDying)
+    {
+        return;
+    }
+    bIsDying = true;
+
     // 나를 생성한 스포너가 있다면, 죽음을 알립니다.
     if (MySpawner)
     {
         MySpawner->OnMonsterKilled();
-    }
-
-    // AI 컨트롤러를 가져와서 비헤이비어 트리를 중지시킵니다.
-    AMonsterAIController* AIController = Cast<AMonsterAIController>(GetController());
-    if (AIController && AIController->BrainComponent) // BrainComponent가 유효한지 함께 체크
-    {
-        // IsValid()는 함수가 아니므로 제거하고, StopLogic을 바로 호출합니다.
-        AIController->BrainComponent->StopLogic(TEXT("Monster Died"));
     }
 
     // TODO: 사망 애니메이션, 이펙트 재생 로직 추가

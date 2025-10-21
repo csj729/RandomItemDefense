@@ -31,6 +31,10 @@ public:
 	 */
 	virtual void Die(AActor* Killer);
 
+	/** @brief 몬스터가 이미 죽음 처리 중인지 확인합니다. */
+	UFUNCTION(BlueprintPure, Category = "Stats")
+	bool IsDying() const { return bIsDying; }
+
 protected:
 	virtual void BeginPlay() override;
 
@@ -49,4 +53,8 @@ protected:
 	// 이 몬스터를 스폰한 스포너의 주소
 	UPROPERTY()
 	TObjectPtr<AMonsterSpawner> MySpawner;
+
+	/** 몬스터가 죽음 상태(골드 지급, 파괴 대기)에 진입했는지 여부입니다. */
+	UPROPERTY(VisibleAnywhere, Category = "Stats")
+	bool bIsDying;
 };

@@ -20,81 +20,65 @@ void UMonsterAttributeSet::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>&
 
 void UMonsterAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallbackData& Data)
 {
-    Super::PostGameplayEffectExecute(Data);
+	Super::PostGameplayEffectExecute(Data);
 
-    if (Data.EvaluatedData.Attribute == GetHealthAttribute())
-    {
-        const float OldHealth = GetHealth();
-        // NewHealth는 이미 계산된 후의 값이므로 GetHealth() 대신 사용합니다.
-        const float NewHealth = Data.EvaluatedData.Magnitude + OldHealth;
+	if (Data.EvaluatedData.Attribute == GetHealthAttribute())
+	{
+		// --- [코드 수정] ---
+		// 데미지 적용 *후*의 실제 체력 값을 가져옵니다.
+		const float NewHealth = GetHealth();
 
-        // OldHealth > 0 조건으로 "이미 죽지 않았는지" 반드시 확인합니다.
-        if (NewHealth <= 0.f)
-        {
-            AMonsterBaseCharacter* Monster = Cast<AMonsterBaseCharacter>(GetOwningAbilitySystemComponent()->GetAvatarActor());
+		// 1. 몬스터 액터를 먼저 가져옵니다.
+		AMonsterBaseCharacter* Monster = Cast<AMonsterBaseCharacter>(GetOwningAbilitySystemComponent()->GetAvatarActor());
 
-            // --- [코드 수정] ---
-            // Instigator (유발자)와 EffectCauser (효과 유발자)를 모두 가져옵니다.
-            AActor* InstigatorActor = Data.EffectSpec.GetContext().GetInstigator();
-            AActor* EffectCauserActor = Data.EffectSpec.GetContext().GetEffectCauser();
+		// 2. 몬스터가 유효하고, [핵심] 아직 죽음 상태(bIsDying)가 아닌지 확인합니다.
+		if (Monster && !Monster->IsDying())
+		{
+			// 3. 이 공격으로 인해 체력이 0 이하가 되었는지 확인합니다.
+			if (NewHealth <= 0.f)
+			{
+				// 킬러(Instigator/EffectCauser)를 찾습니다.
+				AActor* InstigatorActor = Data.EffectSpec.GetContext().GetInstigator();
+				AActor* EffectCauserActor = Data.EffectSpec.GetContext().GetEffectCauser();
 
-            // 1. Instigator를 캐스팅해 봅니다.
-            ARamdomItemDefenseCharacter* KillerCharacter = Cast<ARamdomItemDefenseCharacter>(InstigatorActor);
+				ARamdomItemDefenseCharacter* KillerCharacter = Cast<ARamdomItemDefenseCharacter>(InstigatorActor);
+				if (KillerCharacter == nullptr)
+				{
+					KillerCharacter = Cast<ARamdomItemDefenseCharacter>(EffectCauserActor);
+				}
 
-            // 2. 만약 Instigator가 플레이어 캐릭터가 아니라면 (예: PlayerController),
-            //    방금 블루프린트에서 설정한 EffectCauser를 캐스팅해 봅니다.
-            if (KillerCharacter == nullptr)
-            {
-                KillerCharacter = Cast<ARamdomItemDefenseCharacter>(EffectCauserActor);
-            }
-            // ------------------
+				// (디버깅 로그는 유지하셔도 좋습니다)
 
-            // (디버깅을 위해 두 액터의 이름을 모두 출력해봅니다)
-            if (GEngine)
-            {
-                FString InstigatorName = (InstigatorActor) ? InstigatorActor->GetName() : TEXT("NULL (Instigator)");
-                FString CauserName = (EffectCauserActor) ? EffectCauserActor->GetName() : TEXT("NULL (EffectCauser)");
-                GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Cyan, FString::Printf(TEXT("Instigator: %s"), *InstigatorName));
-                GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Cyan, FString::Printf(TEXT("EffectCauser: %s"), *CauserName));
-            }
+				// 4. Die() 함수를 호출합니다. (이 함수 내부에서 bIsDying이 true로 설정됩니다)
+				Monster->Die(KillerCharacter);
 
+				// 5. 킬러가 유효하면 골드를 지급합니다.
+				if (KillerCharacter)
+				{
+					AMyPlayerState* PS = KillerCharacter->GetPlayerState<AMyPlayerState>();
+					if (PS)
+					{
+						const int32 GoldAmount = Monster->GetGoldOnDeath();
+						PS->AddGold(GoldAmount);
 
-            // 1. 몬스터의 죽음 처리를 먼저 호출합니다.
-            if (Monster)
-            {
-                Monster->Die(KillerCharacter);
-            }
-
-            // 2. 킬러와 몬스터가 모두 유효한 경우에만 골드를 지급합니다.
-            if (KillerCharacter && Monster)
-            {
-                AMyPlayerState* PS = KillerCharacter->GetPlayerState<AMyPlayerState>();
-                if (PS)
-                {
-                    const int32 GoldAmount = Monster->GetGoldOnDeath();
-                    PS->AddGold(GoldAmount);
-
-                    if (GEngine)
-                    {
-                        FString GoldMessage = FString::Printf(TEXT("Awarded %d gold to %s for killing %s"),
-                            GoldAmount,
-                            *PS->GetPlayerName(),
-                            *Monster->GetName()
-                        );
-                        GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor::Yellow, GoldMessage);
-                    }
-                }
-            }
-            else if (GEngine) // 킬러 정보를 여전히 못 가져온 경우 디버그 메시지
-            {
-                FString MonsterName = (Monster) ? Monster->GetName() : TEXT("NULL");
-                FString KillerName = (KillerCharacter) ? KillerCharacter->GetName() : TEXT("NULL");
-                GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red,
-                    FString::Printf(TEXT("Gold Award FAILED. Killer: %s, Monster: %s"), *KillerName, *MonsterName));
-            }
-        }
-    }
+						if (GEngine)
+						{
+							FString GoldMessage = FString::Printf(TEXT("Awarded %d gold to %s for killing %s"),
+								GoldAmount,
+								*PS->GetPlayerName(),
+								*Monster->GetName()
+							);
+							GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor::Yellow, GoldMessage);
+						}
+					}
+				}
+				// (킬러 정보가 없는 디버그 로그는 유지하셔도 좋습니다)
+			}
+		}
+		// ------------------
+	}
 }
+
 // RepNotify 함수들 구현
 void UMonsterAttributeSet::OnRep_Health(const FGameplayAttributeData& OldValue) { GAMEPLAYATTRIBUTE_REPNOTIFY(UMonsterAttributeSet, Health, OldValue); }
 void UMonsterAttributeSet::OnRep_MaxHealth(const FGameplayAttributeData& OldValue) { GAMEPLAYATTRIBUTE_REPNOTIFY(UMonsterAttributeSet, MaxHealth, OldValue); }
