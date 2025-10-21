@@ -20,8 +20,6 @@ void UMyAttributeSet::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutL
 
     // 아이템 전용 스탯
     DOREPLIFETIME_CONDITION_NOTIFY(UMyAttributeSet, CritChance, COND_None, REPNOTIFY_Always);
-
-    // 고정 스탯
     DOREPLIFETIME_CONDITION_NOTIFY(UMyAttributeSet, AttackRange, COND_None, REPNOTIFY_Always);
 
 }

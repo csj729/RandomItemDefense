@@ -14,6 +14,8 @@
 #include "Engine/Engine.h"
 #include "AttackComponent.h"
 #include "NavigationSystem.h"
+#include "Blueprint/UserWidget.h"
+#include "MainHUDWidget.h"
 #include "Engine/LocalPlayer.h"
 
 
@@ -30,10 +32,41 @@ ARamdomItemDefensePlayerController::ARamdomItemDefensePlayerController()
 void ARamdomItemDefensePlayerController::BeginPlay()
 {
 	Super::BeginPlay();
-
-	if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
+	// EnhancedInput 및 UI 생성 로직은 로컬 플레이어 컨트롤러에서만 실행되어야 합니다.
+	if (IsLocalPlayerController())
 	{
-		Subsystem->AddMappingContext(DefaultMappingContext, 0);
+		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
+		{
+			Subsystem->AddMappingContext(DefaultMappingContext, 0);
+		}
+
+		// --- UI 생성 ---
+		UWorld* World = GetWorld();
+		if (World)
+		{
+			// 1. 메인 HUD 생성 및 뷰포트 추가
+			if (MainHUDWidgetClass)
+			{
+				MainHUDInstance = CreateWidget<UMainHUDWidget>(this, MainHUDWidgetClass);
+				if (MainHUDInstance)
+				{
+					MainHUDInstance->AddToViewport();
+				}
+			}
+
+			// 2. 스탯 강화창 생성 (숨겨진 상태로)
+			if (StatUpgradeWidgetClass)
+			{
+				StatUpgradeInstance = CreateWidget<UUserWidget>(this, StatUpgradeWidgetClass);
+				// (필요시 StatUpgradeInstance->SetVisibility(ESlateVisibility::Hidden);)
+			}
+
+			// 3. 인벤토리창 생성 (숨겨진 상태로)
+			if (InventoryWidgetClass)
+			{
+				InventoryInstance = CreateWidget<UUserWidget>(this, InventoryWidgetClass);
+			}
+		}
 	}
 }
 
@@ -134,3 +167,32 @@ void ARamdomItemDefensePlayerController::OnTouchReleased()
 	OnSetDestinationReleased();
 }
 
+void ARamdomItemDefensePlayerController::ToggleStatUpgradeWidget()
+{
+	if (StatUpgradeInstance)
+	{
+		if (StatUpgradeInstance->IsInViewport())
+		{
+			StatUpgradeInstance->RemoveFromParent();
+		}
+		else
+		{
+			StatUpgradeInstance->AddToViewport();
+		}
+	}
+}
+
+void ARamdomItemDefensePlayerController::ToggleInventoryWidget()
+{
+	if (InventoryInstance)
+	{
+		if (InventoryInstance->IsInViewport())
+		{
+			InventoryInstance->RemoveFromParent();
+		}
+		else
+		{
+			InventoryInstance->AddToViewport();
+		}
+	}
+}

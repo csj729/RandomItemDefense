@@ -21,6 +21,16 @@ public:
 	// Spawner가 자신을 등록하기 위해 호출할 함수
 	void SetSpawner(AMonsterSpawner* InSpawner);
 
+	/** @brief 몬스터가 죽었을 때 지급할 골드량을 반환합니다. */
+	UFUNCTION(BlueprintPure, Category = "Stats")
+	FORCEINLINE int32 GetGoldOnDeath() const { return GoldOnDeath; }
+
+	/**
+	 * @brief 몬스터의 죽음 처리를 시작합니다. (AI 정지, 애니메이션 재생, 골드 지급 알림 등)
+	 * @param Killer 몬스터를 죽인 액터 (플레이어 캐릭터)
+	 */
+	virtual void Die(AActor* Killer);
+
 protected:
 	virtual void BeginPlay() override;
 

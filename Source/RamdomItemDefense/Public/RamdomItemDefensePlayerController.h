@@ -12,6 +12,11 @@ class UNiagaraSystem;
 class UInputMappingContext;
 class UInputAction;
 
+// Widget 전방 선언
+class UMainHUDWidget;
+class UStatUpgradeWidget;
+class UInventoryWidget;
+
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
 
 UCLASS()
@@ -42,6 +47,13 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* SetDestinationTouchAction;
 
+public:
+	/** (추후 구현) 스탯 강화창 UI를 토글합니다. */
+	void ToggleStatUpgradeWidget();
+
+	/** (추후 구현) 인벤토리 UI를 토글합니다. */
+	void ToggleInventoryWidget();
+
 protected:
 	/** True if the controlled character should navigate to the mouse cursor. */
 	uint32 bMoveToMouseCursor : 1;
@@ -57,6 +69,30 @@ protected:
 	void OnSetDestinationReleased();
 	void OnTouchTriggered();
 	void OnTouchReleased();
+
+	/** WBP_MainHUD (블루프린트) 클래스를 에디터에서 지정할 변수 */
+	UPROPERTY(EditDefaultsOnly, Category = "UI")
+	TSubclassOf<UMainHUDWidget> MainHUDWidgetClass;
+
+	/** WBP_StatUpgrade (블루프린트) 클래스를 에디터에서 지정할 변수 */
+	UPROPERTY(EditDefaultsOnly, Category = "UI")
+	TSubclassOf<UUserWidget> StatUpgradeWidgetClass; // 부모를 UStatUpgradeWidget으로 해도 됩니다.
+
+	/** WBP_Inventory (블루프린트) 클래스를 에디터에서 지정할 변수 */
+	UPROPERTY(EditDefaultsOnly, Category = "UI")
+	TSubclassOf<UUserWidget> InventoryWidgetClass; // 부모를 UInventoryWidget으로 해도 됩니다.
+
+	/** 실제 생성된 메인 HUD 위젯 인스턴스 */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "UI")
+	TObjectPtr<UMainHUDWidget> MainHUDInstance;
+
+	/** 실제 생성된 스탯 강화 위젯 인스턴스 */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "UI")
+	TObjectPtr<UUserWidget> StatUpgradeInstance;
+
+	/** 실제 생성된 인벤토리 위젯 인스턴스 */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "UI")
+	TObjectPtr<UUserWidget> InventoryInstance;
 
 private:
 	FVector CachedDestination;

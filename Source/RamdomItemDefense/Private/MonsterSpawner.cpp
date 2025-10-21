@@ -3,6 +3,7 @@
 #include "Engine/World.h"
 #include "DrawDebugHelpers.h"
 #include "Engine/Engine.h"
+#include "Net/UnrealNetwork.h"
 
 AMonsterSpawner::AMonsterSpawner()
 {
@@ -17,6 +18,18 @@ AMonsterSpawner::AMonsterSpawner()
 void AMonsterSpawner::BeginPlay()
 {
 	Super::BeginPlay();
+}
+
+void AMonsterSpawner::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME(AMonsterSpawner, CurrentMonsterCount);
+}
+
+void AMonsterSpawner::OnRep_CurrentMonsterCount()
+{
+	// UI에 몬스터 수가 변경되었음을 알립니다.
+	OnMonsterCountChangedDelegate.Broadcast(CurrentMonsterCount);
 }
 
 void AMonsterSpawner::BeginSpawning(TSubclassOf<AMonsterBaseCharacter> MonsterClass, int32 Count)
@@ -69,6 +82,7 @@ void AMonsterSpawner::SpawnMonster()
 				// 스폰된 몬스터에게 "너를 스폰한 스포너는 나야" 라고 알려줍니다.
 				SpawnedMonster->SetSpawner(this);
 				CurrentMonsterCount++; // 스폰 성공 시 카운트 증가
+				if (HasAuthority()) OnRep_CurrentMonsterCount();
 			}
 
 			SpawnCounter++;
@@ -100,6 +114,7 @@ void AMonsterSpawner::OnMonsterKilled()
 	if (CurrentMonsterCount > 0)
 	{
 		CurrentMonsterCount--;
+		if (HasAuthority()) OnRep_CurrentMonsterCount();
 	}
 }
 

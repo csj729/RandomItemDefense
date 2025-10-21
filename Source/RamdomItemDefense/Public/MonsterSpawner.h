@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "ItemTypes.h"
 #include "MonsterSpawner.generated.h"
 
 class AMonsterBaseCharacter;
@@ -13,6 +14,12 @@ class RAMDOMITEMDEFENSE_API AMonsterSpawner : public AActor
 
 public:
 	AMonsterSpawner();
+
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
+	/** UI 바인딩용 델리게이트 */
+	UPROPERTY(BlueprintAssignable, Category = "Events")
+	FOnIntChangedDelegate OnMonsterCountChangedDelegate;
 
 	// GameMode가 호출할 스폰 시작 함수
 	void BeginSpawning(TSubclassOf<AMonsterBaseCharacter> MonsterClass, int32 Count);
@@ -32,6 +39,9 @@ public:
 protected:
 	virtual void BeginPlay() override;
 
+	UFUNCTION()
+	virtual void OnRep_CurrentMonsterCount();
+
 private:
 	// 몬스터를 실제로 스폰하는 함수
 	void SpawnMonster();
@@ -39,7 +49,7 @@ private:
 	// 스폰할 몬스터의 클래스
 	UPROPERTY()
 	TSubclassOf<AMonsterBaseCharacter> MonsterClassToSpawn;
-
+		
 	// 이번 웨이브에 스폰할 총 몬스터 수
 	int32 TotalToSpawn;
 
@@ -54,7 +64,7 @@ private:
 	bool bEnableDebug;
 
 	// 이 스포너가 관리하는 현재 몬스터 수
-	UPROPERTY(VisibleAnywhere, Category = "Live Count")
+	UPROPERTY(VisibleAnywhere, ReplicatedUsing = OnRep_CurrentMonsterCount, Category = "Live Count")
 	int32 CurrentMonsterCount;
 
 	// 이 스테이지의 게임오버 여부

@@ -8,6 +8,14 @@
 #include "Abilities/GameplayAbility.h"
 #include "ItemTypes.generated.h"
 
+#define GAMEOVER_MONSTER_NUM 60
+
+
+// 델리게이트 선언을 이 공용 파일에 *한 번만* 합니다.
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnIntChangedDelegate, int32, NewValue);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnFloatChangedDelegate, float, NewValue);
+// ------------------
+
 // 아이템 등급 열거형
 UENUM(BlueprintType)
 enum class EItemGrade : uint8

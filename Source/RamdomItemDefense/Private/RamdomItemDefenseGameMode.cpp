@@ -1,5 +1,6 @@
 #include "RamdomItemDefenseGameMode.h"
 #include "MyGameState.h"
+#include "MyPlayerState.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Engine/DataTable.h"
 #include "Kismet/GameplayStatics.h"
@@ -66,9 +67,24 @@ void ARamdomItemDefenseGameMode::StartNextWave()
 	MyGameState->CurrentWave++;
 	MyGameState->OnRep_CurrentWave();
 
+	// 모든 플레이어에게 라운드 선택 횟수 2회를 부여합니다.
+	for (APlayerState* PS : MyGameState->PlayerArray)
+	{
+		AMyPlayerState* MyPS = Cast<AMyPlayerState>(PS);
+		if (MyPS)
+		{
+			MyPS->AddChoiceCount(2); // 서버 전용 함수 호출
+		}
+	}
+
 	const int32 CurrentWave = MyGameState->GetCurrentWave();
 	const bool bIsBossWave = (CurrentWave > 0 && CurrentWave % 10 == 0);
 	const float TimeLimitForThisWave = bIsBossWave ? BossStageTimeLimit : StageTimeLimit;
+
+	// GameState에 이번 웨이브의 종료 시간을 기록합니다.
+	MyGameState->WaveEndTime = GetWorld()->GetTimeSeconds() + TimeLimitForThisWave;
+	MyGameState->OnRep_WaveEndTime();
+
 	const int32 NumToSpawn = bIsBossWave ? 1 : MonstersPerWave;
 
 	if (GEngine)
