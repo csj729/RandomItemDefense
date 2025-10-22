@@ -55,6 +55,12 @@ public:
 	FItemData GetItemData(FName ItemID, bool& bSuccess) const;
 	// ------------------
 
+	UFUNCTION(BlueprintPure, Category = "Inventory")
+	UDataTable* GetItemDataTable() const { return ItemDataTable;  }
+
+	UFUNCTION(BlueprintPure, Category = "Inventory")
+	UDataTable* GetRecipeDataTable() const { return RecipeDataTable; }
+
 	UPROPERTY(BlueprintAssignable, Category = "Events")
 	FOnInventoryUpdatedDelegate OnInventoryUpdated;
 
