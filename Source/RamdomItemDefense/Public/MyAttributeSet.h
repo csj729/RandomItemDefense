@@ -65,6 +65,20 @@ public:
     FGameplayAttributeData AttackRange;
     ATTRIBUTE_ACCESSORS(UMyAttributeSet, AttackRange);
 
+    // --- BaseValue 조정 함수 (서버 전용) ---
+public:
+    /** AttackDamage의 BaseValue를 Delta만큼 조정합니다. */
+    void AdjustBaseAttackDamage(float Delta);
+    /** AttackSpeed의 BaseValue를 Delta만큼 조정합니다. */
+    void AdjustBaseAttackSpeed(float Delta);
+    /** CritDamage의 BaseValue를 Delta만큼 조정합니다. */
+    void AdjustBaseCritDamage(float Delta);
+    /** ArmorReduction의 BaseValue를 Delta만큼 조정합니다. */
+    void AdjustBaseArmorReduction(float Delta);
+    /** SkillActivationChance의 BaseValue를 Delta만큼 조정합니다. */
+    void AdjustBaseSkillActivationChance(float Delta);
+    // ----------------------------------------
+
 protected:
     // --- 각 스탯에 대한 RepNotify 함수 선언 ---
     UFUNCTION()

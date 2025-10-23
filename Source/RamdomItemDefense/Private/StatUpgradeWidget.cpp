@@ -1,31 +1,31 @@
-#include "StatUpgradeWidget.h"
+ï»¿#include "StatUpgradeWidget.h"
 #include "Components/TextBlock.h"
 #include "Components/Button.h"
 #include "MyPlayerState.h"
-#include "MyAttributeSet.h" // Attribute Á¤ÀÇ Æ÷ÇÔ
-#include "AbilitySystemComponent.h" // ASC »ç¿ë
-#include "RamdomItemDefenseCharacter.h" // Ä³¸¯ÅÍ Å¬·¡½º (ASC °¡Á®¿À±â À§ÇÔ)
+#include "MyAttributeSet.h" // Attribute ì •ì˜ í¬í•¨
+#include "AbilitySystemComponent.h" // ASC ì‚¬ìš©
+#include "RamdomItemDefenseCharacter.h" // ìºë¦­í„° í´ë˜ìŠ¤ (ASC ê°€ì ¸ì˜¤ê¸° ìœ„í•¨)
 #include "GameplayEffectTypes.h"
-#include "Engine/Engine.h" // GEngine µğ¹ö±× ¸Ş½ÃÁö (¼±ÅÃ »çÇ×)
+#include "Engine/Engine.h" // GEngine ë””ë²„ê·¸ ë©”ì‹œì§€ (ì„ íƒ ì‚¬í•­)
 
 void UStatUpgradeWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
 
-	// PlayerState ÂüÁ¶ °¡Á®¿À±â ¹× µ¨¸®°ÔÀÌÆ® ¹ÙÀÎµù
+	// PlayerState ì°¸ì¡° ê°€ì ¸ì˜¤ê¸° ë° ë¸ë¦¬ê²Œì´íŠ¸ ë°”ì¸ë”©
 	MyPlayerState = GetOwningPlayerState<AMyPlayerState>();
 	if (MyPlayerState)
 	{
 		MyPlayerState->OnGoldChangedDelegate.AddDynamic(this, &UStatUpgradeWidget::HandleGoldChanged);
 		MyPlayerState->OnStatLevelChangedDelegate.AddDynamic(this, &UStatUpgradeWidget::HandleStatLevelChanged);
 
-		// ÃÊ±â UI ¾÷µ¥ÀÌÆ®
+		// ì´ˆê¸° UI ì—…ë°ì´íŠ¸
 		HandleGoldChanged(MyPlayerState->GetGold());
-		UpdateAllStatLines(); // ·¹º§, ºñ¿ë, ¹öÆ° »óÅÂ ÃÊ±âÈ­
+		UpdateAllStatLines(); // ë ˆë²¨, ë¹„ìš©, ë²„íŠ¼ ìƒíƒœ ì´ˆê¸°í™”
 	}
 	else
 	{
-		// PlayerState°¡ ´Ê°Ô ·ÎµåµÉ °æ¿ì ´ÙÀ½ Æ½¿¡ Àç½Ãµµ
+		// PlayerStateê°€ ëŠ¦ê²Œ ë¡œë“œë  ê²½ìš° ë‹¤ìŒ í‹±ì— ì¬ì‹œë„
 		GetWorld()->GetTimerManager().SetTimerForNextTick([this]() {
 			MyPlayerState = GetOwningPlayerState<AMyPlayerState>();
 			if (MyPlayerState)
@@ -34,42 +34,42 @@ void UStatUpgradeWidget::NativeConstruct()
 				MyPlayerState->OnStatLevelChangedDelegate.AddDynamic(this, &UStatUpgradeWidget::HandleStatLevelChanged);
 				HandleGoldChanged(MyPlayerState->GetGold());
 				UpdateAllStatLines();
-				// ASC ¹ÙÀÎµùµµ ¿©±â¼­ ´Ù½Ã ½ÃµµÇØ¾ß ÇÒ ¼ö ÀÖÀ½
-				// ... (¾Æ·¡ ASC ¹ÙÀÎµù ·ÎÁ÷ º¹»ç) ...
+				// ASC ë°”ì¸ë”©ë„ ì—¬ê¸°ì„œ ë‹¤ì‹œ ì‹œë„í•´ì•¼ í•  ìˆ˜ ìˆìŒ
+				// ... (ì•„ë˜ ASC ë°”ì¸ë”© ë¡œì§ ë³µì‚¬) ...
 			}
 			});
 	}
 
-	// Ä³¸¯ÅÍÀÇ ASC ÂüÁ¶ °¡Á®¿À±â ¹× ½ºÅÈ º¯°æ µ¨¸®°ÔÀÌÆ® ¹ÙÀÎµù
+	// ìºë¦­í„°ì˜ ASC ì°¸ì¡° ê°€ì ¸ì˜¤ê¸° ë° ìŠ¤íƒ¯ ë³€ê²½ ë¸ë¦¬ê²Œì´íŠ¸ ë°”ì¸ë”©
 	ARamdomItemDefenseCharacter* OwningCharacter = GetOwningPlayerPawn<ARamdomItemDefenseCharacter>();
 	if (OwningCharacter)
 	{
 		OwningASC = OwningCharacter->GetAbilitySystemComponent();
 		if (OwningASC.IsValid())
 		{
-			// °¢ Attribute º¯°æ ½Ã ÇØ´ç ÇÚµé·¯ ÇÔ¼ö¸¦ È£ÃâÇÏµµ·Ï ¿¬°á
+			// ê° Attribute ë³€ê²½ ì‹œ í•´ë‹¹ í•¸ë“¤ëŸ¬ í•¨ìˆ˜ë¥¼ í˜¸ì¶œí•˜ë„ë¡ ì—°ê²°
 			OwningASC->GetGameplayAttributeValueChangeDelegate(UMyAttributeSet::GetAttackDamageAttribute()).AddUObject(this, &UStatUpgradeWidget::HandleAttackDamageChanged);
 			OwningASC->GetGameplayAttributeValueChangeDelegate(UMyAttributeSet::GetAttackSpeedAttribute()).AddUObject(this, &UStatUpgradeWidget::HandleAttackSpeedChanged);
 			OwningASC->GetGameplayAttributeValueChangeDelegate(UMyAttributeSet::GetCritDamageAttribute()).AddUObject(this, &UStatUpgradeWidget::HandleCritDamageChanged);
 			OwningASC->GetGameplayAttributeValueChangeDelegate(UMyAttributeSet::GetArmorReductionAttribute()).AddUObject(this, &UStatUpgradeWidget::HandleArmorReductionChanged);
 			OwningASC->GetGameplayAttributeValueChangeDelegate(UMyAttributeSet::GetSkillActivationChanceAttribute()).AddUObject(this, &UStatUpgradeWidget::HandleSkillChanceChanged);
-			// (°ñµå °­È­ ºÒ°¡ ½ºÅÈ °ª Ç¥½Ã°¡ ÇÊ¿äÇÏ´Ù¸é ¿©±â¼­ ¹ÙÀÎµù Ãß°¡)
-			// OwningASC->GetGameplayAttributeValueChangeDelegate(UMyAttributeSet::GetCritChanceAttribute()).AddUObject(this, &UStatUpgradeWidget::HandleCritChanceChanged); // ¿¹½Ã
+			// (ê³¨ë“œ ê°•í™” ë¶ˆê°€ ìŠ¤íƒ¯ ê°’ í‘œì‹œê°€ í•„ìš”í•˜ë‹¤ë©´ ì—¬ê¸°ì„œ ë°”ì¸ë”© ì¶”ê°€)
+			// OwningASC->GetGameplayAttributeValueChangeDelegate(UMyAttributeSet::GetCritChanceAttribute()).AddUObject(this, &UStatUpgradeWidget::HandleCritChanceChanged); // ì˜ˆì‹œ
 
-			// ÃÊ±â ½ºÅÈ °ª UI ¾÷µ¥ÀÌÆ®
-			// °¢ ÇÚµé·¯¸¦ Á÷Á¢ È£ÃâÇÏ¿© ÃÊ±â °ªÀ» ¼³Á¤ÇÕ´Ï´Ù.
-			FOnAttributeChangeData DummyData; // ÀÓ½Ã µ¥ÀÌÅÍ ±¸Á¶Ã¼
+			// ì´ˆê¸° ìŠ¤íƒ¯ ê°’ UI ì—…ë°ì´íŠ¸
+			// ê° í•¸ë“¤ëŸ¬ë¥¼ ì§ì ‘ í˜¸ì¶œí•˜ì—¬ ì´ˆê¸° ê°’ì„ ì„¤ì •í•©ë‹ˆë‹¤.
+			FOnAttributeChangeData DummyData; // ì„ì‹œ ë°ì´í„° êµ¬ì¡°ì²´
 			DummyData.NewValue = OwningASC->GetNumericAttribute(UMyAttributeSet::GetAttackDamageAttribute()); HandleAttackDamageChanged(DummyData);
 			DummyData.NewValue = OwningASC->GetNumericAttribute(UMyAttributeSet::GetAttackSpeedAttribute()); HandleAttackSpeedChanged(DummyData);
 			DummyData.NewValue = OwningASC->GetNumericAttribute(UMyAttributeSet::GetCritDamageAttribute()); HandleCritDamageChanged(DummyData);
 			DummyData.NewValue = OwningASC->GetNumericAttribute(UMyAttributeSet::GetArmorReductionAttribute()); HandleArmorReductionChanged(DummyData);
 			DummyData.NewValue = OwningASC->GetNumericAttribute(UMyAttributeSet::GetSkillActivationChanceAttribute()); HandleSkillChanceChanged(DummyData);
-			// (´Ù¸¥ ½ºÅÈ ÃÊ±â°ª ¼³Á¤µµ ÇÊ¿ä½Ã Ãß°¡)
+			// (ë‹¤ë¥¸ ìŠ¤íƒ¯ ì´ˆê¸°ê°’ ì„¤ì •ë„ í•„ìš”ì‹œ ì¶”ê°€)
 		}
 	}
 
 
-	// ¹öÆ° Å¬¸¯ ÀÌº¥Æ® ¹ÙÀÎµù
+	// ë²„íŠ¼ í´ë¦­ ì´ë²¤íŠ¸ ë°”ì¸ë”©
 	if (AtkDmg_UpgradeButton) AtkDmg_UpgradeButton->OnClicked.AddDynamic(this, &UStatUpgradeWidget::HandleUpgradeAtkDmg);
 	if (AtkSpd_UpgradeButton) AtkSpd_UpgradeButton->OnClicked.AddDynamic(this, &UStatUpgradeWidget::HandleUpgradeAtkSpd);
 	if (CritDmg_UpgradeButton) CritDmg_UpgradeButton->OnClicked.AddDynamic(this, &UStatUpgradeWidget::HandleUpgradeCritDmg);
@@ -77,38 +77,38 @@ void UStatUpgradeWidget::NativeConstruct()
 	if (SkillChance_UpgradeButton) SkillChance_UpgradeButton->OnClicked.AddDynamic(this, &UStatUpgradeWidget::HandleUpgradeSkillChance);
 }
 
-// °ñµå º¯°æ ½Ã È£Ãâ
+// ê³¨ë“œ ë³€ê²½ ì‹œ í˜¸ì¶œ
 void UStatUpgradeWidget::HandleGoldChanged(int32 NewGold)
 {
 	if (GoldText)
 	{
-		// °ñµå ÅØ½ºÆ® ¾÷µ¥ÀÌÆ® (¿¹: FText::AsCurrency(NewGold, TEXT("G")))
-		GoldText->SetText(FText::AsNumber(NewGold));
+		// ê³¨ë“œ í…ìŠ¤íŠ¸ ì—…ë°ì´íŠ¸ (ì˜ˆ: FText::AsCurrency(NewGold, TEXT("G")))
+		GoldText->SetText(FText::FromString(FString::Printf(TEXT("ë‚¨ì€ ê³¨ë“œ : %d G"), NewGold)));
 	}
-	// °ñµå°¡ º¯°æµÇ¸é ¸ğµç ¹öÆ°ÀÇ È°¼ºÈ­ »óÅÂ¸¦ ´Ù½Ã °è»ê
+	// ê³¨ë“œê°€ ë³€ê²½ë˜ë©´ ëª¨ë“  ë²„íŠ¼ì˜ í™œì„±í™” ìƒíƒœë¥¼ ë‹¤ì‹œ ê³„ì‚°
 	UpdateAllStatLines();
 }
 
-// ½ºÅÈ ·¹º§ º¯°æ ½Ã È£Ãâ (PlayerState RepNotify -> Delegate)
+// ìŠ¤íƒ¯ ë ˆë²¨ ë³€ê²½ ì‹œ í˜¸ì¶œ (PlayerState RepNotify -> Delegate)
 void UStatUpgradeWidget::HandleStatLevelChanged(EItemStatType StatType, int32 NewLevel)
 {
-	// ÇØ´ç ½ºÅÈ ¶óÀÎÀÇ ·¹º§, ºñ¿ë, È®·ü, ¹öÆ° »óÅÂ ¾÷µ¥ÀÌÆ®
+	// í•´ë‹¹ ìŠ¤íƒ¯ ë¼ì¸ì˜ ë ˆë²¨, ë¹„ìš©, í™•ë¥ , ë²„íŠ¼ ìƒíƒœ ì—…ë°ì´íŠ¸
 	UpdateStatLineUI(StatType);
 }
 
-// ¸ğµç ½ºÅÈ ¶óÀÎ UI ¾÷µ¥ÀÌÆ® (ÃÊ±âÈ­ ¹× °ñµå º¯°æ ½Ã)
+// ëª¨ë“  ìŠ¤íƒ¯ ë¼ì¸ UI ì—…ë°ì´íŠ¸ (ì´ˆê¸°í™” ë° ê³¨ë“œ ë³€ê²½ ì‹œ)
 void UStatUpgradeWidget::UpdateAllStatLines()
 {
-	// ¸ğµç °­È­ °¡´ÉÇÑ ½ºÅÈ¿¡ ´ëÇØ UI ¾÷µ¥ÀÌÆ® È£Ãâ
+	// ëª¨ë“  ê°•í™” ê°€ëŠ¥í•œ ìŠ¤íƒ¯ì— ëŒ€í•´ UI ì—…ë°ì´íŠ¸ í˜¸ì¶œ
 	UpdateStatLineUI(EItemStatType::AttackDamage);
 	UpdateStatLineUI(EItemStatType::AttackSpeed);
 	UpdateStatLineUI(EItemStatType::CritDamage);
 	UpdateStatLineUI(EItemStatType::ArmorReduction);
 	UpdateStatLineUI(EItemStatType::SkillActivationChance);
-	// (°ñµå °­È­ ºÒ°¡ ½ºÅÈÀº È£ÃâÇÒ ÇÊ¿ä ¾øÀ½)
+	// (ê³¨ë“œ ê°•í™” ë¶ˆê°€ ìŠ¤íƒ¯ì€ í˜¸ì¶œí•  í•„ìš” ì—†ìŒ)
 }
 
-/** Æ¯Á¤ ½ºÅÈ ¶óÀÎ UI ¾÷µ¥ÀÌÆ® (·¹º§, ºñ¿ë, È®·ü, ¹öÆ° »óÅÂ) */
+/** íŠ¹ì • ìŠ¤íƒ¯ ë¼ì¸ UI ì—…ë°ì´íŠ¸ (ë ˆë²¨, ë¹„ìš©, í™•ë¥ , ë²„íŠ¼ ìƒíƒœ) */
 void UStatUpgradeWidget::UpdateStatLineUI(EItemStatType StatType)
 {
 	if (!MyPlayerState) return;
@@ -116,7 +116,7 @@ void UStatUpgradeWidget::UpdateStatLineUI(EItemStatType StatType)
 	int32 CurrentLevel = MyPlayerState->GetStatLevel(StatType);
 	int32 CurrentGold = MyPlayerState->GetGold();
 
-	// --- °­È­ ±ÔÄ¢ (PlayerState¿Í µ¿ÀÏÇÏ°Ô À¯Áö) ---
+	// --- ê°•í™” ê·œì¹™ (PlayerStateì™€ ë™ì¼í•˜ê²Œ ìœ ì§€) ---
 	const bool bIsBasicStat = (StatType == EItemStatType::AttackDamage || StatType == EItemStatType::AttackSpeed || StatType == EItemStatType::CritDamage);
 	const bool bIsSpecialStat = (StatType == EItemStatType::ArmorReduction || StatType == EItemStatType::SkillActivationChance);
 	int32 MaxLevel = bIsBasicStat ? 999 : 3;
@@ -125,14 +125,14 @@ void UStatUpgradeWidget::UpdateStatLineUI(EItemStatType StatType)
 	float SuccessChance = 1.0f;
 	// ---------------------------------------------
 
-	// ·¹º§ Á¦ÇÑ È®ÀÎ
+	// ë ˆë²¨ ì œí•œ í™•ì¸
 	bool bMaxLevelReached = (CurrentLevel >= MaxLevel);
 
-	// ºñ¿ë °è»ê
+	// ë¹„ìš© ê³„ì‚°
 	int32 UpgradeCost = BaseCost + (CurrentLevel * CostIncreaseFactor);
 	bool bCanAfford = (CurrentGold >= UpgradeCost);
 
-	// Æ¯¼ö ½ºÅÈ ¼º°ø È®·ü °è»ê (Ç¥½Ã¿ë)
+	// íŠ¹ìˆ˜ ìŠ¤íƒ¯ ì„±ê³µ í™•ë¥  ê³„ì‚° (í‘œì‹œìš©)
 	if (bIsSpecialStat)
 	{
 		switch (CurrentLevel)
@@ -140,14 +140,14 @@ void UStatUpgradeWidget::UpdateStatLineUI(EItemStatType StatType)
 		case 0: SuccessChance = 0.5f; break; // 50%
 		case 1: SuccessChance = 0.4f; break; // 40%
 		case 2: SuccessChance = 0.3f; break; // 30%
-		default: SuccessChance = 0.0f; break; // ÃÖ´ë ·¹º§ µµ´Ş
+		default: SuccessChance = 0.0f; break; // ìµœëŒ€ ë ˆë²¨ ë„ë‹¬
 		}
 	}
 
-	// UI ¿ä¼Ò ¾÷µ¥ÀÌÆ® (Switch »ç¿ë)
+	// UI ìš”ì†Œ ì—…ë°ì´íŠ¸ (Switch ì‚¬ìš©)
 	FText LevelText = FText::Format(NSLOCTEXT("StatUpgradeWidget", "LevelFormat", "Lv.{0}"), FText::AsNumber(CurrentLevel));
-	FText CostText = FText::Format(NSLOCTEXT("StatUpgradeWidget", "CostFormat", "{0} G"), FText::AsNumber(UpgradeCost));
-	FText ChanceText = FText::Format(NSLOCTEXT("StatUpgradeWidget", "ChanceFormat", "({0}%)"), FText::AsPercent(SuccessChance));
+	FText CostText = FText::Format(NSLOCTEXT("StatUpgradeWidget", "CostFormat", "{0}G"), FText::AsNumber(UpgradeCost));
+	FText ChanceText = FText::Format(NSLOCTEXT("StatUpgradeWidget", "ChanceFormat", "{0}"), FText::AsPercent(SuccessChance));
 	bool bButtonEnabled = bCanAfford && !bMaxLevelReached;
 
 	switch (StatType)
@@ -184,21 +184,21 @@ void UStatUpgradeWidget::UpdateStatLineUI(EItemStatType StatType)
 		if (SkillChance_UpgradeButton) SkillChance_UpgradeButton->SetIsEnabled(bButtonEnabled);
 		break;
 
-	default: break; // °­È­ ºÒ°¡ ½ºÅÈÀº UI ¾÷µ¥ÀÌÆ® ¾È ÇÔ
+	default: break; // ê°•í™” ë¶ˆê°€ ìŠ¤íƒ¯ì€ UI ì—…ë°ì´íŠ¸ ì•ˆ í•¨
 	}
 }
 
 
-// --- °³º° ½ºÅÈ °ª º¯°æ ÇÚµé·¯ ±¸Çö ---
-// ASCÀÇ Attribute °ªÀÌ º¯°æµÉ ¶§ È£ÃâµÇ¾î ValueText ¾÷µ¥ÀÌÆ®
+// --- ê°œë³„ ìŠ¤íƒ¯ ê°’ ë³€ê²½ í•¸ë“¤ëŸ¬ êµ¬í˜„ ---
+// ASCì˜ Attribute ê°’ì´ ë³€ê²½ë  ë•Œ í˜¸ì¶œë˜ì–´ ValueText ì—…ë°ì´íŠ¸
 void UStatUpgradeWidget::HandleAttackDamageChanged(const FOnAttributeChangeData& Data)
 {
-	if (AtkDmg_ValueText) AtkDmg_ValueText->SetText(FText::AsNumber(FMath::RoundToInt(Data.NewValue))); // Á¤¼ö·Î ¹İ¿Ã¸² Ç¥½Ã
+	if (AtkDmg_ValueText) AtkDmg_ValueText->SetText(FText::AsNumber(FMath::RoundToInt(Data.NewValue))); // ì •ìˆ˜ë¡œ ë°˜ì˜¬ë¦¼ í‘œì‹œ
 }
 
 void UStatUpgradeWidget::HandleAttackSpeedChanged(const FOnAttributeChangeData& Data)
 {
-	// °ø°İ ¼Óµµ´Â ¼Ò¼öÁ¡ ÆÛ¼¾Æ®·Î Ç¥½Ã (¿¹: 0.15 -> 15.0%)
+	// ê³µê²© ì†ë„ëŠ” ì†Œìˆ˜ì  í¼ì„¼íŠ¸ë¡œ í‘œì‹œ (ì˜ˆ: 0.15 -> 15.0%)
 	if (AtkSpd_ValueText) AtkSpd_ValueText->SetText(FText::FromString(FString::Printf(TEXT("%.1f%%"), Data.NewValue * 100.0f)));
 }
 
@@ -214,13 +214,13 @@ void UStatUpgradeWidget::HandleArmorReductionChanged(const FOnAttributeChangeDat
 
 void UStatUpgradeWidget::HandleSkillChanceChanged(const FOnAttributeChangeData& Data)
 {
-	// ½ºÅ³ ¹ßµ¿ È®·üµµ ¼Ò¼öÁ¡ ÆÛ¼¾Æ®·Î Ç¥½Ã
+	// ìŠ¤í‚¬ ë°œë™ í™•ë¥ ë„ ì†Œìˆ˜ì  í¼ì„¼íŠ¸ë¡œ í‘œì‹œ
 	if (SkillChance_ValueText) SkillChance_ValueText->SetText(FText::FromString(FString::Printf(TEXT("%.1f%%"), Data.NewValue * 100.0f)));
 }
-// (ÇÊ¿ä½Ã ´Ù¸¥ ½ºÅÈ °ª ÇÚµé·¯µµ ±¸Çö - °ñµå °­È­ ºÒ°¡ ½ºÅÈ Æ÷ÇÔ °¡´É)
+// (í•„ìš”ì‹œ ë‹¤ë¥¸ ìŠ¤íƒ¯ ê°’ í•¸ë“¤ëŸ¬ë„ êµ¬í˜„ - ê³¨ë“œ ê°•í™” ë¶ˆê°€ ìŠ¤íƒ¯ í¬í•¨ ê°€ëŠ¥)
 
 
-// --- ¹öÆ° Å¬¸¯ ÇÚµé·¯ ±¸Çö (PlayerStateÀÇ ¼­¹ö ÇÔ¼ö È£Ãâ) ---
+// --- ë²„íŠ¼ í´ë¦­ í•¸ë“¤ëŸ¬ êµ¬í˜„ (PlayerStateì˜ ì„œë²„ í•¨ìˆ˜ í˜¸ì¶œ) ---
 void UStatUpgradeWidget::HandleUpgradeAtkDmg() { if (MyPlayerState) MyPlayerState->Server_RequestStatUpgrade(EItemStatType::AttackDamage); }
 void UStatUpgradeWidget::HandleUpgradeAtkSpd() { if (MyPlayerState) MyPlayerState->Server_RequestStatUpgrade(EItemStatType::AttackSpeed); }
 void UStatUpgradeWidget::HandleUpgradeCritDmg() { if (MyPlayerState) MyPlayerState->Server_RequestStatUpgrade(EItemStatType::CritDamage); }

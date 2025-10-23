@@ -73,3 +73,60 @@ void UMyAttributeSet::OnRep_AttackRange(const FGameplayAttributeData& OldValue)
 {
     GAMEPLAYATTRIBUTE_REPNOTIFY(UMyAttributeSet, AttackRange, OldValue);
 }
+
+// --- BaseValue 조정 함수 구현 ---
+void UMyAttributeSet::AdjustBaseAttackDamage(float Delta)
+{
+	UAbilitySystemComponent* ASC = GetOwningAbilitySystemComponent();
+	if (ASC && ASC->IsOwnerActorAuthoritative() && FMath::Abs(Delta) > SMALL_NUMBER)
+	{
+		// --- [코드 수정] ---
+		// GetBaseAttackDamage() 대신 AttackDamage 변수의 GetBaseValue() 호출
+		ASC->SetNumericAttributeBase(GetAttackDamageAttribute(), AttackDamage.GetBaseValue() + Delta);
+		// --- ----------- ---
+	}
+}
+
+void UMyAttributeSet::AdjustBaseAttackSpeed(float Delta)
+{
+	UAbilitySystemComponent* ASC = GetOwningAbilitySystemComponent();
+	if (ASC && ASC->IsOwnerActorAuthoritative() && FMath::Abs(Delta) > SMALL_NUMBER)
+	{
+		// --- [코드 수정] ---
+		ASC->SetNumericAttributeBase(GetAttackSpeedAttribute(), AttackSpeed.GetBaseValue() + Delta);
+		// --- ----------- ---
+	}
+}
+
+void UMyAttributeSet::AdjustBaseCritDamage(float Delta)
+{
+	UAbilitySystemComponent* ASC = GetOwningAbilitySystemComponent();
+	if (ASC && ASC->IsOwnerActorAuthoritative() && FMath::Abs(Delta) > SMALL_NUMBER)
+	{
+		// --- [코드 수정] ---
+		ASC->SetNumericAttributeBase(GetCritDamageAttribute(), CritDamage.GetBaseValue() + Delta * 100.f);
+		// --- ----------- ---
+	}
+}
+
+void UMyAttributeSet::AdjustBaseArmorReduction(float Delta)
+{
+	UAbilitySystemComponent* ASC = GetOwningAbilitySystemComponent();
+	if (ASC && ASC->IsOwnerActorAuthoritative() && FMath::Abs(Delta) > SMALL_NUMBER)
+	{
+		// --- [코드 수정] ---
+		ASC->SetNumericAttributeBase(GetArmorReductionAttribute(), ArmorReduction.GetBaseValue() + Delta);
+		// --- ----------- ---
+	}
+}
+
+void UMyAttributeSet::AdjustBaseSkillActivationChance(float Delta)
+{
+	UAbilitySystemComponent* ASC = GetOwningAbilitySystemComponent();
+	if (ASC && ASC->IsOwnerActorAuthoritative() && FMath::Abs(Delta) > SMALL_NUMBER)
+	{
+		// --- [코드 수정] ---
+		ASC->SetNumericAttributeBase(GetSkillActivationChanceAttribute(), SkillActivationChance.GetBaseValue() + Delta);
+		// --- ----------- ---
+	}
+}

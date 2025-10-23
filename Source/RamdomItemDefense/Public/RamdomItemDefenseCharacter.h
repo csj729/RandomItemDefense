@@ -62,12 +62,7 @@ protected:
 
 	UPROPERTY(Replicated)
 	TObjectPtr<AActor> ManualTarget;
-
-	/** 각 스탯 강화를 위한 GameplayEffect 클래스 (에디터에서 설정) */
-	UPROPERTY(EditDefaultsOnly, Category = "GAS|Upgrade")
-	TMap<EItemStatType, TSubclassOf<class UGameplayEffect>> UpgradeEffects;
-
-
+	
 private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
 	class UCameraComponent* TopDownCameraComponent;

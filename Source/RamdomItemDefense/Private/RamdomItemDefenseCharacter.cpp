@@ -13,6 +13,10 @@
 #include "Net/UnrealNetwork.h"
 #include "AttackComponent.h"
 #include "InventoryComponent.h"
+#include "GameplayTagsManager.h"
+#include "ItemTypes.h"
+#include "AbilitySystemBlueprintLibrary.h"
+#include "Engine/Engine.h"
 
 ARamdomItemDefenseCharacter::ARamdomItemDefenseCharacter()
 {
@@ -128,38 +132,52 @@ void ARamdomItemDefenseCharacter::GetLifetimeReplicatedProps(TArray<FLifetimePro
 	DOREPLIFETIME(ARamdomItemDefenseCharacter, ManualTarget);
 }
 
-/** (서버 전용) 스탯 강화 적용 함수 */
+/** (서버 전용) 스탯 강화 적용 함수 (BaseValue 수정 방식) */
 void ARamdomItemDefenseCharacter::ApplyStatUpgrade(EItemStatType StatType, int32 NewLevel)
 {
-	if (!HasAuthority() || !AbilitySystemComponent) return;
-
-	// 해당 스탯 타입에 맞는 GE 클래스를 TMap에서 찾습니다.
-	TSubclassOf<UGameplayEffect>* EffectClassPtr = UpgradeEffects.Find(StatType);
-	if (EffectClassPtr && *EffectClassPtr)
+	// 서버에서만 실행하고 AttributeSet이 유효한지 확인
+	if (!HasAuthority() || !AttributeSet)
 	{
-		// 기존에 적용된 같은 레벨의 강화 효과가 있다면 제거해야 할 수 있음 (Stacking 방식에 따라 다름)
-		// TODO: Remove Gameplay Effects by Tag Query (강화 효과 식별 태그 필요)
-
-		// 새 레벨에 맞는 GameplayEffect를 적용합니다.
-		FGameplayEffectContextHandle ContextHandle = AbilitySystemComponent->MakeEffectContext();
-		ContextHandle.AddSourceObject(this);
-
-		// GE의 레벨을 설정하여 적용 (GE 내부에서 레벨에 따른 수치 계산 필요)
-		FGameplayEffectSpecHandle SpecHandle = AbilitySystemComponent->MakeOutgoingSpec(*EffectClassPtr, NewLevel, ContextHandle);
-		if (SpecHandle.IsValid())
-		{
-			AbilitySystemComponent->ApplyGameplayEffectSpecToSelf(*SpecHandle.Data.Get());
-
-			if (GEngine)
-			{
-				FString StatName = UEnum::GetValueAsString(StatType);
-				GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Cyan, FString::Printf(TEXT("Applied Upgrade Effect: %s (Level %d)"), *StatName, NewLevel));
-			}
-		}
+		if (GEngine && HasAuthority()) GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("ApplyStatUpgrade Error: Not Server or AttributeSet is NULL"));
+		return;
 	}
-	else if (GEngine)
+
+	// --- [코드 수정] BaseValue 조정 로직 ---
+
+	// 1. 이번 강화 단계로 인해 추가되어야 할 *증가량(Delta)* 계산
+	//    (NewLevel은 1부터 시작)
+	float DeltaValue = 0.0f;
+	switch (StatType)
+	{
+		// 예시: 레벨당 증가량 정의 (이 값들을 원하는 대로 조절하세요)
+	case EItemStatType::AttackDamage: 			DeltaValue = 10.0f; break; // 레벨당 +10
+	case EItemStatType::AttackSpeed: 			DeltaValue = 0.05f; break; // 레벨당 +5%
+	case EItemStatType::CritDamage: 			DeltaValue = 0.1f; break;  // 레벨당 +10%
+	case EItemStatType::ArmorReduction: 		DeltaValue = 10.0f; break;  // 레벨당 +10
+	case EItemStatType::SkillActivationChance: 	DeltaValue = 0.05f; break; // 레벨당 +5%
+	default:
+		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, FString::Printf(TEXT("ApplyStatUpgrade Error: Invalid StatType for BaseValue modification: %s"), *UEnum::GetValueAsString(StatType)));
+		return; // 골드 강화 불가능 스탯이면 종료
+	}
+
+	// 2. AttributeSet의 해당 스탯 BaseValue 조정 함수 호출
+	switch (StatType)
+	{
+	case EItemStatType::AttackDamage: 			AttributeSet->AdjustBaseAttackDamage(DeltaValue); break;
+	case EItemStatType::AttackSpeed: 			AttributeSet->AdjustBaseAttackSpeed(DeltaValue); break;
+	case EItemStatType::CritDamage: 			AttributeSet->AdjustBaseCritDamage(DeltaValue); break;
+	case EItemStatType::ArmorReduction: 		AttributeSet->AdjustBaseArmorReduction(DeltaValue); break;
+	case EItemStatType::SkillActivationChance: 	AttributeSet->AdjustBaseSkillActivationChance(DeltaValue); break;
+		// default는 위에서 처리했으므로 필요 없음
+	}
+
+	// 3. 로그 출력 (성공 확인)
+	if (GEngine)
 	{
 		FString StatName = UEnum::GetValueAsString(StatType);
-		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, FString::Printf(TEXT("ApplyStatUpgrade Error: No GE found for %s"), *StatName));
+		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Cyan, FString::Printf(TEXT("Applied BaseValue Upgrade: %s (Level %d, Delta: %.2f)"), *StatName, NewLevel, DeltaValue));
 	}
+
+	// GameplayEffect 적용 로직은 모두 제거됨
+	// --------------------------------------
 }
