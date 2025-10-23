@@ -4,6 +4,7 @@
 #include "GameFramework/Pawn.h"
 #include "Blueprint/AIBlueprintHelperLibrary.h"
 #include "NiagaraSystem.h"
+#include "InventoryComponent.h"
 #include "NiagaraFunctionLibrary.h"
 #include "RamdomItemDefenseCharacter.h"
 #include "Engine/World.h"
@@ -108,6 +109,23 @@ void ARamdomItemDefensePlayerController::OnPossess(APawn* InPawn)
 				});
 		}
 	}
+}
+
+void ARamdomItemDefensePlayerController::Server_RequestCombineItem_Implementation(FName ResultItemID)
+{
+	// 서버인지 확인
+	if (!HasAuthority()) return;
+
+	// 이 컨트롤러가 조종하는 폰(캐릭터)을 가져옵니다.
+	ARamdomItemDefenseCharacter* MyCharacter = GetPawn<ARamdomItemDefenseCharacter>();
+	if (!MyCharacter) return; // 캐릭터가 없으면 종료
+
+	// 캐릭터에서 인벤토리 컴포넌트를 가져옵니다.
+	UInventoryComponent* InventoryComp = MyCharacter->GetInventoryComponent();
+	if (!InventoryComp) return; // 인벤토리 컴포넌트가 없으면 종료
+
+	// 인벤토리 컴포넌트의 조합 함수를 호출합니다.
+	InventoryComp->CombineItemByResultID(ResultItemID);
 }
 
 void ARamdomItemDefensePlayerController::SetupInputComponent()

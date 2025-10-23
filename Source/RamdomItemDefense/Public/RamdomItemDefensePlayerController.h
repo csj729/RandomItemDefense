@@ -56,6 +56,9 @@ public:
 	/** (추후 구현) 인벤토리 UI를 토글합니다. */
 	void ToggleInventoryWidget();
 
+	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Inventory")
+	void Server_RequestCombineItem(FName ResultItemID);
+
 protected:
 	/** True if the controlled character should navigate to the mouse cursor. */
 	uint32 bMoveToMouseCursor : 1;

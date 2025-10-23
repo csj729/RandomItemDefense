@@ -128,3 +128,38 @@ void ARamdomItemDefenseCharacter::GetLifetimeReplicatedProps(TArray<FLifetimePro
 	DOREPLIFETIME(ARamdomItemDefenseCharacter, ManualTarget);
 }
 
+/** (서버 전용) 스탯 강화 적용 함수 */
+void ARamdomItemDefenseCharacter::ApplyStatUpgrade(EItemStatType StatType, int32 NewLevel)
+{
+	if (!HasAuthority() || !AbilitySystemComponent) return;
+
+	// 해당 스탯 타입에 맞는 GE 클래스를 TMap에서 찾습니다.
+	TSubclassOf<UGameplayEffect>* EffectClassPtr = UpgradeEffects.Find(StatType);
+	if (EffectClassPtr && *EffectClassPtr)
+	{
+		// 기존에 적용된 같은 레벨의 강화 효과가 있다면 제거해야 할 수 있음 (Stacking 방식에 따라 다름)
+		// TODO: Remove Gameplay Effects by Tag Query (강화 효과 식별 태그 필요)
+
+		// 새 레벨에 맞는 GameplayEffect를 적용합니다.
+		FGameplayEffectContextHandle ContextHandle = AbilitySystemComponent->MakeEffectContext();
+		ContextHandle.AddSourceObject(this);
+
+		// GE의 레벨을 설정하여 적용 (GE 내부에서 레벨에 따른 수치 계산 필요)
+		FGameplayEffectSpecHandle SpecHandle = AbilitySystemComponent->MakeOutgoingSpec(*EffectClassPtr, NewLevel, ContextHandle);
+		if (SpecHandle.IsValid())
+		{
+			AbilitySystemComponent->ApplyGameplayEffectSpecToSelf(*SpecHandle.Data.Get());
+
+			if (GEngine)
+			{
+				FString StatName = UEnum::GetValueAsString(StatType);
+				GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Cyan, FString::Printf(TEXT("Applied Upgrade Effect: %s (Level %d)"), *StatName, NewLevel));
+			}
+		}
+	}
+	else if (GEngine)
+	{
+		FString StatName = UEnum::GetValueAsString(StatType);
+		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, FString::Printf(TEXT("ApplyStatUpgrade Error: No GE found for %s"), *StatName));
+	}
+}

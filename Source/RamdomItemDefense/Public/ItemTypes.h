@@ -9,6 +9,10 @@
 #include "ItemTypes.generated.h"
 
 #define GAMEOVER_MONSTER_NUM 60
+#define MAX_NORMAL_STAT_LEVEL 100
+#define MAX_SPECIAL_STAT_LEVEL 3
+#define BASE_LEVELUP_COST 100
+#define INCREASING_COST_PER_LEVEL 50
 
 // 델리게이트 선언
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnIntChangedDelegate, int32, NewValue);
@@ -88,7 +92,7 @@ struct RAMDOMITEMDEFENSE_API FItemData : public FTableRowBase
     TSubclassOf<UGameplayAbility> GrantedAbility;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Item Data")
-    FText AbilityDescription;
+    FText ItemDescription;
 };
 
 // 조합법 데이터 구조체

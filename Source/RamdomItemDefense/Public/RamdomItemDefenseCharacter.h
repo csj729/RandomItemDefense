@@ -32,6 +32,9 @@ public:
 	FORCEINLINE UAttackComponent* GetAttackComponent() const { return AttackComponent; }
 	FORCEINLINE UInventoryComponent* GetInventoryComponent() const { return InventoryComponent; }
 
+	/** (서버 전용) PlayerState로부터 스탯 강화 적용 요청을 받습니다. */
+	void ApplyStatUpgrade(EItemStatType StatType, int32 NewLevel);
+
 protected:
 	virtual void BeginPlay() override;
 
@@ -59,6 +62,10 @@ protected:
 
 	UPROPERTY(Replicated)
 	TObjectPtr<AActor> ManualTarget;
+
+	/** 각 스탯 강화를 위한 GameplayEffect 클래스 (에디터에서 설정) */
+	UPROPERTY(EditDefaultsOnly, Category = "GAS|Upgrade")
+	TMap<EItemStatType, TSubclassOf<class UGameplayEffect>> UpgradeEffects;
 
 
 private:

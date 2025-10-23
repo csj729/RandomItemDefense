@@ -9,6 +9,13 @@ AMyPlayerState::AMyPlayerState()
 {
 	Gold = 0;
 	ChoiceCount = 0;
+
+	// 모든 강화 가능한 스탯의 초기 레벨을 0으로 설정
+	AttackDamageLevel = 0;
+	AttackSpeedLevel = 0;
+	CritDamageLevel = 0;
+	ArmorReductionLevel = 0;
+	SkillActivationChanceLevel = 0;
 }
 
 void AMyPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -17,6 +24,12 @@ void AMyPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 	DOREPLIFETIME(AMyPlayerState, Gold);
 	DOREPLIFETIME(AMyPlayerState, ChoiceCount);
 	DOREPLIFETIME(AMyPlayerState, MySpawner);
+	
+	DOREPLIFETIME(AMyPlayerState, AttackDamageLevel);
+	DOREPLIFETIME(AMyPlayerState, AttackSpeedLevel);
+	DOREPLIFETIME(AMyPlayerState, CritDamageLevel);
+	DOREPLIFETIME(AMyPlayerState, ArmorReductionLevel);
+	DOREPLIFETIME(AMyPlayerState, SkillActivationChanceLevel);
 }
 
 // --- 골드 관련 (수정됨) ---
@@ -27,6 +40,21 @@ void AMyPlayerState::AddGold(int32 Amount)
 		Gold += Amount;
 		OnRep_Gold(); // 서버에서도 델리게이트 호출
 	}
+}
+
+// --- 골드 소모 함수 ---
+bool AMyPlayerState::SpendGold(int32 Amount)
+{
+	if (!HasAuthority()) return false; // 서버에서만 실행
+	if (Amount <= 0) return true; // 0 이하 소모는 항상 성공
+
+	if (Gold >= Amount)
+	{
+		Gold -= Amount;
+		OnRep_Gold(); // 서버 UI 즉시 업데이트 및 클라이언트 복제 트리거
+		return true; // 소모 성공
+	}
+	return false; // 골드 부족
 }
 
 void AMyPlayerState::OnRep_Gold()
@@ -98,4 +126,159 @@ void AMyPlayerState::Server_UseRoundChoice_Implementation(bool bChoseItemGacha)
 		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Cyan, FString::Printf(TEXT("Player chose: Gold Gamble (+%d)"), GambleAmount));
 	}
 }
-// ------------------------------------
+
+/** 클라이언트에서 StatLevels 복제 시 호출 */
+// 각 OnRep 함수는 해당 스탯 타입과 새 레벨로 델리게이트를 호출합니다.
+void AMyPlayerState::OnRep_AttackDamageLevel() { OnStatLevelChangedDelegate.Broadcast(EItemStatType::AttackDamage, AttackDamageLevel); }
+void AMyPlayerState::OnRep_AttackSpeedLevel() { OnStatLevelChangedDelegate.Broadcast(EItemStatType::AttackSpeed, AttackSpeedLevel); }
+void AMyPlayerState::OnRep_CritDamageLevel() { OnStatLevelChangedDelegate.Broadcast(EItemStatType::CritDamage, CritDamageLevel); }
+void AMyPlayerState::OnRep_ArmorReductionLevel() { OnStatLevelChangedDelegate.Broadcast(EItemStatType::ArmorReduction, ArmorReductionLevel); }
+void AMyPlayerState::OnRep_SkillActivationChanceLevel() { OnStatLevelChangedDelegate.Broadcast(EItemStatType::SkillActivationChance, SkillActivationChanceLevel); }
+
+/** 특정 스탯 레벨 반환 */
+int32 AMyPlayerState::GetStatLevel(EItemStatType StatType) const
+{
+	// --- [코드 수정] switch 문 사용 ---
+	switch (StatType)
+	{
+	case EItemStatType::AttackDamage: return AttackDamageLevel;
+	case EItemStatType::AttackSpeed: return AttackSpeedLevel;
+	case EItemStatType::CritDamage: return CritDamageLevel;
+	case EItemStatType::ArmorReduction: return ArmorReductionLevel;
+	case EItemStatType::SkillActivationChance: return SkillActivationChanceLevel;
+	default: return 0;
+	}
+	// ----------------------------------
+}
+
+/** UI에서 호출하는 서버 RPC */
+void AMyPlayerState::Server_RequestStatUpgrade_Implementation(EItemStatType StatToUpgrade)
+{
+	// 서버에서 실제 강화 시도
+	TryUpgradeStat(StatToUpgrade);
+}
+
+/** (서버 전용) 실제 강화 로직 */
+/** (서버 전용) 실제 강화 로직 */
+bool AMyPlayerState::TryUpgradeStat(EItemStatType StatToUpgrade)
+{
+	if (!HasAuthority()) return false;
+
+	// 강화 가능 스탯 확인 (변경 없음)
+	const bool bIsGoldUpgradableBasicStat = (StatToUpgrade == EItemStatType::AttackDamage ||
+		StatToUpgrade == EItemStatType::AttackSpeed ||
+		StatToUpgrade == EItemStatType::CritDamage);
+
+	const bool bIsGoldUpgradableSpecialStat = (StatToUpgrade == EItemStatType::ArmorReduction ||
+		StatToUpgrade == EItemStatType::SkillActivationChance);
+
+	if (!bIsGoldUpgradableBasicStat && !bIsGoldUpgradableSpecialStat)
+	{
+		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, FString::Printf(TEXT("TryUpgradeStat: %s cannot be upgraded with gold."), *UEnum::GetValueAsString(StatToUpgrade)));
+		return false;
+	}
+
+	int32 CurrentLevel = GetStatLevel(StatToUpgrade);
+
+	// --- 강화 규칙 (변경 없음) ---
+	int32 MaxLevel = bIsGoldUpgradableBasicStat ? MAX_NORMAL_STAT_LEVEL : MAX_SPECIAL_STAT_LEVEL; // 특수 스탯 최대 3레벨
+	int32 BaseCost = BASE_LEVELUP_COST;
+	int32 CostIncreaseFactor = INCREASING_COST_PER_LEVEL;
+	// ---------------------------
+
+	// 레벨 제한 확인 (변경 없음)
+	if (CurrentLevel >= MaxLevel)
+	{
+		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Yellow, TEXT("TryUpgradeStat: Max level reached"));
+		return false;
+	}
+
+	// 비용 계산 (변경 없음)
+	int32 UpgradeCost = BaseCost + (CurrentLevel * CostIncreaseFactor);
+
+	// 골드 확인 및 소모 (변경 없음)
+	if (!SpendGold(UpgradeCost))
+	{
+		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Yellow, TEXT("TryUpgradeStat: Not enough gold"));
+		return false;
+	}
+
+	// --- [코드 수정] 성공 확률 계산 (새로운 규칙 적용) ---
+	bool bUpgradeSuccess = true; // 기본 스탯은 항상 성공
+	float SuccessChance = 1.0f; // 성공 확률 기록용 변수
+
+	if (bIsGoldUpgradableSpecialStat) // 특수 스탯일 경우 확률 적용
+	{
+		// CurrentLevel 기준으로 다음 레벨로 갈 확률 설정
+		switch (CurrentLevel)
+		{
+		case 0: // 0 -> 1 레벨 강화 시도
+			SuccessChance = 0.5f; // 50%
+			break;
+		case 1: // 1 -> 2 레벨 강화 시도
+			SuccessChance = 0.4f; // 40%
+			break;
+		case 2: // 2 -> 3 레벨 강화 시도
+			SuccessChance = 0.3f; // 30%
+			break;
+		default: // 이미 최대 레벨이거나 예외 상황 (이론상 여기에 도달하면 안 됨)
+			SuccessChance = 0.0f;
+			break;
+		}
+		// 0.0 ~ 1.0 사이 난수 생성하여 성공 여부 판정
+		bUpgradeSuccess = (FMath::FRand() < SuccessChance);
+	}
+	// ----------------------------------------------------
+
+	// 강화 성공 시 (변경 없음)
+	if (bUpgradeSuccess)
+	{
+		// 1. 레벨 증가 및 변수 업데이트 (switch 사용)
+		int32 NewLevel = CurrentLevel + 1;
+		bool bLevelUpdated = false;
+		switch (StatToUpgrade)
+		{
+		case EItemStatType::AttackDamage: AttackDamageLevel = NewLevel; bLevelUpdated = true; break;
+		case EItemStatType::AttackSpeed: AttackSpeedLevel = NewLevel; bLevelUpdated = true; break;
+		case EItemStatType::CritDamage: CritDamageLevel = NewLevel; bLevelUpdated = true; break;
+		case EItemStatType::ArmorReduction: ArmorReductionLevel = NewLevel; bLevelUpdated = true; break;
+		case EItemStatType::SkillActivationChance: SkillActivationChanceLevel = NewLevel; bLevelUpdated = true; break;
+		}
+
+		// 레벨 업데이트 성공 시 서버 UI 즉시 업데이트 및 클라이언트 복제 트리거
+		if (bLevelUpdated)
+		{
+			// 변경된 변수의 OnRep 함수 직접 호출 (변경 없음)
+			switch (StatToUpgrade)
+			{
+			case EItemStatType::AttackDamage: OnRep_AttackDamageLevel(); break;
+			case EItemStatType::AttackSpeed: OnRep_AttackSpeedLevel(); break;
+			case EItemStatType::CritDamage: OnRep_CritDamageLevel(); break;
+			case EItemStatType::ArmorReduction: OnRep_ArmorReductionLevel(); break;
+			case EItemStatType::SkillActivationChance: OnRep_SkillActivationChanceLevel(); break;
+			}
+
+			if (GEngine) // 성공 로그 (변경 없음)
+			{
+				FString StatName = UEnum::GetValueAsString(StatToUpgrade);
+				// 특수 스탯 성공 시 확률도 함께 표시 (선택 사항)
+				FString ChanceString = bIsGoldUpgradableSpecialStat ? FString::Printf(TEXT(" (Chance: %.0f%%)"), SuccessChance * 100) : TEXT("");
+				GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Green, FString::Printf(TEXT("Upgrade Success: %s to Level %d (Cost: %d)%s"), *StatName, NewLevel, UpgradeCost, *ChanceString));
+			}
+		}
+
+		// 2. 실제 스탯 적용 요청 (캐릭터 ASC에) (변경 없음)
+		ARamdomItemDefenseCharacter* Character = GetPawn<ARamdomItemDefenseCharacter>();
+		if (Character)
+		{
+			Character->ApplyStatUpgrade(StatToUpgrade, NewLevel);
+		}
+		return true;
+	}
+	else // 강화 실패 시 (특수 스탯 - 로그 변경 없음)
+	{
+		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Orange, FString::Printf(TEXT("Upgrade Failed: %s (Level %d -> %d, Cost: %d, Chance: %.0f%%)"),
+			*UEnum::GetValueAsString(StatToUpgrade), CurrentLevel, CurrentLevel + 1, UpgradeCost, SuccessChance * 100));
+		return false;
+	}
+}
