@@ -73,114 +73,120 @@ FGameplayTag UInventoryComponent::GetTagFromStatType(EItemStatType StatType) con
 	}
 }
 
-/**
- * @brief (서버 전용) 인벤토리에 아이템을 추가하고 GAS 효과(SetByCaller) 및 어빌리티를 적용합니다.
- */
+/** (서버 전용) 아이템 추가 */
 void UInventoryComponent::AddItem(FName ItemID)
 {
-	// ASC가 유효한지, 그리고 서버에서 실행되는지 확인합니다.
 	if (!AbilitySystemComponent.IsValid()) return;
-	if (!GetOwner()->HasAuthority())
-	{
-		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("InventoryComponent::AddItem called on Client!"));
-		return;
-	}
+	if (!GetOwner()->HasAuthority()) return;
 
-	// 데이터 테이블에서 아이템 정보를 가져옵니다.
 	bool bFound = false;
 	const FItemData ItemData = GetItemData(ItemID, bFound);
-	if (!bFound)
-	{
-		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, FString::Printf(TEXT("InventoryComponent: ItemID '%s' not found in ItemDataTable."), *ItemID.ToString()));
-		return;
-	}
+	if (!bFound) return;
 
-	// 1. 스탯 효과(GE) 적용 (SetByCaller 방식)
-	// 아이템 데이터에 BaseStats 정보가 있고, GenericItemStatEffect가 설정되어 있는지 확인합니다.
+	// 1. 스탯 효과(GE) 적용 (SetByCaller)
 	if (ItemData.BaseStats.Num() > 0 && GenericItemStatEffect)
 	{
-		// GameplayEffect 컨텍스트를 생성합니다.
 		FGameplayEffectContextHandle ContextHandle = AbilitySystemComponent->MakeEffectContext();
-		ContextHandle.AddSourceObject(this); // 이펙트 유발자를 InventoryComponent로 설정
-
-		// GenericItemStatEffect를 기반으로 Spec 핸들을 생성합니다.
+		ContextHandle.AddSourceObject(this);
 		FGameplayEffectSpecHandle SpecHandle = AbilitySystemComponent->MakeOutgoingSpec(GenericItemStatEffect, 1.0f, ContextHandle);
+
 		if (SpecHandle.IsValid())
 		{
-			// 아이템 데이터의 모든 BaseStats를 순회하며 SetByCaller 값을 설정합니다.
 			for (const FItemStatData& StatData : ItemData.BaseStats)
 			{
-				FGameplayTag StatTag = GetTagFromStatType(StatData.StatType); // 스탯 타입에 맞는 태그 가져오기
+				FGameplayTag StatTag = GetTagFromStatType(StatData.StatType);
 				if (StatTag.IsValid())
 				{
-					// Spec 데이터에 SetByCaller 값을 주입합니다 (예: "Item.Stat.AttackDamage" 태그에 10.0f)
 					SpecHandle.Data.Get()->SetSetByCallerMagnitude(StatTag, StatData.Value);
 				}
 			}
-
-			// 모든 값이 설정된 Spec을 캐릭터 자신에게 적용합니다.
 			FActiveGameplayEffectHandle ActiveHandle = AbilitySystemComponent->ApplyGameplayEffectSpecToSelf(*SpecHandle.Data.Get());
-			// 나중에 제거할 수 있도록 핸들을 아이템 ID와 함께 맵에 저장합니다.
-			AppliedStatEffectHandles.Add(ItemID, ActiveHandle);
+
+			// --- [디버그 로그 추가] ---
+			if (ActiveHandle.IsValid())
+			{
+				// 핸들이 유효하다면 맵에 저장
+				AppliedStatEffectHandles.Add(ItemID, ActiveHandle);
+				if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Cyan, FString::Printf(TEXT("AddItem: Stored GE Handle for %s"), *ItemID.ToString()));
+			}
+			else if (GEngine)
+			{
+				GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, FString::Printf(TEXT("AddItem: Applied GE Handle for %s is INVALID!"), *ItemID.ToString()));
+			}
+			// -------------------------
 		}
 	}
 
-	// 2. 고유 능력(GA) 부여 (GameplayAbility)
-	// 아이템 데이터에 GrantedAbility가 설정되어 있는지 확인합니다.
+	// 2. 고유 능력(GA) 부여 (변경 없음)
 	if (ItemData.GrantedAbility)
 	{
-		// 어빌리티 Spec을 생성하고 캐릭터에게 부여합니다.
 		FGameplayAbilitySpec AbilitySpec(ItemData.GrantedAbility);
 		FGameplayAbilitySpecHandle AbilityHandle = AbilitySystemComponent->GiveAbility(AbilitySpec);
-		// 나중에 제거할 수 있도록 핸들을 아이템 ID와 함께 맵에 저장합니다.
 		GrantedAbilityHandles.Add(ItemID, AbilityHandle);
+		// TODO: GA 핸들도 제대로 저장되는지 로그 추가 필요
 	}
 
-	// 인벤토리 배열에 아이템 ID를 추가합니다.
 	InventoryItems.Add(ItemID);
-	// UI 갱신을 위해 델리게이트를 방송합니다.
 	OnInventoryUpdated.Broadcast();
-
-	// 로그 출력
 	if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Green, FString::Printf(TEXT("Item Added (SBC): %s"), *ItemID.ToString()));
 }
 
-/**
- * @brief (서버 전용) 인벤토리에서 아이템을 제거하고 GAS 효과 및 어빌리티를 해제합니다.
- */
+/** (서버 전용) 아이템 제거 */
 void UInventoryComponent::RemoveItem(FName ItemID)
 {
-	// ASC 유효성, 서버 실행, 아이템 존재 여부를 확인합니다.
 	if (!AbilitySystemComponent.IsValid()) return;
 	if (!GetOwner()->HasAuthority()) return;
-	if (!InventoryItems.Contains(ItemID)) return;
+	// --- [코드 수정] 인벤토리 배열에서 실제로 제거하기 전에 핸들부터 처리 ---
+	// if (!InventoryItems.Contains(ItemID)) return; // 이 라인 이동
 
 	// 1. 스탯 효과(GE) 제거
-	// 해당 아이템 ID로 저장된 GE 핸들이 있는지 확인합니다.
+	// --- [디버그 로그 및 로직 수정] ---
 	if (AppliedStatEffectHandles.Contains(ItemID))
 	{
-		// 핸들을 사용하여 적용된 GameplayEffect를 제거합니다.
-		AbilitySystemComponent->RemoveActiveGameplayEffect(AppliedStatEffectHandles[ItemID]);
-		// 맵에서도 핸들 정보를 제거합니다.
-		AppliedStatEffectHandles.Remove(ItemID);
+		FActiveGameplayEffectHandle HandleToRemove = AppliedStatEffectHandles[ItemID];
+		if (HandleToRemove.IsValid())
+		{
+			bool bRemoved = AbilitySystemComponent->RemoveActiveGameplayEffect(HandleToRemove);
+			if (bRemoved && GEngine)
+			{
+				GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Orange, FString::Printf(TEXT("RemoveItem: Removed GE Handle for %s (Success)"), *ItemID.ToString()));
+			}
+			else if (GEngine)
+			{
+				GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, FString::Printf(TEXT("RemoveItem: Failed to remove GE Handle for %s"), *ItemID.ToString()));
+			}
+		}
+		else if (GEngine)
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, FString::Printf(TEXT("RemoveItem: Found INVALID GE Handle in map for %s"), *ItemID.ToString()));
+		}
+		AppliedStatEffectHandles.Remove(ItemID); // 맵에서 제거
 	}
+	else if (GEngine)
+	{
+		// 맵에 해당 ItemID 키 자체가 없는 경우
+		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Yellow, FString::Printf(TEXT("RemoveItem: No GE Handle found in map for %s"), *ItemID.ToString()));
+	}
+	// ---------------------------------
 
-	// 2. 고유 능력(GA) 제거
-	// 해당 아이템 ID로 저장된 GA 핸들이 있는지 확인합니다.
+	// 2. 고유 능력(GA) 제거 (변경 없음, 필요시 로그 추가)
 	if (GrantedAbilityHandles.Contains(ItemID))
 	{
-		// 핸들을 사용하여 부여된 GameplayAbility를 제거합니다.
 		AbilitySystemComponent->ClearAbility(GrantedAbilityHandles[ItemID]);
-		// 맵에서도 핸들 정보를 제거합니다.
 		GrantedAbilityHandles.Remove(ItemID);
+		// TODO: GA 제거 로그 추가
 	}
 
-	// 인벤토리 배열에서 아이템 ID를 제거합니다. (첫 번째 발견된 것 하나만)
-	InventoryItems.RemoveSingle(ItemID);
-	// UI 갱신을 위해 델리게이트를 방송합니다.
-	OnInventoryUpdated.Broadcast();
+	// --- [코드 수정] 실제 인벤토리 배열에서 제거는 가장 마지막에 ---
+	bool bRemovedFromArray = InventoryItems.RemoveSingle(ItemID) > 0;
+	if (!bRemovedFromArray && GEngine) // 아이템이 배열에 없는데 제거 시도된 경우
+	{
+		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, FString::Printf(TEXT("RemoveItem: ItemID %s was not found in InventoryItems array!"), *ItemID.ToString()));
+		return; // 아이템이 없었으므로 UI 업데이트 불필요
+	}
+	// --------------------------------------------------------
 
-	// 로그 출력
+	OnInventoryUpdated.Broadcast(); // UI 갱신 알림
 	if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Yellow, FString::Printf(TEXT("Item Removed: %s"), *ItemID.ToString()));
 }
 

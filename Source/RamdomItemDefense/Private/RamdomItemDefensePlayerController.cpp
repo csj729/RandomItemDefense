@@ -75,6 +75,12 @@ void ARamdomItemDefensePlayerController::BeginPlay()
 			{
 				RoundChoiceInstance = CreateWidget<URoundChoiceWidget>(this, RoundChoiceWidgetClass);
 			}
+
+			// --- [코드 추가] 게임오버 위젯 생성 ---
+			if (GameOverWidgetClass)
+			{
+				GameOverInstance = CreateWidget<UUserWidget>(this, GameOverWidgetClass);
+			}
 		}
 	}
 }
@@ -274,5 +280,55 @@ void ARamdomItemDefensePlayerController::OnPlayerChoiceCountChanged(int32 NewCou
 		{
 			RoundChoiceInstance->RemoveFromParent();
 		}
+	}
+}
+
+/** 게임오버 UI 표시 */
+void ARamdomItemDefensePlayerController::ShowGameOverUI()
+{
+	if (!IsLocalPlayerController()) return;
+
+	// 1. 기존 게임 UI 숨기기
+	if (MainHUDInstance && MainHUDInstance->IsInViewport()) MainHUDInstance->RemoveFromParent();
+	if (StatUpgradeInstance && StatUpgradeInstance->IsInViewport()) StatUpgradeInstance->RemoveFromParent();
+	if (InventoryInstance && InventoryInstance->IsInViewport()) InventoryInstance->RemoveFromParent();
+	if (RoundChoiceInstance && RoundChoiceInstance->IsInViewport()) RoundChoiceInstance->RemoveFromParent();
+	// (다른 팝업 UI가 있다면 여기서 함께 숨김 처리)
+
+	// 2. 게임오버 UI 표시
+	if (GameOverInstance && !GameOverInstance->IsInViewport())
+	{
+		GameOverInstance->AddToViewport();
+	}
+
+	// 3. 입력 모드를 UI 전용으로 변경 (게임 조작 방지)
+	FInputModeUIOnly InputModeData;
+	InputModeData.SetWidgetToFocus(GameOverInstance->TakeWidget()); // 포커스 설정 (선택 사항)
+	InputModeData.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+	SetInputMode(InputModeData);
+	bShowMouseCursor = true; // 마우스 커서 표시
+}
+
+/** 게임오버 UI 숨기기 */
+void ARamdomItemDefensePlayerController::HideGameOverUI()
+{
+	if (!IsLocalPlayerController()) return;
+
+	if (GameOverInstance && GameOverInstance->IsInViewport())
+	{
+		GameOverInstance->RemoveFromParent();
+	}
+
+	// 입력 모드 원래대로 복구 (예: 게임 + UI)
+	FInputModeGameAndUI InputModeData;
+	// InputModeData.SetWidgetToFocus(...); // 필요시 포커스 설정
+	InputModeData.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+	SetInputMode(InputModeData);
+	// bShowMouseCursor = false; // 게임에 따라 조절
+
+	// 메인 HUD 다시 표시
+	if (MainHUDInstance && !MainHUDInstance->IsInViewport())
+	{
+		MainHUDInstance->AddToViewport();
 	}
 }

@@ -6,6 +6,8 @@
 #include "Kismet/GameplayStatics.h"
 #include "MonsterWaveData.h"
 #include "MonsterSpawner.h"
+#include "MonsterBaseCharacter.h"
+#include "RamdomItemDefensePlayerController.h"
 #include "GameFramework/PlayerState.h"
 #include "Engine/Engine.h"
 
@@ -128,32 +130,73 @@ void ARamdomItemDefenseGameMode::StartNextWave()
 	if (!MyGameState)
 	{
 		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Red, TEXT("ERROR: GameState is NOT valid!"));
-		return;
+		return; // GameState 없으면 함수 종료
 	}
 
-	MyGameState->CurrentWave++;
-	MyGameState->OnRep_CurrentWave();
+	// --- [코드 추가] 보스 타임아웃 체크 ---
+	// 현재 웨이브가 1 이상이고(첫 웨이브 시작 시점 제외), 이전 웨이브가 보스 웨이브였는지 확인
+	if (MyGameState->GetCurrentWave() > 0 && (MyGameState->GetCurrentWave() % 10 == 0))
+	{
+		// TODO: 현재 맵에 보스 몬스터가 아직 살아있는지 확인하는 로직 구현 필요
+		// 예시: GameState에 보스 몬스터 액터 참조를 저장하고 IsValid 체크
+		bool bBossIsAlive = false; // <<--- 이 부분을 실제 보스 생존 확인 로직으로 교체해야 합니다.
+		// 예: TObjectPtr<AMonsterBaseCharacter> CurrentBoss; 를 GameState에 추가하고 관리
 
-	// 모든 플레이어에게 라운드 선택 횟수 2회를 부여합니다.
+		if (bBossIsAlive)
+		{
+			// 보스가 아직 살아있다면 -> 보스 타임 아웃 게임오버
+			if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 15.f, FColor::Red, TEXT("GAME OVER: Boss Time Out!"));
+
+			// 모든 플레이어 컨트롤러를 가져와 게임오버 UI 표시 함수 호출
+			for (APlayerState* PS : MyGameState->PlayerArray)
+			{
+				ARamdomItemDefensePlayerController* PC = Cast<ARamdomItemDefensePlayerController>(PS->GetPlayerController());
+				if (PC)
+				{
+					PC->ShowGameOverUI();
+				}
+			}
+			// 다음 웨이브 진행 및 게임오버 체크 타이머 중지
+			GetWorldTimerManager().ClearTimer(StageTimerHandle);
+			GetWorldTimerManager().ClearTimer(GameOverCheckTimerHandle);
+			return; // 게임오버 처리 후 함수 종료
+		}
+		// 보스가 죽었다면 정상적으로 다음 웨이브 진행
+	}
+	// --- 보스 타임아웃 체크 끝 ---
+
+
+	// 다음 웨이브 번호 설정
+	MyGameState->CurrentWave++;
+	MyGameState->OnRep_CurrentWave(); // RepNotify 호출 (서버 UI 즉시 업데이트 및 클라이언트 복제)
+
+	// 모든 플레이어에게 라운드 선택 횟수 2회 부여 (변경 없음)
 	for (APlayerState* PS : MyGameState->PlayerArray)
 	{
 		AMyPlayerState* MyPS = Cast<AMyPlayerState>(PS);
 		if (MyPS)
 		{
+			// AddChoiceCount 함수 이름 확인 필요 (이전 코드에서는 AddChoiceCount로 되어 있었음)
 			MyPS->AddChoiceCount(2); // 서버 전용 함수 호출
 		}
 	}
 
+	// --- [코드 수정] 보스 웨이브 분기 로직 ---
 	const int32 CurrentWave = MyGameState->GetCurrentWave();
+	// 현재 웨이브가 1 이상이고 10의 배수이면 보스 웨이브로 간주
 	const bool bIsBossWave = (CurrentWave > 0 && CurrentWave % 10 == 0);
+	// 보스 웨이브는 120초, 일반 웨이브는 60초
 	const float TimeLimitForThisWave = bIsBossWave ? BossStageTimeLimit : StageTimeLimit;
 
-	// GameState에 이번 웨이브의 종료 시간을 기록합니다.
+	// GameState에 이번 웨이브의 종료 시간 기록 (변경 없음)
 	MyGameState->WaveEndTime = GetWorld()->GetTimeSeconds() + TimeLimitForThisWave;
 	MyGameState->OnRep_WaveEndTime();
 
+	// 보스 웨이브는 1마리, 일반 웨이브는 설정값(MonstersPerWave)만큼 스폰
 	const int32 NumToSpawn = bIsBossWave ? 1 : MonstersPerWave;
+	// --- 보스 웨이브 분기 끝 ---
 
+	// 로그 출력 (변경 없음)
 	if (GEngine)
 	{
 		FString WaveInfoMsg = FString::Printf(TEXT("Wave %d Info: bIsBoss=%s, TimeLimit=%.1f, NumToSpawn=%d"),
@@ -161,13 +204,17 @@ void ARamdomItemDefenseGameMode::StartNextWave()
 		GEngine->AddOnScreenDebugMessage(-1, 10.0f, FColor::White, WaveInfoMsg);
 	}
 
+	// 몬스터 데이터 테이블 로드 및 스폰 명령 (변경 없음)
 	if (MonsterWaveDataTable)
 	{
+		// 보스 웨이브와 일반 웨이브에 다른 Row Name 규칙이 필요할 수 있음 (예: "Boss1", "Boss2")
+		// 여기서는 일단 "Wave10", "Wave20" 등으로 동일하게 사용
 		FString RowName = FString::Printf(TEXT("Wave%d"), CurrentWave);
 		FMonsterWaveData* WaveData = MonsterWaveDataTable->FindRow<FMonsterWaveData>(*RowName, TEXT(""));
 
 		if (WaveData && WaveData->MonstersToSpawn.Num() > 0)
 		{
+			// TODO: 보스 웨이브일 경우 WaveData->MonstersToSpawn[0]이 실제 보스 몬스터 클래스인지 확인 필요
 			TSubclassOf<AMonsterBaseCharacter> MonsterClass = WaveData->MonstersToSpawn[0];
 
 			if (GEngine)
@@ -176,21 +223,31 @@ void ARamdomItemDefenseGameMode::StartNextWave()
 				GEngine->AddOnScreenDebugMessage(-1, 10.0f, FColor::Cyan, SpawnerCountMsg);
 			}
 
+			// 모든 스포너에게 스폰 명령 전달
 			for (AMonsterSpawner* Spawner : MonsterSpawners)
 			{
 				if (Spawner)
 				{
+					// 스포너가 게임오버 상태가 아닐 때만 스폰하도록 추가 체크 가능
+					// if (!Spawner->IsGameOver())
+					// {
 					Spawner->BeginSpawning(MonsterClass, NumToSpawn);
+					// }
 				}
 			}
+
+			// TODO: 보스 스폰 시 GameState 등에 보스 액터 참조 저장하는 로직 필요 (타임아웃 체크용)
+
 		}
 		else
 		{
-			if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 10.0f, FColor::Red, TEXT("ERROR: WaveData not found or no monsters assigned in DataTable!"));
-			return;
+			if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 10.0f, FColor::Red, FString::Printf(TEXT("ERROR: WaveData for '%s' not found or no monsters assigned in DataTable!"), *RowName));
+			// 웨이브 데이터가 없으면 다음 웨이브로 넘어가지 않도록 타이머 설정 중단 (선택 사항)
+			// return;
 		}
 	}
 
+	// 다음 웨이브 시작 타이머 설정 (변경 없음)
 	GetWorld()->GetTimerManager().SetTimer(StageTimerHandle, this, &ARamdomItemDefenseGameMode::StartNextWave, TimeLimitForThisWave, false);
 }
 
@@ -200,12 +257,41 @@ void ARamdomItemDefenseGameMode::CheckGameOver()
 	for (AMonsterSpawner* Spawner : MonsterSpawners)
 	{
 		// 스포너가 유효하고, 아직 게임오버 상태가 아니며, 몬스터 수가 60마리를 초과했는지 확인
-		if (Spawner && !Spawner->IsGameOver() && Spawner->GetCurrentMonsterCount() > 60)
+		if (Spawner && !Spawner->IsGameOver() && Spawner->GetCurrentMonsterCount() > GameoverMonsterNum)
 		{
 			// 해당 스포너를 게임오버 상태로 만듭니다.
 			Spawner->SetGameOver();
 
+			APlayerController* Controller = GetControllerForSpawner(Spawner);
+			ARamdomItemDefensePlayerController* PC = Cast<ARamdomItemDefensePlayerController>(Controller);
+			if (PC)
+			{
+				if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 15.f, FColor::Red, FString::Printf(TEXT("GAME OVER: Monster limit exceeded for %s"), *PC->GetName()));
+				PC->ShowGameOverUI();
+			}
+
 			// TODO: 이 스포너와 연결된 플레이어에게 게임오버 UI를 띄우는 로직
 		}
 	}
+}
+
+/** 스포너 -> 컨트롤러 찾기 헬퍼 함수 */
+APlayerController* ARamdomItemDefenseGameMode::GetControllerForSpawner(AMonsterSpawner* Spawner) const
+{
+	if (!Spawner) return nullptr;
+	AMyGameState* MyGameState = GetGameState<AMyGameState>();
+	if (!MyGameState) return nullptr;
+
+	// 모든 PlayerState를 순회
+	for (APlayerState* PS : MyGameState->PlayerArray)
+	{
+		AMyPlayerState* MyPS = Cast<AMyPlayerState>(PS);
+		// PlayerState의 MySpawner가 주어진 Spawner와 일치하는지 확인
+		if (MyPS && MyPS->MySpawner == Spawner)
+		{
+			// 일치하면 해당 PlayerState의 Controller 반환
+			return MyPS->GetPlayerController();
+		}
+	}
+	return nullptr; // 찾지 못함
 }

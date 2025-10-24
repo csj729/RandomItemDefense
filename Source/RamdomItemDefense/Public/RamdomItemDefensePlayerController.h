@@ -18,6 +18,7 @@ class UStatUpgradeWidget;
 class UInventoryWidget;
 class URoundChoiceWidget;
 class AMyPlayerState;
+class UUserWidget;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
 
@@ -58,6 +59,11 @@ public:
 
 	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Inventory")
 	void Server_RequestCombineItem(FName ResultItemID);
+
+	/** (GameMode에서 호출) 게임오버 UI를 표시합니다. */
+	void ShowGameOverUI();
+	/** 게임오버 UI를 숨깁니다. (재시작 시 호출될 수 있음) */
+	void HideGameOverUI();
 
 protected:
 	/** True if the controlled character should navigate to the mouse cursor. */
@@ -114,6 +120,14 @@ protected:
 
 	UPROPERTY()
 	TObjectPtr<AMyPlayerState> MyPlayerStateRef;
+
+	/** WBP_GameOver 블루프린트 클래스 (에디터에서 설정) */
+	UPROPERTY(EditDefaultsOnly, Category = "UI")
+	TSubclassOf<UUserWidget> GameOverWidgetClass;
+
+	/** 생성된 게임오버 위젯 인스턴스 */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "UI")
+	TObjectPtr<UUserWidget> GameOverInstance;
 
 private:
 	FVector CachedDestination;

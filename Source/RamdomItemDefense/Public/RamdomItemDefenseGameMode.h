@@ -34,6 +34,9 @@ private:
 	int32 MonstersPerWave;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Wave Data|Normal")
+	int32 GameoverMonsterNum;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Wave Data|Normal")
 	float StageTimeLimit;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Wave Data|Boss")
@@ -47,4 +50,7 @@ private:
 
 	FTimerHandle StageTimerHandle;
 	FTimerHandle GameOverCheckTimerHandle;
+
+	/** 스포너와 연결된 플레이어 컨트롤러를 찾아 반환하는 헬퍼 함수 */
+	APlayerController* GetControllerForSpawner(AMonsterSpawner* Spawner) const;
 };
