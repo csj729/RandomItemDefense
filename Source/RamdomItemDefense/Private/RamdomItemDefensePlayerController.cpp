@@ -35,53 +35,39 @@ ARamdomItemDefensePlayerController::ARamdomItemDefensePlayerController()
 void ARamdomItemDefensePlayerController::BeginPlay()
 {
 	Super::BeginPlay();
-	// EnhancedInput 및 UI 생성 로직은 로컬 플레이어 컨트롤러에서만 실행되어야 합니다.
+
+	// 로컬 플레이어 컨트롤러에서만 Input 및 UI 설정
 	if (IsLocalPlayerController())
 	{
+		// --- Enhanced Input Subsystem 설정 ---
 		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
 		{
 			Subsystem->AddMappingContext(DefaultMappingContext, 0);
 		}
+		// ------------------------------------
 
-		// --- UI 생성 ---
+		// --- UI 생성 (기존과 동일) ---
 		UWorld* World = GetWorld();
 		if (World)
 		{
-			// 1. 메인 HUD 생성 및 뷰포트 추가
-			if (MainHUDWidgetClass)
-			{
-				MainHUDInstance = CreateWidget<UMainHUDWidget>(this, MainHUDWidgetClass);
-				if (MainHUDInstance)
-				{
-					MainHUDInstance->AddToViewport();
-				}
-			}
+			if (MainHUDWidgetClass) MainHUDInstance = CreateWidget<UMainHUDWidget>(this, MainHUDWidgetClass);
+			if (StatUpgradeWidgetClass) StatUpgradeInstance = CreateWidget<UUserWidget>(this, StatUpgradeWidgetClass);
+			if (InventoryWidgetClass) InventoryInstance = CreateWidget<UUserWidget>(this, InventoryWidgetClass);
+			if (RoundChoiceWidgetClass) RoundChoiceInstance = CreateWidget<URoundChoiceWidget>(this, RoundChoiceWidgetClass);
+			if (GameOverWidgetClass) GameOverInstance = CreateWidget<UUserWidget>(this, GameOverWidgetClass);
 
-			// 2. 스탯 강화창 생성 (숨겨진 상태로)
-			if (StatUpgradeWidgetClass)
-			{
-				StatUpgradeInstance = CreateWidget<UUserWidget>(this, StatUpgradeWidgetClass);
-				// (필요시 StatUpgradeInstance->SetVisibility(ESlateVisibility::Hidden);)
-			}
-
-			// 3. 인벤토리창 생성 (숨겨진 상태로)
-			if (InventoryWidgetClass)
-			{
-				InventoryInstance = CreateWidget<UUserWidget>(this, InventoryWidgetClass);
-			}
-
-			// 4. 라운드 선택 위젯 생성 (화면에 바로 추가하지 않음)
-			if (RoundChoiceWidgetClass)
-			{
-				RoundChoiceInstance = CreateWidget<URoundChoiceWidget>(this, RoundChoiceWidgetClass);
-			}
-
-			// --- [코드 추가] 게임오버 위젯 생성 ---
-			if (GameOverWidgetClass)
-			{
-				GameOverInstance = CreateWidget<UUserWidget>(this, GameOverWidgetClass);
-			}
+			// 초기에는 메인 HUD만 보이도록
+			if (MainHUDInstance) MainHUDInstance->AddToViewport();
 		}
+		// -----------------------------
+
+		// 게임 시작 또는 레벨 재시작 시 입력 모드를 Game and UI로 설정합니다.
+		FInputModeGameAndUI InputModeData;
+		// InputModeData.SetWidgetToFocus(...); // 필요시 포커스 위젯 설정
+		InputModeData.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock); // 마우스 락 해제
+		SetInputMode(InputModeData);
+		// bShowMouseCursor = true; // 마우스 커서는 이미 생성자에서 true로 설정됨
+		// ------------------------------------
 	}
 }
 
