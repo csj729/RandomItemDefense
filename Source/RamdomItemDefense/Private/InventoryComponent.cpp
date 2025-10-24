@@ -4,6 +4,7 @@
 #include "Engine/DataTable.h"
 #include "Engine/Engine.h" // GEngine 디버그 메시지
 #include "GameplayTagsManager.h" // GameplayTag 관련
+#include "RamdomItemDefense.h" // RID_LOG 매크로용
 
 UInventoryComponent::UInventoryComponent()
 {
@@ -28,7 +29,9 @@ FItemData UInventoryComponent::GetItemData(FName ItemID, bool& bSuccess) const
 	bSuccess = false; // 기본적으로 실패로 설정
 	if (!ItemDataTable)
 	{
-		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("InventoryComponent: ItemDataTable is NOT set!"));
+		// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
+		RID_LOG(FColor::Red, TEXT("InventoryComponent: ItemDataTable is NOT set!"));
+		// -----------------------------------------
 		return FItemData(); // 빈 구조체 반환
 	}
 
@@ -107,12 +110,16 @@ void UInventoryComponent::AddItem(FName ItemID)
 			{
 				// 핸들이 유효하다면 맵에 저장
 				AppliedStatEffectHandles.Add(ItemID, ActiveHandle);
-				if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Cyan, FString::Printf(TEXT("AddItem: Stored GE Handle for %s"), *ItemID.ToString()));
+				// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
+				RID_LOG(FColor::Cyan, TEXT("AddItem: Stored GE Handle for %s"), *ItemID.ToString());
+				// -----------------------------------------
 			}
-			else if (GEngine)
+			// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
+			else
 			{
-				GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, FString::Printf(TEXT("AddItem: Applied GE Handle for %s is INVALID!"), *ItemID.ToString()));
+				RID_LOG(FColor::Red, TEXT("AddItem: Applied GE Handle for %s is INVALID!"), *ItemID.ToString());
 			}
+			// -----------------------------------------
 			// -------------------------
 		}
 	}
@@ -128,7 +135,9 @@ void UInventoryComponent::AddItem(FName ItemID)
 
 	InventoryItems.Add(ItemID);
 	OnInventoryUpdated.Broadcast();
-	if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Green, FString::Printf(TEXT("Item Added (SBC): %s"), *ItemID.ToString()));
+	// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
+	RID_LOG(FColor::Green, TEXT("Item Added (SBC): %s"), *ItemID.ToString());
+	// -----------------------------------------
 }
 
 /** (서버 전용) 아이템 제거 */
@@ -147,26 +156,32 @@ void UInventoryComponent::RemoveItem(FName ItemID)
 		if (HandleToRemove.IsValid())
 		{
 			bool bRemoved = AbilitySystemComponent->RemoveActiveGameplayEffect(HandleToRemove);
-			if (bRemoved && GEngine)
+			// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
+			if (bRemoved)
 			{
-				GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Orange, FString::Printf(TEXT("RemoveItem: Removed GE Handle for %s (Success)"), *ItemID.ToString()));
+				RID_LOG(FColor::Orange, TEXT("RemoveItem: Removed GE Handle for %s (Success)"), *ItemID.ToString());
 			}
-			else if (GEngine)
+			else
 			{
-				GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, FString::Printf(TEXT("RemoveItem: Failed to remove GE Handle for %s"), *ItemID.ToString()));
+				RID_LOG(FColor::Red, TEXT("RemoveItem: Failed to remove GE Handle for %s"), *ItemID.ToString());
 			}
+			// -----------------------------------------
 		}
-		else if (GEngine)
+		// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
+		else
 		{
-			GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, FString::Printf(TEXT("RemoveItem: Found INVALID GE Handle in map for %s"), *ItemID.ToString()));
+			RID_LOG(FColor::Red, TEXT("RemoveItem: Found INVALID GE Handle in map for %s"), *ItemID.ToString());
 		}
+		// -----------------------------------------
 		AppliedStatEffectHandles.Remove(ItemID); // 맵에서 제거
 	}
-	else if (GEngine)
+	// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
+	else
 	{
 		// 맵에 해당 ItemID 키 자체가 없는 경우
-		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Yellow, FString::Printf(TEXT("RemoveItem: No GE Handle found in map for %s"), *ItemID.ToString()));
+		RID_LOG(FColor::Yellow, TEXT("RemoveItem: No GE Handle found in map for %s"), *ItemID.ToString());
 	}
+	// ---------------------------------
 	// ---------------------------------
 
 	// 2. 고유 능력(GA) 제거 (변경 없음, 필요시 로그 추가)
@@ -179,15 +194,19 @@ void UInventoryComponent::RemoveItem(FName ItemID)
 
 	// --- [코드 수정] 실제 인벤토리 배열에서 제거는 가장 마지막에 ---
 	bool bRemovedFromArray = InventoryItems.RemoveSingle(ItemID) > 0;
-	if (!bRemovedFromArray && GEngine) // 아이템이 배열에 없는데 제거 시도된 경우
+	// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
+	if (!bRemovedFromArray) // 아이템이 배열에 없는데 제거 시도된 경우
 	{
-		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, FString::Printf(TEXT("RemoveItem: ItemID %s was not found in InventoryItems array!"), *ItemID.ToString()));
+		RID_LOG(FColor::Red, TEXT("RemoveItem: ItemID %s was not found in InventoryItems array!"), *ItemID.ToString());
 		return; // 아이템이 없었으므로 UI 업데이트 불필요
 	}
 	// --------------------------------------------------------
+	// --------------------------------------------------------
 
 	OnInventoryUpdated.Broadcast(); // UI 갱신 알림
-	if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Yellow, FString::Printf(TEXT("Item Removed: %s"), *ItemID.ToString()));
+	// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
+	RID_LOG(FColor::Yellow, TEXT("Item Removed: %s"), *ItemID.ToString());
+	// -----------------------------------------
 }
 
 /**
@@ -199,7 +218,9 @@ void UInventoryComponent::AddRandomItem()
 	// ItemDataTable 유효성 검사
 	if (!ItemDataTable)
 	{
-		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("InventoryComponent: ItemDataTable is NOT set! Cannot add random item."));
+		// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
+		RID_LOG(FColor::Red, TEXT("InventoryComponent: ItemDataTable is NOT set! Cannot add random item."));
+		// -----------------------------------------
 		return;
 	}
 
@@ -238,7 +259,9 @@ void UInventoryComponent::AddRandomItem()
 	else
 	{
 		// 데이터 테이블에 흔함 등급 아이템이 하나도 없을 경우 로그 출력
-		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Yellow, TEXT("InventoryComponent: No Common grade items found in ItemDataTable!"));
+		// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
+		RID_LOG(FColor::Yellow, TEXT("InventoryComponent: No Common grade items found in ItemDataTable!"));
+		// -----------------------------------------
 	}
 	// ------------------
 }
@@ -253,13 +276,17 @@ bool UInventoryComponent::CombineItemByResultID(FName ResultItemID)
 	// 서버에서만 실행되도록 합니다.
 	if (!GetOwner()->HasAuthority())
 	{
-		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("CombineItemByResultID called on Client!"));
+		// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
+		RID_LOG(FColor::Red, TEXT("CombineItemByResultID called on Client!"));
+		// -----------------------------------------
 		return false;
 	}
 	// RecipeDataTable이 설정되어 있는지 확인합니다.
 	if (!RecipeDataTable)
 	{
-		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("RecipeDataTable is NOT set!"));
+		// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
+		RID_LOG(FColor::Red, TEXT("RecipeDataTable is NOT set!"));
+		// -----------------------------------------
 		return false;
 	}
 
@@ -286,7 +313,9 @@ bool UInventoryComponent::CombineItemByResultID(FName ResultItemID)
 	// 최종적으로 조합법을 찾지 못했다면 실패를 반환합니다.
 	if (!RecipeData)
 	{
-		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Yellow, FString::Printf(TEXT("No recipe found for ResultItemID: %s"), *ResultItemID.ToString()));
+		// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
+		RID_LOG(FColor::Yellow, TEXT("No recipe found for ResultItemID: %s"), *ResultItemID.ToString());
+		// -----------------------------------------
 		return false;
 	}
 
@@ -295,7 +324,9 @@ bool UInventoryComponent::CombineItemByResultID(FName ResultItemID)
 	// 여기서는 임시로 ResultItemID를 RecipeID처럼 사용합니다. 필요시 수정 필요)
 	if (!CanCombine(ResultItemID)) // TODO: RecipeData->GetRowName() 같은 함수가 있다면 그것을 사용
 	{
-		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Yellow, FString::Printf(TEXT("Cannot combine %s: Ingredients missing."), *ResultItemID.ToString()));
+		// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
+		RID_LOG(FColor::Yellow, TEXT("Cannot combine %s: Ingredients missing."), *ResultItemID.ToString());
+		// -----------------------------------------
 		return false;
 	}
 
@@ -315,7 +346,9 @@ bool UInventoryComponent::CombineItemByResultID(FName ResultItemID)
 		{
 			// 이 경우는 CanCombine() 로직이 잘못되었거나, 그 사이에 아이템이 사라진 경우입니다.
 			bFailedToRemoveIngredient = true;
-			if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 15.f, FColor::Red, FString::Printf(TEXT("CRITICAL ERROR in CombineItem: Ingredient %s vanished AFTER CanCombine passed!"), *IngredientID.ToString()));
+			// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
+			RID_LOG(FColor::Red, TEXT("CRITICAL ERROR in CombineItem: Ingredient %s vanished AFTER CanCombine passed!"), *IngredientID.ToString());
+			// -----------------------------------------
 			break; // 재료 소모 중단
 		}
 	}
@@ -324,7 +357,9 @@ bool UInventoryComponent::CombineItemByResultID(FName ResultItemID)
 	if (!bFailedToRemoveIngredient)
 	{
 		AddItem(RecipeData->ResultItemID); // 결과 아이템 추가 및 효과 적용
-		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Green, FString::Printf(TEXT("Successfully combined: %s"), *RecipeData->ResultItemID.ToString()));
+		// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
+		RID_LOG(FColor::Green, TEXT("Successfully combined: %s"), *RecipeData->ResultItemID.ToString());
+		// -----------------------------------------
 		return true; // 조합 성공
 	}
 

@@ -11,6 +11,7 @@
 #include "Blueprint/AIBlueprintHelperLibrary.h"
 #include "AbilitySystemBlueprintLibrary.h"
 #include "Engine/Engine.h"
+#include "RamdomItemDefense.h" // RID_LOG 매크로용
 
 UAttackComponent::UAttackComponent()
 {
@@ -63,11 +64,9 @@ void UAttackComponent::OnAttackSpeedChanged(const FOnAttributeChangeData& Data)
 			GetWorld()->GetTimerManager().SetTimer(PerformAttackTimerHandle, this, &UAttackComponent::PerformAttack, NewInterval, true);
 		}
 
-		if (GEngine)
-		{
-			FString Msg = FString::Printf(TEXT("AttackSpeed changed to: %.2f. Timer rescheduled."), NewAttackSpeed);
-			GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Green, Msg);
-		}
+		// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
+		RID_LOG(FColor::Green, TEXT("AttackSpeed changed to: %.2f. Timer rescheduled."), NewAttackSpeed);
+		// -----------------------------------------
 	}
 }
 
@@ -84,11 +83,9 @@ void UAttackComponent::OrderAttack(AActor* Target)
 		return;
 	}
 
-	if (GEngine)
-	{
-		FString Msg = FString::Printf(TEXT("OrderAttack received for Target(%s). Setting as ManualTarget."), *Target->GetName());
-		GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Cyan, Msg);
-	}
+	// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
+	RID_LOG(FColor::Cyan, TEXT("OrderAttack received for Target(%s). Setting as ManualTarget."), *Target->GetName());
+	// -----------------------------------------
 
 	ManualTarget = Target;
 	AutoTarget = nullptr;
@@ -174,7 +171,9 @@ void UAttackComponent::PerformAttack()
 
 		if (!AttributeSet)
 		{
-			if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("ERROR: AttributeSet is NULL!"));
+			// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
+			RID_LOG(FColor::Red, TEXT("ERROR: AttributeSet is NULL!"));
+			// -----------------------------------------
 			return;
 		}
 
@@ -221,13 +220,10 @@ void UAttackComponent::PerformAttack()
 				FGameplayTag EventTag = FGameplayTag::RequestGameplayTag(FName("Event.Attack.Perform"));
 				UAbilitySystemBlueprintLibrary::SendGameplayEventToActor(OwnerCharacter, EventTag, Payload);
 
-				if (GEngine)
-				{
-					FString DebugMes = FString::Printf(TEXT("Attacking -> %s"), *TargetToAttack->GetName());
-					GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Yellow, DebugMes);
-				}
+				// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
+				RID_LOG(FColor::Yellow, TEXT("Attacking -> %s"), *TargetToAttack->GetName());
+				// -----------------------------------------
 			}
 		}
 	}
 }
-

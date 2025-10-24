@@ -2,7 +2,7 @@
 #include "AIController.h"
 #include "BehaviorTree/BlackboardComponent.h"
 #include "Components/SplineComponent.h"
-#include "Engine/Engine.h"
+#include "RamdomItemDefense.h" // GEngine 대체
 #include "NavigationSystem.h"
 
 UBTTask_FindPatrolPos::UBTTask_FindPatrolPos()
@@ -17,7 +17,9 @@ EBTNodeResult::Type UBTTask_FindPatrolPos::ExecuteTask(UBehaviorTreeComponent& O
 	UBlackboardComponent* BlackboardComp = OwnerComp.GetBlackboardComponent();
 	if (BlackboardComp == nullptr)
 	{
-		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("BTTask: ERROR! Blackboard is null."));
+		// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
+		RID_LOG(FColor::Red, TEXT("BTTask: ERROR! Blackboard is null."));
+		// -----------------------------------------
 		return EBTNodeResult::Failed;
 	}
 
@@ -27,11 +29,13 @@ EBTNodeResult::Type UBTTask_FindPatrolPos::ExecuteTask(UBehaviorTreeComponent& O
 	// 1. 블랙보드에서 경로 액터와 현재 인덱스를 가져옵니다.
 	AActor* PathActor = Cast<AActor>(BlackboardComp->GetValueAsObject(PathActorKey.SelectedKeyName));
 	int32 CurrentPointIndex = BlackboardComp->GetValueAsInt(PointIndexKey.SelectedKeyName);
-	
+
 	if (PathActor == nullptr)
 	{
 		// 이 에러 메시지가 바로 지금 겪고 계신 문제입니다.
-		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, FString::Printf(TEXT("BTTask: ERROR! Value for key '%s' is null in Blackboard."), *PathActorKey.SelectedKeyName.ToString()));
+		// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
+		RID_LOG(FColor::Red, TEXT("BTTask: ERROR! Value for key '%s' is null in Blackboard."), *PathActorKey.SelectedKeyName.ToString());
+		// -----------------------------------------
 		return EBTNodeResult::Failed;
 	}
 
@@ -39,7 +43,9 @@ EBTNodeResult::Type UBTTask_FindPatrolPos::ExecuteTask(UBehaviorTreeComponent& O
 	USplineComponent* SplineComp = PathActor->FindComponentByClass<USplineComponent>();
 	if (SplineComp == nullptr)
 	{
-		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("BTTask: ERROR! Path Actor has no Spline Component."));
+		// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
+		RID_LOG(FColor::Red, TEXT("BTTask: ERROR! Path Actor has no Spline Component."));
+		// -----------------------------------------
 		return EBTNodeResult::Failed;
 	}
 

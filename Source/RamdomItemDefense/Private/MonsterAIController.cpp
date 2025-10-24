@@ -3,7 +3,7 @@
 #include "BehaviorTree/BlackboardComponent.h"
 #include "MonsterBaseCharacter.h"
 #include "Kismet/GameplayStatics.h"
-#include "Engine/Engine.h" // GEngine 사용
+#include "RamdomItemDefense.h" // GEngine 대체
 
 // 생성자는 이전과 동일
 AMonsterAIController::AMonsterAIController()
@@ -18,7 +18,9 @@ void AMonsterAIController::OnPossess(APawn* InPawn)
 
 	// ================== [AI 디버깅 1-1] ==================
 	// 컨트롤러가 폰에 빙의되었는지 확인
-	if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 10.f, FColor::Cyan, TEXT("AIController: OnPossess called."));
+	// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
+	RID_LOG(FColor::Cyan, TEXT("AIController: OnPossess called."));
+	// -----------------------------------------
 
 	if (BehaviorTree)
 	{
@@ -37,11 +39,15 @@ void AMonsterAIController::OnPossess(APawn* InPawn)
 		{
 			PathActor = FoundPaths[0];
 			FString PathName = GetNameSafe(PathActor);
-			if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 10.f, FColor::Green, FString::Printf(TEXT("AIController: Found Path Actor '%s'."), *PathName));
+			// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
+			RID_LOG(FColor::Green, TEXT("AIController: Found Path Actor '%s'."), *PathName);
+			// -----------------------------------------
 		}
 		else
 		{
-			if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 10.f, FColor::Red, TEXT("AIController: ERROR! Could not find Actor with tag 'MonsterPath'."));
+			// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
+			RID_LOG(FColor::Red, TEXT("AIController: ERROR! Could not find Actor with tag 'MonsterPath'."));
+			// -----------------------------------------
 		}
 		// =======================================================
 
@@ -51,14 +57,20 @@ void AMonsterAIController::OnPossess(APawn* InPawn)
 			BlackboardComponent->SetValueAsObject(TEXT("PathToFollow"), PathActor);
 			BlackboardComponent->SetValueAsInt(TEXT("CurrentSplinePointIndex"), 0);
 
-			if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 10.f, FColor::Green, TEXT("AIController: Set 'PathToFollow' on Blackboard."));
+			// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
+			RID_LOG(FColor::Green, TEXT("AIController: Set 'PathToFollow' on Blackboard."));
+			// -----------------------------------------
 		}
 
 		RunBehaviorTree(BehaviorTree);
-		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 10.f, FColor::Cyan, TEXT("AIController: RunBehaviorTree called."));
+		// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
+		RID_LOG(FColor::Cyan, TEXT("AIController: RunBehaviorTree called."));
+		// -----------------------------------------
 	}
 	else
 	{
-		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 10.f, FColor::Red, TEXT("AIController: ERROR! BehaviorTree is NOT assigned."));
+		// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
+		RID_LOG(FColor::Red, TEXT("AIController: ERROR! BehaviorTree is NOT assigned."));
+		// -----------------------------------------
 	}
 }

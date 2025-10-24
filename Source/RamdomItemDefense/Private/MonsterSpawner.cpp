@@ -4,6 +4,7 @@
 #include "DrawDebugHelpers.h"
 #include "Engine/Engine.h"
 #include "Net/UnrealNetwork.h"
+#include "RamdomItemDefense.h" // RID_LOG 매크로용
 
 AMonsterSpawner::AMonsterSpawner()
 {
@@ -44,12 +45,14 @@ void AMonsterSpawner::BeginSpawning(TSubclassOf<AMonsterBaseCharacter> MonsterCl
 	TotalToSpawn = Count;
 	SpawnCounter = 0;
 
-	if (bEnableDebug && GEngine)
+	// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
+	if (bEnableDebug)
 	{
 		FString MonsterName = GetNameSafe(MonsterClassToSpawn);
 		FString DebugMessage = FString::Printf(TEXT("Spawner '%s' received command: Spawn %d of '%s'."), *GetName(), Count, *MonsterName);
-		GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Cyan, DebugMessage);
+		RID_LOG(FColor::Cyan, *DebugMessage);
 	}
+	// -----------------------------------------
 
 	if (MonsterClassToSpawn && TotalToSpawn > 0)
 	{
@@ -89,22 +92,23 @@ void AMonsterSpawner::SpawnMonster()
 
 			if (bEnableDebug)
 			{
-				if (GEngine)
-				{
-					FString DebugMessage = FString::Printf(TEXT("Spawner '%s' spawned monster #%d/%d. (Live: %d)"), *GetName(), SpawnCounter, TotalToSpawn, CurrentMonsterCount);
-					GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Green, DebugMessage);
-				}
+				// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
+				FString DebugMessage = FString::Printf(TEXT("Spawner '%s' spawned monster #%d/%d. (Live: %d)"), *GetName(), SpawnCounter, TotalToSpawn, CurrentMonsterCount);
+				RID_LOG(FColor::Green, *DebugMessage);
+				// -----------------------------------------
 				DrawDebugSphere(GetWorld(), GetActorLocation(), 100.0f, 12, FColor::Green, false, 2.0f);
 			}
 		}
 	}
 	else
 	{
-		if (bEnableDebug && GEngine)
+		// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
+		if (bEnableDebug)
 		{
 			FString DebugMessage = FString::Printf(TEXT("Spawner '%s' finished spawning wave."), *GetName());
-			GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::White, DebugMessage);
+			RID_LOG(FColor::White, *DebugMessage);
 		}
+		// -----------------------------------------
 		GetWorld()->GetTimerManager().ClearTimer(SpawnTimerHandle);
 	}
 }
@@ -123,9 +127,11 @@ void AMonsterSpawner::SetGameOver()
 	bIsGameOver = true;
 	GetWorld()->GetTimerManager().ClearTimer(SpawnTimerHandle);
 
-	if (bEnableDebug && GEngine)
+	// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
+	if (bEnableDebug)
 	{
 		FString GameOverMsg = FString::Printf(TEXT("Spawner '%s' is now in GAME OVER state."), *GetName());
-		GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Magenta, GameOverMsg);
+		RID_LOG(FColor::Magenta, *GameOverMsg);
 	}
+	// -----------------------------------------
 }

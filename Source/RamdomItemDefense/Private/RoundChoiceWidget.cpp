@@ -3,6 +3,8 @@
 #include "Components/Button.h"
 #include "MyPlayerState.h" // PlayerState 헤더 인클루드
 #include "Kismet/GameplayStatics.h" // GetPlayerState
+#include "RamdomItemDefense.h" // RID_LOG 매크로용
+#include "Engine/Engine.h" // GEngine 디버그 메시지 (선택 사항)
 
 void URoundChoiceWidget::NativeConstruct()
 {
@@ -56,12 +58,13 @@ void URoundChoiceWidget::HandleChoiceCountChanged(int32 NewCount)
 		// 직접 한글 문자열 리터럴을 사용합니다.
 		ChoiceCountText->SetText(FText::Format(FText::FromString(TEXT("남은 선택 횟수: {Count}")), Args));
 	}
-
-	else if(GEngine)
-    {
-        // ChoiceCountText 변수가 바인딩되지 않았을 경우 로그 출력
-         GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("[Widget] ERROR: ChoiceCountText is NULL!"));
-    }
+	// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
+	else
+	{
+		// ChoiceCountText 변수가 바인딩되지 않았을 경우 로그 출력
+		RID_LOG(FColor::Red, TEXT("[Widget] ERROR: ChoiceCountText is NULL!"));
+	}
+	// -----------------------------------------
 
 	// 선택 횟수가 0 이하이면 버튼 비활성화 (클릭 방지)
 	const bool bCanChoose = (NewCount > 0);

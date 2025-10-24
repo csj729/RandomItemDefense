@@ -17,6 +17,7 @@
 #include "ItemTypes.h"
 #include "AbilitySystemBlueprintLibrary.h"
 #include "Engine/Engine.h"
+#include "RamdomItemDefense.h" // RID_LOG 매크로용
 
 ARamdomItemDefenseCharacter::ARamdomItemDefenseCharacter()
 {
@@ -138,7 +139,9 @@ void ARamdomItemDefenseCharacter::ApplyStatUpgrade(EItemStatType StatType, int32
 	// 서버에서만 실행하고 AttributeSet이 유효한지 확인
 	if (!HasAuthority() || !AttributeSet)
 	{
-		if (GEngine && HasAuthority()) GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("ApplyStatUpgrade Error: Not Server or AttributeSet is NULL"));
+		// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
+		if (HasAuthority()) RID_LOG(FColor::Red, TEXT("ApplyStatUpgrade Error: Not Server or AttributeSet is NULL"));
+		// -----------------------------------------
 		return;
 	}
 
@@ -156,7 +159,9 @@ void ARamdomItemDefenseCharacter::ApplyStatUpgrade(EItemStatType StatType, int32
 	case EItemStatType::ArmorReduction: 		DeltaValue = 10.0f; break;  // 레벨당 +10
 	case EItemStatType::SkillActivationChance: 	DeltaValue = 0.05f; break; // 레벨당 +5%
 	default:
-		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, FString::Printf(TEXT("ApplyStatUpgrade Error: Invalid StatType for BaseValue modification: %s"), *UEnum::GetValueAsString(StatType)));
+		// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
+		RID_LOG(FColor::Red, TEXT("ApplyStatUpgrade Error: Invalid StatType for BaseValue modification: %s"), *UEnum::GetValueAsString(StatType));
+		// -----------------------------------------
 		return; // 골드 강화 불가능 스탯이면 종료
 	}
 
@@ -172,11 +177,10 @@ void ARamdomItemDefenseCharacter::ApplyStatUpgrade(EItemStatType StatType, int32
 	}
 
 	// 3. 로그 출력 (성공 확인)
-	if (GEngine)
-	{
-		FString StatName = UEnum::GetValueAsString(StatType);
-		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Cyan, FString::Printf(TEXT("Applied BaseValue Upgrade: %s (Level %d, Delta: %.2f)"), *StatName, NewLevel, DeltaValue));
-	}
+	// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
+	FString StatName = UEnum::GetValueAsString(StatType);
+	RID_LOG(FColor::Cyan, TEXT("Applied BaseValue Upgrade: %s (Level %d, Delta: %.2f)"), *StatName, NewLevel, DeltaValue);
+	// -----------------------------------------
 
 	// GameplayEffect 적용 로직은 모두 제거됨
 	// --------------------------------------

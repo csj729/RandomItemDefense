@@ -7,15 +7,16 @@
 #include "MonsterBaseCharacter.h"
 #include "RamdomItemDefenseCharacter.h"
 #include "MyPlayerState.h"
+#include "RamdomItemDefense.h" // RID_LOG 매크로용
 
 void UMonsterAttributeSet::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
-    Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
-    DOREPLIFETIME_CONDITION_NOTIFY(UMonsterAttributeSet, Health, COND_None, REPNOTIFY_Always);
-    DOREPLIFETIME_CONDITION_NOTIFY(UMonsterAttributeSet, MaxHealth, COND_None, REPNOTIFY_Always);
-    DOREPLIFETIME_CONDITION_NOTIFY(UMonsterAttributeSet, Armor, COND_None, REPNOTIFY_Always);
-    DOREPLIFETIME_CONDITION_NOTIFY(UMonsterAttributeSet, MoveSpeed, COND_None, REPNOTIFY_Always);
+	DOREPLIFETIME_CONDITION_NOTIFY(UMonsterAttributeSet, Health, COND_None, REPNOTIFY_Always);
+	DOREPLIFETIME_CONDITION_NOTIFY(UMonsterAttributeSet, MaxHealth, COND_None, REPNOTIFY_Always);
+	DOREPLIFETIME_CONDITION_NOTIFY(UMonsterAttributeSet, Armor, COND_None, REPNOTIFY_Always);
+	DOREPLIFETIME_CONDITION_NOTIFY(UMonsterAttributeSet, MoveSpeed, COND_None, REPNOTIFY_Always);
 }
 
 void UMonsterAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallbackData& Data)
@@ -61,15 +62,13 @@ void UMonsterAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCal
 						const int32 GoldAmount = Monster->GetGoldOnDeath();
 						PS->AddGold(GoldAmount);
 
-						if (GEngine)
-						{
-							FString GoldMessage = FString::Printf(TEXT("Awarded %d gold to %s for killing %s"),
-								GoldAmount,
-								*PS->GetPlayerName(),
-								*Monster->GetName()
-							);
-							GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor::Yellow, GoldMessage);
-						}
+						// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
+						RID_LOG(FColor::Yellow, TEXT("Awarded %d gold to %s for killing %s"),
+							GoldAmount,
+							*PS->GetPlayerName(),
+							*Monster->GetName()
+						);
+						// -----------------------------------------
 					}
 				}
 				// (킬러 정보가 없는 디버그 로그는 유지하셔도 좋습니다)
