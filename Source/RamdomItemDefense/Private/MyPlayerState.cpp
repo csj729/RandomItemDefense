@@ -4,6 +4,7 @@
 #include "MonsterSpawner.h"
 #include "RamdomItemDefenseCharacter.h"
 #include "InventoryComponent.h"
+#include "RamdomItemDefense.h" // RID_LOG 매크로용
 
 AMyPlayerState::AMyPlayerState()
 {
@@ -24,7 +25,7 @@ void AMyPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 	DOREPLIFETIME(AMyPlayerState, Gold);
 	DOREPLIFETIME(AMyPlayerState, ChoiceCount);
 	DOREPLIFETIME(AMyPlayerState, MySpawner);
-	
+
 	DOREPLIFETIME(AMyPlayerState, AttackDamageLevel);
 	DOREPLIFETIME(AMyPlayerState, AttackSpeedLevel);
 	DOREPLIFETIME(AMyPlayerState, CritDamageLevel);
@@ -116,14 +117,14 @@ void AMyPlayerState::Server_UseRoundChoice_Implementation(bool bChoseItemGacha)
 			Character->GetInventoryComponent()->AddRandomItem();
 		}
 
-		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Cyan, TEXT("Player chose: Item Gacha"));
+		RID_LOG(FColor::Cyan, TEXT("Player chose: Item Gacha"));
 	}
 	else
 	{
 		// TODO: 골드 도박 로직 (랜덤 골드 AddGold)
 		const int32 GambleAmount = FMath::RandRange(100, 500); // 예: 100~500 골드
 		AddGold(GambleAmount);
-		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Cyan, FString::Printf(TEXT("Player chose: Gold Gamble (+%d)"), GambleAmount));
+		RID_LOG(FColor::Cyan, TEXT("Player chose: Gold Gamble (+%d)"), GambleAmount);
 	}
 }
 
@@ -174,7 +175,7 @@ bool AMyPlayerState::TryUpgradeStat(EItemStatType StatToUpgrade)
 
 	if (!bIsGoldUpgradableBasicStat && !bIsGoldUpgradableSpecialStat)
 	{
-		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, FString::Printf(TEXT("TryUpgradeStat: %s cannot be upgraded with gold."), *UEnum::GetValueAsString(StatToUpgrade)));
+		RID_LOG(FColor::Red, TEXT("TryUpgradeStat: %s cannot be upgraded with gold."), *UEnum::GetValueAsString(StatToUpgrade));
 		return false;
 	}
 
@@ -189,7 +190,7 @@ bool AMyPlayerState::TryUpgradeStat(EItemStatType StatToUpgrade)
 	// 레벨 제한 확인 (변경 없음)
 	if (CurrentLevel >= MaxLevel)
 	{
-		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Yellow, TEXT("TryUpgradeStat: Max level reached"));
+		RID_LOG(FColor::Yellow, TEXT("TryUpgradeStat: Max level reached"));
 		return false;
 	}
 
@@ -199,7 +200,7 @@ bool AMyPlayerState::TryUpgradeStat(EItemStatType StatToUpgrade)
 	// 골드 확인 및 소모 (변경 없음)
 	if (!SpendGold(UpgradeCost))
 	{
-		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Yellow, TEXT("TryUpgradeStat: Not enough gold"));
+		RID_LOG(FColor::Yellow, TEXT("TryUpgradeStat: Not enough gold"));
 		return false;
 	}
 
@@ -212,15 +213,17 @@ bool AMyPlayerState::TryUpgradeStat(EItemStatType StatToUpgrade)
 		// CurrentLevel 기준으로 다음 레벨로 갈 확률 설정
 		switch (CurrentLevel)
 		{
+			// --- [코드 수정] 매직 넘버를 매크로로 대체 ---
 		case 0: // 0 -> 1 레벨 강화 시도
-			SuccessChance = 0.5f; // 50%
+			SuccessChance = SPECIAL_STAT_UPGRADE_CHANCE_LVL0; // 50%
 			break;
 		case 1: // 1 -> 2 레벨 강화 시도
-			SuccessChance = 0.4f; // 40%
+			SuccessChance = SPECIAL_STAT_UPGRADE_CHANCE_LVL1; // 40%
 			break;
 		case 2: // 2 -> 3 레벨 강화 시도
-			SuccessChance = 0.3f; // 30%
+			SuccessChance = SPECIAL_STAT_UPGRADE_CHANCE_LVL2; // 30%
 			break;
+			// ------------------------------------------
 		default: // 이미 최대 레벨이거나 예외 상황 (이론상 여기에 도달하면 안 됨)
 			SuccessChance = 0.0f;
 			break;
@@ -258,13 +261,12 @@ bool AMyPlayerState::TryUpgradeStat(EItemStatType StatToUpgrade)
 			case EItemStatType::SkillActivationChance: OnRep_SkillActivationChanceLevel(); break;
 			}
 
-			if (GEngine) // 성공 로그 (변경 없음)
-			{
-				FString StatName = UEnum::GetValueAsString(StatToUpgrade);
-				// 특수 스탯 성공 시 확률도 함께 표시 (선택 사항)
-				FString ChanceString = bIsGoldUpgradableSpecialStat ? FString::Printf(TEXT(" (Chance: %.0f%%)"), SuccessChance * 100) : TEXT("");
-				GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Green, FString::Printf(TEXT("Upgrade Success: %s to Level %d (Cost: %d)%s"), *StatName, NewLevel, UpgradeCost, *ChanceString));
-			}
+			// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
+			FString StatName = UEnum::GetValueAsString(StatToUpgrade);
+			// 특수 스탯 성공 시 확률도 함께 표시 (선택 사항)
+			FString ChanceString = bIsGoldUpgradableSpecialStat ? FString::Printf(TEXT(" (Chance: %.0f%%)"), SuccessChance * 100) : TEXT("");
+			RID_LOG(FColor::Green, TEXT("Upgrade Success: %s to Level %d (Cost: %d)%s"), *StatName, NewLevel, UpgradeCost, *ChanceString);
+			// -----------------------------------------
 		}
 
 		// 2. 실제 스탯 적용 요청 (캐릭터 ASC에) (변경 없음)
@@ -277,8 +279,10 @@ bool AMyPlayerState::TryUpgradeStat(EItemStatType StatToUpgrade)
 	}
 	else // 강화 실패 시 (특수 스탯 - 로그 변경 없음)
 	{
-		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Orange, FString::Printf(TEXT("Upgrade Failed: %s (Level %d -> %d, Cost: %d, Chance: %.0f%%)"),
-			*UEnum::GetValueAsString(StatToUpgrade), CurrentLevel, CurrentLevel + 1, UpgradeCost, SuccessChance * 100));
+		// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
+		RID_LOG(FColor::Orange, TEXT("Upgrade Failed: %s (Level %d -> %d, Cost: %d, Chance: %.0f%%)"),
+			*UEnum::GetValueAsString(StatToUpgrade), CurrentLevel, CurrentLevel + 1, UpgradeCost, SuccessChance * 100);
+		// -----------------------------------------
 		return false;
 	}
 }

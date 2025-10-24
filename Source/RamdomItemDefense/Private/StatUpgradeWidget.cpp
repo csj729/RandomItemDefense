@@ -7,6 +7,7 @@
 #include "RamdomItemDefenseCharacter.h" // 캐릭터 클래스 (ASC 가져오기 위함)
 #include "GameplayEffectTypes.h"
 #include "Engine/Engine.h" // GEngine 디버그 메시지 (선택 사항)
+#include "RamdomItemDefense.h" // RID_LOG 매크로용 (디버깅 없으면 불필요)
 
 void UStatUpgradeWidget::NativeConstruct()
 {
@@ -119,9 +120,13 @@ void UStatUpgradeWidget::UpdateStatLineUI(EItemStatType StatType)
 	// --- 강화 규칙 (PlayerState와 동일하게 유지) ---
 	const bool bIsBasicStat = (StatType == EItemStatType::AttackDamage || StatType == EItemStatType::AttackSpeed || StatType == EItemStatType::CritDamage);
 	const bool bIsSpecialStat = (StatType == EItemStatType::ArmorReduction || StatType == EItemStatType::SkillActivationChance);
-	int32 MaxLevel = bIsBasicStat ? 999 : 3;
-	int32 BaseCost = 100;
-	int32 CostIncreaseFactor = 50;
+
+	// --- [코드 수정] 매직 넘버를 매크로로 대체 ---
+	int32 MaxLevel = bIsBasicStat ? MAX_NORMAL_STAT_LEVEL : MAX_SPECIAL_STAT_LEVEL;
+	int32 BaseCost = BASE_LEVELUP_COST;
+	int32 CostIncreaseFactor = INCREASING_COST_PER_LEVEL;
+	// ---------------------------------------------
+
 	float SuccessChance = 1.0f;
 	// ---------------------------------------------
 
@@ -135,13 +140,15 @@ void UStatUpgradeWidget::UpdateStatLineUI(EItemStatType StatType)
 	// 특수 스탯 성공 확률 계산 (표시용)
 	if (bIsSpecialStat)
 	{
+		// --- [코드 수정] 매직 넘버를 매크로로 대체 ---
 		switch (CurrentLevel)
 		{
-		case 0: SuccessChance = 0.5f; break; // 50%
-		case 1: SuccessChance = 0.4f; break; // 40%
-		case 2: SuccessChance = 0.3f; break; // 30%
+		case 0: SuccessChance = SPECIAL_STAT_UPGRADE_CHANCE_LVL0; break; // 50%
+		case 1: SuccessChance = SPECIAL_STAT_UPGRADE_CHANCE_LVL1; break; // 40%
+		case 2: SuccessChance = SPECIAL_STAT_UPGRADE_CHANCE_LVL2; break; // 30%
 		default: SuccessChance = 0.0f; break; // 최대 레벨 도달
 		}
+		// ---------------------------------------------
 	}
 
 	// UI 요소 업데이트 (Switch 사용)
