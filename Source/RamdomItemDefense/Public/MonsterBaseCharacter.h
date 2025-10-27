@@ -8,6 +8,7 @@
 
 class UMonsterAttributeSet;
 class AMonsterSpawner;
+class UAnimMontage;
 
 UCLASS()
 class RAMDOMITEMDEFENSE_API AMonsterBaseCharacter : public ACharacter, public IAbilitySystemInterface
@@ -46,6 +47,10 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Stats")
 	int32 GoldOnDeath;
+
+	/** 사망 시 재생할 애니메이션 몽타주 (블루프린트에서 설정) */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation")
+	TObjectPtr<UAnimMontage> DeathMontage;
 
 	// 체력 변화를 감지하여 죽음을 처리할 함수
 	virtual void HandleHealthChanged(const FOnAttributeChangeData& Data);

@@ -73,12 +73,35 @@ void AMonsterBaseCharacter::Die(AActor* Killer)
         MySpawner->OnMonsterKilled();
     }
 
-    // TODO: 사망 애니메이션, 이펙트 재생 로직 추가
+    // 1. AI 정지
+    AMonsterAIController* AIController = Cast<AMonsterAIController>(GetController());
+    if (AIController && AIController->GetBrainComponent())
+    {
+        AIController->GetBrainComponent()->StopLogic(TEXT("Died"));
+    }
 
-    // 콜리전(충돌)을 비활성화합니다.
+    // 2. 콜리전(충돌)을 비활성화합니다.
     GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
-    // 사망 애니메이션 등이 재생될 시간을 기다린 후 액터를 파괴합니다.
-    // (지금은 2초로 설정, 애니메이션 길이에 맞게 조절)
-    SetLifeSpan(2.0f);
+    float DeathAnimLength = 0.1f; // 애니메이션이 없을 경우 기본 파괴 시간 (매우 짧게)
+
+    // 3. 사망 애니메이션 재생
+    if (DeathMontage)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("Death"));
+        // 몽타주를 재생하고 실제 길이를 받아옵니다.
+        DeathAnimLength = PlayAnimMontage(DeathMontage);
+    }
+
+    // 4. 애니메이션 길이만큼 LifeSpan 설정
+    // (길이가 0이거나 몽타주가 없으면 기본값(0.1f)을 사용해 즉시 파괴)
+    if (DeathAnimLength > 0.f)
+    {
+        SetLifeSpan(DeathAnimLength);
+    }
+    else
+    {
+        // 몽타주가 없거나 길이가 0이면 즉시 파괴되도록 매우 짧은 시간 설정
+        SetLifeSpan(0.1f);
+    }
 }
