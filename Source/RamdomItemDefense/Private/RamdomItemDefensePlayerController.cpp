@@ -56,18 +56,31 @@ void ARamdomItemDefensePlayerController::BeginPlay()
 			if (RoundChoiceWidgetClass) RoundChoiceInstance = CreateWidget<URoundChoiceWidget>(this, RoundChoiceWidgetClass);
 			if (GameOverWidgetClass) GameOverInstance = CreateWidget<UUserWidget>(this, GameOverWidgetClass);
 
+
+			// --- [핵심 수정] ---
+			// MainHUD를 뷰포트에 추가하기 전에
+			// 위젯의 '가시성(Visibility)' 설정을 변경합니다.
+			if (MainHUDInstance)
+			{
+				// SelfHitTestInvisible:
+				// 위젯 '자신'(배경)은 마우스 클릭에 반응하지(Hit-Test) 않고
+				// '자식'(버튼 등)들만 반응하도록 설정합니다.
+				MainHUDInstance->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+			}
+			// --- [수정 끝] ---
+
+
 			// 초기에는 메인 HUD만 보이도록
 			if (MainHUDInstance) MainHUDInstance->AddToViewport();
 		}
 		// -----------------------------
 
-		// 게임 시작 또는 레벨 재시작 시 입력 모드를 Game and UI로 설정합니다.
-		FInputModeGameAndUI InputModeData;
-		// InputModeData.SetWidgetToFocus(...); // 필요시 포커스 위젯 설정
-		InputModeData.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock); // 마우스 락 해제
-		SetInputMode(InputModeData);
-		// bShowMouseCursor = true; // 마우스 커서는 이미 생성자에서 true로 설정됨
-		// ------------------------------------
+		//// --- [수정 없음] ---
+		//// 이 입력 모드 설정 코드는 올바르며, 그대로 두시면 됩니다.
+		//FInputModeGameAndUI InputModeData;
+		//InputModeData.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+		//SetInputMode(InputModeData);
+		//// -------------------
 	}
 }
 
@@ -287,12 +300,13 @@ void ARamdomItemDefensePlayerController::ShowGameOverUI()
 		GameOverInstance->AddToViewport();
 	}
 
-	// 3. 입력 모드를 UI 전용으로 변경 (게임 조작 방지)
-	FInputModeUIOnly InputModeData;
-	InputModeData.SetWidgetToFocus(GameOverInstance->TakeWidget()); // 포커스 설정 (선택 사항)
-	InputModeData.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
-	SetInputMode(InputModeData);
-	bShowMouseCursor = true; // 마우스 커서 표시
+
+	//// 3. 입력 모드를 UI 전용으로 변경 (게임 조작 방지)
+	//FInputModeUIOnly InputModeData;
+	////InputModeData.SetWidgetToFocus(GameOverInstance->TakeWidget()); // 포커스 설정 (선택 사항)
+	//InputModeData.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+	//SetInputMode(InputModeData);
+	//bShowMouseCursor = true; // 마우스 커서 표시
 }
 
 /** 게임오버 UI 숨기기 */
@@ -305,12 +319,12 @@ void ARamdomItemDefensePlayerController::HideGameOverUI()
 		GameOverInstance->RemoveFromParent();
 	}
 
-	// 입력 모드 원래대로 복구 (예: 게임 + UI)
-	FInputModeGameAndUI InputModeData;
-	// InputModeData.SetWidgetToFocus(...); // 필요시 포커스 설정
-	InputModeData.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
-	SetInputMode(InputModeData);
-	// bShowMouseCursor = false; // 게임에 따라 조절
+	//// 입력 모드 원래대로 복구 (예: 게임 + UI)
+	//FInputModeGameAndUI InputModeData;
+	//// InputModeData.SetWidgetToFocus(...); // 필요시 포커스 설정
+	//InputModeData.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+	//SetInputMode(InputModeData);
+	//// bShowMouseCursor = false; // 게임에 따라 조절
 
 	// 메인 HUD 다시 표시
 	if (MainHUDInstance && !MainHUDInstance->IsInViewport())

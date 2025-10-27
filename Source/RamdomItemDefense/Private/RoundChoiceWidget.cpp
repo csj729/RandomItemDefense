@@ -6,6 +6,23 @@
 #include "RamdomItemDefense.h" // RID_LOG 매크로용
 #include "Engine/Engine.h" // GEngine 디버그 메시지 (선택 사항)
 
+/** 위젯 생성 시 '단 한 번' 호출 (버튼 클릭 바인딩 전용) */
+void URoundChoiceWidget::NativeOnInitialized()
+{
+	Super::NativeOnInitialized();
+
+	// 버튼 클릭 이벤트는 위젯이 생성될 때 단 한 번만 바인딩합니다.
+	if (ItemGachaButton)
+	{
+		ItemGachaButton->OnClicked.AddDynamic(this, &URoundChoiceWidget::HandleItemGachaClicked);
+	}
+	if (GoldGambleButton)
+	{
+		GoldGambleButton->OnClicked.AddDynamic(this, &URoundChoiceWidget::HandleGoldGambleClicked);
+	}
+}
+
+/** 위젯이 뷰포트에 '추가될 때마다' 호출 */
 void URoundChoiceWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
@@ -13,7 +30,7 @@ void URoundChoiceWidget::NativeConstruct()
 	// PlayerState 참조 가져오기
 	MyPlayerState = GetOwningPlayerState<AMyPlayerState>();
 
-	// PlayerState 유효성 검사 및 델리게이트 바인딩
+	// PlayerState 유효성 검사 및 '델리게이트' 바인딩
 	if (MyPlayerState)
 	{
 		// PlayerState의 선택 횟수 변경 델리게이트에 C++ 함수 바인딩
@@ -34,14 +51,19 @@ void URoundChoiceWidget::NativeConstruct()
 			});
 	}
 
-	// 버튼 클릭 이벤트에 C++ 함수 바인딩
-	if (ItemGachaButton)
+	// [주의] 버튼 클릭 바인딩(OnClicked.AddDynamic)은 NativeOnInitialized()로 이동했습니다.
+}
+
+/** 위젯이 뷰포트에서 '제거될 때마다' 호출 */
+void URoundChoiceWidget::NativeDestruct()
+{
+	Super::NativeDestruct();
+
+	// 위젯이 화면에서 사라질 때, PlayerState 델리게이트 바인딩을 해제합니다.
+	// 이렇게 하지 않으면 위젯이 숨겨진 상태에서도 델리게이트를 계속 수신할 수 있습니다.
+	if (MyPlayerState)
 	{
-		ItemGachaButton->OnClicked.AddDynamic(this, &URoundChoiceWidget::HandleItemGachaClicked);
-	}
-	if (GoldGambleButton)
-	{
-		GoldGambleButton->OnClicked.AddDynamic(this, &URoundChoiceWidget::HandleGoldGambleClicked);
+		MyPlayerState->OnChoiceCountChangedDelegate.RemoveDynamic(this, &URoundChoiceWidget::HandleChoiceCountChanged);
 	}
 }
 

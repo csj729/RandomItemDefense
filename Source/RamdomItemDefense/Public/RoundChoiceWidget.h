@@ -15,8 +15,14 @@ class RAMDOMITEMDEFENSE_API URoundChoiceWidget : public UUserWidget
 	GENERATED_BODY()
 
 protected:
-	/** 위젯 생성 시 호출 (Event Construct) */
+	/** 위젯 생성 시 '단 한 번' 호출됩니다. (버튼 바인딩용) */
+	virtual void NativeOnInitialized() override;
+
+	/** 위젯이 뷰포트에 추가될 때 '매번' 호출됩니다. (델리게이트 바인딩용) */
 	virtual void NativeConstruct() override;
+
+	/** 위젯이 뷰포트에서 제거될 때 '매번' 호출됩니다. (델리게이트 해제용) */
+	virtual void NativeDestruct() override;
 
 	/** PlayerState 참조 */
 	UPROPERTY(BlueprintReadOnly, Category = "PlayerState")

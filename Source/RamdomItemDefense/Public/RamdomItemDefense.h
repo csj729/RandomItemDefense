@@ -8,7 +8,7 @@ DECLARE_LOG_CATEGORY_EXTERN(LogRamdomItemDefense, Log, All);
 
 // --- [디버그 매크로 정의] ---
 // 0으로 바꾸면 모든 RID_LOG가 비활성화됩니다.
-#define ENABLE_RID_DEBUG 1
+#define ENABLE_RID_DEBUG 0
 
 #if ENABLE_RID_DEBUG
 #include "Engine/Engine.h" // GEngine 필요
