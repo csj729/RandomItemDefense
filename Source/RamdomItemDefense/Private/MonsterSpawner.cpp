@@ -1,3 +1,4 @@
+// csj729/randomitemdefense/RandomItemDefense-78a128504f0127dc02646504d4a1e1c677a0e811/Source/RamdomItemDefense/Private/MonsterSpawner.cpp
 #include "MonsterSpawner.h"
 #include "MonsterBaseCharacter.h"
 #include "Engine/World.h"
@@ -49,8 +50,8 @@ void AMonsterSpawner::BeginSpawning(TSubclassOf<AMonsterBaseCharacter> MonsterCl
 	if (bEnableDebug)
 	{
 		FString MonsterName = GetNameSafe(MonsterClassToSpawn);
-		FString DebugMessage = FString::Printf(TEXT("Spawner '%s' received command: Spawn %d of '%s'."), *GetName(), Count, *MonsterName);
-		RID_LOG(FColor::Cyan, *DebugMessage);
+		// [수정] FString 변수를 만들지 않고 매크로에 직접 전달합니다.
+		RID_LOG(FColor::Cyan, TEXT("Spawner '%s' received command: Spawn %d of '%s'."), *GetName(), Count, *MonsterName);
 	}
 	// -----------------------------------------
 
@@ -93,8 +94,8 @@ void AMonsterSpawner::SpawnMonster()
 			if (bEnableDebug)
 			{
 				// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
-				FString DebugMessage = FString::Printf(TEXT("Spawner '%s' spawned monster #%d/%d. (Live: %d)"), *GetName(), SpawnCounter, TotalToSpawn, CurrentMonsterCount);
-				RID_LOG(FColor::Green, *DebugMessage);
+				// [수정] FString 변수를 만들지 않고 매크로에 직접 전달합니다.
+				RID_LOG(FColor::Green, TEXT("Spawner '%s' spawned monster #%d/%d. (Live: %d)"), *GetName(), SpawnCounter, TotalToSpawn, CurrentMonsterCount);
 				// -----------------------------------------
 				DrawDebugSphere(GetWorld(), GetActorLocation(), 100.0f, 12, FColor::Green, false, 2.0f);
 			}
@@ -105,8 +106,8 @@ void AMonsterSpawner::SpawnMonster()
 		// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
 		if (bEnableDebug)
 		{
-			FString DebugMessage = FString::Printf(TEXT("Spawner '%s' finished spawning wave."), *GetName());
-			RID_LOG(FColor::White, *DebugMessage);
+			// [수정] FString 변수를 만들지 않고 매크로에 직접 전달합니다.
+			RID_LOG(FColor::White, TEXT("Spawner '%s' finished spawning wave."), *GetName());
 		}
 		// -----------------------------------------
 		GetWorld()->GetTimerManager().ClearTimer(SpawnTimerHandle);
@@ -130,8 +131,8 @@ void AMonsterSpawner::SetGameOver()
 	// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
 	if (bEnableDebug)
 	{
-		FString GameOverMsg = FString::Printf(TEXT("Spawner '%s' is now in GAME OVER state."), *GetName());
-		RID_LOG(FColor::Magenta, *GameOverMsg);
+		// [수정] FString 변수를 만들지 않고 매크로에 직접 전달합니다.
+		RID_LOG(FColor::Magenta, TEXT("Spawner '%s' is now in GAME OVER state."), *GetName());
 	}
 	// -----------------------------------------
 }

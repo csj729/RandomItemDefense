@@ -1,3 +1,4 @@
+// csj729/randomitemdefense/RandomItemDefense-78a128504f0127dc02646504d4a1e1c677a0e811/Source/RamdomItemDefense/Private/RamdomItemDefenseGameMode.cpp
 #include "RamdomItemDefenseGameMode.h"
 #include "MyGameState.h"
 #include "MyPlayerState.h"
@@ -66,8 +67,8 @@ void ARamdomItemDefenseGameMode::OnPostLogin(AController* NewPlayer)
 		}
 
 		// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
-		FString SpawnerCountMsg = FString::Printf(TEXT("Dynamically found %d Spawners in the level."), MonsterSpawners.Num());
-		RID_LOG(FColor::Magenta, *SpawnerCountMsg);
+		// [수정] FString 변수를 만들지 않고 매크로에 직접 전달합니다.
+		RID_LOG(FColor::Magenta, TEXT("Dynamically found %d Spawners in the level."), MonsterSpawners.Num());
 		// -----------------------------------------
 
 		// (선택 사항: 스포너를 이름순으로 정렬하여 인덱스를 고정시킬 수 있습니다)
@@ -91,8 +92,8 @@ void ARamdomItemDefenseGameMode::OnPostLogin(AController* NewPlayer)
 	int32 PlayerIndex = MyGameState->PlayerArray.Find(MyPS);
 
 	// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
-	FString Msg = FString::Printf(TEXT("Player %s logged in. Assigned PlayerIndex: %d"), *MyPS->GetPlayerName(), PlayerIndex);
-	RID_LOG(FColor::Cyan, *Msg);
+	// [수정] FString 변수를 만들지 않고 매크로에 직접 전달합니다.
+	RID_LOG(FColor::Cyan, TEXT("Player %s logged in. Assigned PlayerIndex: %d"), *MyPS->GetPlayerName(), PlayerIndex);
 	// -----------------------------------------
 
 	// MonsterSpawners 배열에 해당 인덱스가 유효한지 확인합니다.
@@ -106,17 +107,17 @@ void ARamdomItemDefenseGameMode::OnPostLogin(AController* NewPlayer)
 		// 클라이언트에서는 OnRep_MySpawner가 호출되고, UI 바인딩이 일어납니다.
 
 		// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
-		FString SpawnerName = GetNameSafe(MyPS->MySpawner);
-		FString MsgSpawner = FString::Printf(TEXT("Assigned Spawner '%s' to PlayerIndex %d"), *SpawnerName, PlayerIndex);
-		RID_LOG(FColor::Green, *MsgSpawner);
+		// [수정] FString 변수를 만들지 않고 매크로에 직접 전달합니다.
+		FString SpawnerName = GetNameSafe(MyPS->MySpawner); // FString 만드는 것은 OK
+		RID_LOG(FColor::Green, TEXT("Assigned Spawner '%s' to PlayerIndex %d"), *SpawnerName, PlayerIndex);
 		// -----------------------------------------
 	}
 	else
 	{
 		// 맵에 배치된 스포너 수보다 많은 플레이어가 접속한 경우
 		// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
-		FString MsgError = FString::Printf(TEXT("ERROR: No valid spawner found at index %d for player %s."), PlayerIndex, *MyPS->GetPlayerName());
-		RID_LOG(FColor::Red, *MsgError);
+		// [수정] FString 변수를 만들지 않고 매크로에 직접 전달합니다.
+		RID_LOG(FColor::Red, TEXT("ERROR: No valid spawner found at index %d for player %s."), PlayerIndex, *MyPS->GetPlayerName());
 		// -----------------------------------------
 	}
 }
@@ -203,9 +204,9 @@ void ARamdomItemDefenseGameMode::StartNextWave()
 
 	// 로그 출력 (변경 없음)
 	// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
-	FString WaveInfoMsg = FString::Printf(TEXT("Wave %d Info: bIsBoss=%s, TimeLimit=%.1f, NumToSpawn=%d"),
+	// [수정] FString 변수를 만들지 않고 매크로에 직접 전달합니다.
+	RID_LOG(FColor::White, TEXT("Wave %d Info: bIsBoss=%s, TimeLimit=%.1f, NumToSpawn=%d"),
 		CurrentWave, bIsBossWave ? TEXT("true") : TEXT("false"), TimeLimitForThisWave, NumToSpawn);
-	RID_LOG(FColor::White, *WaveInfoMsg);
 	// -----------------------------------------
 
 	// 몬스터 데이터 테이블 로드 및 스폰 명령 (변경 없음)
@@ -222,8 +223,8 @@ void ARamdomItemDefenseGameMode::StartNextWave()
 			TSubclassOf<AMonsterBaseCharacter> MonsterClass = WaveData->MonstersToSpawn[0];
 
 			// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
-			FString SpawnerCountMsg = FString::Printf(TEXT("Found %d Spawners. Issuing spawn command..."), MonsterSpawners.Num());
-			RID_LOG(FColor::Cyan, *SpawnerCountMsg);
+			// [수정] FString 변수를 만들지 않고 매크로에 직접 전달합니다.
+			RID_LOG(FColor::Cyan, TEXT("Found %d Spawners. Issuing spawn command..."), MonsterSpawners.Num());
 			// -----------------------------------------
 
 			// 모든 스포너에게 스폰 명령 전달

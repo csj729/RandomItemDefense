@@ -1,3 +1,5 @@
+// csj729/randomitemdefense/RandomItemDefense-78a128504f0127dc02646504d4a1e1c677a0e811/Source/RamdomItemDefense/Private/InventoryComponent.cpp
+
 #include "InventoryComponent.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemGlobals.h" // MakeEffectContext
@@ -108,19 +110,15 @@ void UInventoryComponent::AddItem(FName ItemID)
 			// --- [디버그 로그 추가] ---
 			if (ActiveHandle.IsValid())
 			{
-				// 핸들이 유효하다면 맵에 저장
-				AppliedStatEffectHandles.Add(ItemID, ActiveHandle);
-				// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
-				RID_LOG(FColor::Cyan, TEXT("AddItem: Stored GE Handle for %s"), *ItemID.ToString());
+				// --- [코드 수정] TMap::Add -> TArray::Add ---
+				ActiveStatEffects.Add({ ItemID, ActiveHandle });
 				// -----------------------------------------
+				RID_LOG(FColor::Cyan, TEXT("AddItem: Stored GE Handle for %s"), *ItemID.ToString());
 			}
-			// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
 			else
 			{
 				RID_LOG(FColor::Red, TEXT("AddItem: Applied GE Handle for %s is INVALID!"), *ItemID.ToString());
 			}
-			// -----------------------------------------
-			// -------------------------
 		}
 	}
 
@@ -129,8 +127,18 @@ void UInventoryComponent::AddItem(FName ItemID)
 	{
 		FGameplayAbilitySpec AbilitySpec(ItemData.GrantedAbility);
 		FGameplayAbilitySpecHandle AbilityHandle = AbilitySystemComponent->GiveAbility(AbilitySpec);
-		GrantedAbilityHandles.Add(ItemID, AbilityHandle);
-		// TODO: GA 핸들도 제대로 저장되는지 로그 추가 필요
+
+		// --- [코드 수정] TMap::Add -> TArray::Add ---
+		if (AbilityHandle.IsValid())
+		{
+			ActiveGrantedAbilities.Add({ ItemID, AbilityHandle });
+			RID_LOG(FColor::Cyan, TEXT("AddItem: Stored GA Handle for %s"), *ItemID.ToString());
+		}
+		else
+		{
+			RID_LOG(FColor::Red, TEXT("AddItem: Applied GA Handle for %s is INVALID!"), *ItemID.ToString());
+		}
+		// --- [코드 수정 끝] ---
 	}
 
 	InventoryItems.Add(ItemID);
@@ -145,18 +153,24 @@ void UInventoryComponent::RemoveItem(FName ItemID)
 {
 	if (!AbilitySystemComponent.IsValid()) return;
 	if (!GetOwner()->HasAuthority()) return;
-	// --- [코드 수정] 인벤토리 배열에서 실제로 제거하기 전에 핸들부터 처리 ---
-	// if (!InventoryItems.Contains(ItemID)) return; // 이 라인 이동
+
+	// --- [코드 수정] TMap::Contains -> TArray::IndexOfByPredicate ---
 
 	// 1. 스탯 효과(GE) 제거
-	// --- [디버그 로그 및 로직 수정] ---
-	if (AppliedStatEffectHandles.Contains(ItemID))
+	// ItemID와 일치하는 '첫 번째' 스탯 효과 항목을 배열에서 찾습니다.
+	int32 StatEffectIndex = ActiveStatEffects.IndexOfByPredicate(
+		[ItemID](const FActiveItemStatEffect& Effect) { return Effect.ItemID == ItemID; }
+	);
+
+	// 항목을 찾았다면
+	if (StatEffectIndex != INDEX_NONE)
 	{
-		FActiveGameplayEffectHandle HandleToRemove = AppliedStatEffectHandles[ItemID];
+		// 핸들을 가져옵니다.
+		FActiveGameplayEffectHandle HandleToRemove = ActiveStatEffects[StatEffectIndex].Handle;
 		if (HandleToRemove.IsValid())
 		{
+			// ASC에서 GE를 제거합니다.
 			bool bRemoved = AbilitySystemComponent->RemoveActiveGameplayEffect(HandleToRemove);
-			// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
 			if (bRemoved)
 			{
 				RID_LOG(FColor::Orange, TEXT("RemoveItem: Removed GE Handle for %s (Success)"), *ItemID.ToString());
@@ -165,42 +179,65 @@ void UInventoryComponent::RemoveItem(FName ItemID)
 			{
 				RID_LOG(FColor::Red, TEXT("RemoveItem: Failed to remove GE Handle for %s"), *ItemID.ToString());
 			}
-			// -----------------------------------------
 		}
-		// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
 		else
 		{
-			RID_LOG(FColor::Red, TEXT("RemoveItem: Found INVALID GE Handle in map for %s"), *ItemID.ToString());
+			RID_LOG(FColor::Red, TEXT("RemoveItem: Found INVALID GE Handle in array for %s"), *ItemID.ToString());
 		}
-		// -----------------------------------------
-		AppliedStatEffectHandles.Remove(ItemID); // 맵에서 제거
+
+		// '반드시' 추적 배열에서 이 항목을 제거합니다. (다음 RemoveItem 호출 시 그 다음 항목을 찾도록)
+		ActiveStatEffects.RemoveAt(StatEffectIndex);
 	}
-	// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
 	else
 	{
-		// 맵에 해당 ItemID 키 자체가 없는 경우
-		RID_LOG(FColor::Yellow, TEXT("RemoveItem: No GE Handle found in map for %s"), *ItemID.ToString());
+		// 스탯이 없는 아이템일 수 있으므로 경고만 출력
+		RID_LOG(FColor::Yellow, TEXT("RemoveItem: No GE Handle found in array for %s"), *ItemID.ToString());
 	}
-	// ---------------------------------
-	// ---------------------------------
+	// --- [코드 수정 끝] ---
 
-	// 2. 고유 능력(GA) 제거 (변경 없음, 필요시 로그 추가)
-	if (GrantedAbilityHandles.Contains(ItemID))
+
+	// 2. 고유 능력(GA) 제거
+	// --- [코드 수정] TMap::Contains -> TArray::IndexOfByPredicate ---
+
+	// ItemID와 일치하는 '첫 번째' 어빌리티 항목을 배열에서 찾습니다.
+	int32 AbilityIndex = ActiveGrantedAbilities.IndexOfByPredicate(
+		[ItemID](const FActiveItemAbility& Ability) { return Ability.ItemID == ItemID; }
+	);
+
+	// 항목을 찾았다면
+	if (AbilityIndex != INDEX_NONE)
 	{
-		AbilitySystemComponent->ClearAbility(GrantedAbilityHandles[ItemID]);
-		GrantedAbilityHandles.Remove(ItemID);
-		// TODO: GA 제거 로그 추가
-	}
+		// 핸들을 가져옵니다.
+		FGameplayAbilitySpecHandle HandleToRemove = ActiveGrantedAbilities[AbilityIndex].Handle;
+		if (HandleToRemove.IsValid())
+		{
+			// ASC에서 어빌리티를 제거합니다.
+			AbilitySystemComponent->ClearAbility(HandleToRemove);
+			RID_LOG(FColor::Orange, TEXT("RemoveItem: Removed GA Handle for %s (Success)"), *ItemID.ToString());
+		}
+		else
+		{
+			RID_LOG(FColor::Red, TEXT("RemoveItem: Found INVALID GA Handle in array for %s"), *ItemID.ToString());
+		}
 
-	// --- [코드 수정] 실제 인벤토리 배열에서 제거는 가장 마지막에 ---
+		// '반드시' 추적 배열에서 이 항목을 제거합니다.
+		ActiveGrantedAbilities.RemoveAt(AbilityIndex);
+	}
+	else
+	{
+		// 어빌리티가 없는 아이템일 수 있으므로 경고만 출력
+		RID_LOG(FColor::Yellow, TEXT("RemoveItem: No GA Handle found in array for %s"), *ItemID.ToString());
+	}
+	// --- [코드 수정 끝] ---
+
+
+	// 3. 실제 인벤토리 배열에서 제거 (가장 마지막에 수행)
 	bool bRemovedFromArray = InventoryItems.RemoveSingle(ItemID) > 0;
-	// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
 	if (!bRemovedFromArray) // 아이템이 배열에 없는데 제거 시도된 경우
 	{
 		RID_LOG(FColor::Red, TEXT("RemoveItem: ItemID %s was not found in InventoryItems array!"), *ItemID.ToString());
 		return; // 아이템이 없었으므로 UI 업데이트 불필요
 	}
-	// --------------------------------------------------------
 	// --------------------------------------------------------
 
 	OnInventoryUpdated.Broadcast(); // UI 갱신 알림

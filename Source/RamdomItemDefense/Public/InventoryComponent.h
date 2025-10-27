@@ -1,3 +1,5 @@
+// csj729/randomitemdefense/RandomItemDefense-78a128504f0127dc02646504d4a1e1c677a0e811/Source/RamdomItemDefense/Public/InventoryComponent.h
+
 #pragma once
 
 #include "CoreMinimal.h"
@@ -9,6 +11,39 @@
 
 class UAbilitySystemComponent;
 class UDataTable;
+
+// --- [코드 추가] ---
+/** 아이템의 스탯 GE 핸들을 ItemID와 함께 추적하기 위한 구조체 */
+USTRUCT()
+struct FActiveItemStatEffect
+{
+	GENERATED_BODY()
+
+	/** 이 핸들이 속한 아이템의 ID */
+	UPROPERTY()
+	FName ItemID;
+
+	/** 적용된 스탯 GameplayEffect의 실제 핸들 */
+	UPROPERTY()
+	FActiveGameplayEffectHandle Handle;
+};
+
+/** 아이템의 고유 어빌리티 핸들을 ItemID와 함께 추적하기 위한 구조체 */
+USTRUCT()
+struct FActiveItemAbility
+{
+	GENERATED_BODY()
+
+	/** 이 핸들이 속한 아이템의 ID */
+	UPROPERTY()
+	FName ItemID;
+
+	/** 부여된 GameplayAbility의 실제 핸들 */
+	UPROPERTY()
+	FGameplayAbilitySpecHandle Handle;
+};
+// --- [코드 추가 끝] ---
+
 
 UCLASS(ClassGroup = (Custom), meta = (BlueprintSpawnableComponent))
 class RAMDOMITEMDEFENSE_API UInventoryComponent : public UActorComponent
@@ -49,14 +84,12 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Inventory")
 	const TArray<FName>& GetInventoryItems() const { return InventoryItems; }
 
-	// --- [코드 수정] ---
 	/** @brief 아이템 ID로 아이템 데이터를 가져옵니다. (UI에서 사용) */
 	UFUNCTION(BlueprintPure, Category = "Inventory")
 	FItemData GetItemData(FName ItemID, bool& bSuccess) const;
-	// ------------------
 
 	UFUNCTION(BlueprintPure, Category = "Inventory")
-	UDataTable* GetItemDataTable() const { return ItemDataTable;  }
+	UDataTable* GetItemDataTable() const { return ItemDataTable; }
 
 	UFUNCTION(BlueprintPure, Category = "Inventory")
 	UDataTable* GetRecipeDataTable() const { return RecipeDataTable; }
@@ -84,9 +117,13 @@ private:
 	UPROPERTY(VisibleInstanceOnly, Category = "Inventory")
 	TArray<FName> InventoryItems;
 
+	// --- [코드 수정] TMap -> TArray<struct> ---
+	/** (신) TArray: 아이템의 '각 인스턴스'별로 스탯 GE 핸들을 추적합니다. */
 	UPROPERTY()
-	TMap<FName, FActiveGameplayEffectHandle> AppliedStatEffectHandles;
+	TArray<FActiveItemStatEffect> ActiveStatEffects;
 
+	/** (신) TArray: 아이템의 '각 인스턴스'별로 부여된 GA 핸들을 추적합니다. */
 	UPROPERTY()
-	TMap<FName, FGameplayAbilitySpecHandle> GrantedAbilityHandles;
+	TArray<FActiveItemAbility> ActiveGrantedAbilities;
+	// --- [코드 수정 끝] ---
 };

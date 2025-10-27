@@ -213,6 +213,15 @@ void UAttackComponent::PerformAttack()
 			FRotator LookAtRotation = UKismetMathLibrary::FindLookAtRotation(OwnerCharacter->GetActorLocation(), TargetToAttack->GetActorLocation());
 			OwnerCharacter->SetActorRotation(FRotator(0.f, LookAtRotation.Yaw, 0.f));
 
+			// 1. 캐릭터에서 '단일' 몽타주가 아닌 '랜덤' 몽타주를 가져옵니다.
+			UAnimMontage* MontageToPlay = OwnerCharacter->GetRandomAttackMontage();
+
+			if (MontageToPlay)
+			{
+				// 2. 서버에서 몽타주를 재생합니다.
+				OwnerCharacter->PlayAnimMontage(MontageToPlay);
+			}
+
 			if (AbilitySystemComponent)
 			{
 				FGameplayEventData Payload;

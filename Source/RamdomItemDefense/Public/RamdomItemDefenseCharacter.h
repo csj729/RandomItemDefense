@@ -12,6 +12,7 @@
 // 전방 선언
 class UAttackComponent;
 class UInventoryComponent;
+class UAnimMontage;
 
 UCLASS(Blueprintable)
 class ARamdomItemDefenseCharacter : public ACharacter, public IAbilitySystemInterface
@@ -35,6 +36,12 @@ public:
 	/** (서버 전용) PlayerState로부터 스탯 강화 적용 요청을 받습니다. */
 	void ApplyStatUpgrade(EItemStatType StatType, int32 NewLevel);
 
+	/**
+	 * @brief 설정된 공격 몽타주 배열에서 랜덤하게 하나를 골라 반환합니다.
+	 * @return 재생할 몽타주 (없으면 nullptr)
+	 */
+	UAnimMontage* GetRandomAttackMontage() const;
+
 protected:
 	virtual void BeginPlay() override;
 
@@ -46,6 +53,13 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "GAS", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UAbilitySystemComponent> AbilitySystemComponent;
+
+	/**
+	 * @brief 재생할 기본 공격 몽타주 '배열'입니다.
+	 * 블루프린트 클래스 디폴트에서 설정해야 합니다.
+	 */
+	UPROPERTY(EditDefaultsOnly, Category = "Animation")
+	TArray<TObjectPtr<UAnimMontage>> DefaultAttackMontages; // 단일 변수에서 TArray로
 
 	UPROPERTY()
 	TObjectPtr<UMyAttributeSet> AttributeSet;

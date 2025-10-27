@@ -185,3 +185,21 @@ void ARamdomItemDefenseCharacter::ApplyStatUpgrade(EItemStatType StatType, int32
 	// GameplayEffect 적용 로직은 모두 제거됨
 	// --------------------------------------
 }
+
+UAnimMontage* ARamdomItemDefenseCharacter::GetRandomAttackMontage() const
+{
+	// 1. 배열에 몽타주가 하나라도 있는지 확인합니다.
+	if (DefaultAttackMontages.Num() == 0)
+	{
+		// 몽타주가 없으면 로그를 남기고 null을 반환합니다.
+		RID_LOG(FColor::Red, TEXT("Character: DefaultAttackMontages 배열이 비어있습니다!"));
+		return nullptr;
+	}
+
+	// 2. 0부터 (배열 크기 - 1) 사이의 랜덤 인덱스를 선택합니다.
+	// (예: 3개일 경우 0, 1, 2 중 하나 선택)
+	const int32 RandomIndex = FMath::RandRange(0, DefaultAttackMontages.Num() - 1);
+
+	// 3. 해당 인덱스의 몽타주를 반환합니다.
+	return DefaultAttackMontages[RandomIndex];
+}
