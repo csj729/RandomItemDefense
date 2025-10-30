@@ -6,6 +6,9 @@
 #include "Engine/Engine.h"
 #include "Net/UnrealNetwork.h"
 #include "RamdomItemDefense.h" // RID_LOG 매크로용
+#include "MyGameState.h"
+#include "Materials/MaterialInterface.h"
+
 
 AMonsterSpawner::AMonsterSpawner()
 {
@@ -46,14 +49,11 @@ void AMonsterSpawner::BeginSpawning(TSubclassOf<AMonsterBaseCharacter> MonsterCl
 	TotalToSpawn = Count;
 	SpawnCounter = 0;
 
-	// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
 	if (bEnableDebug)
 	{
 		FString MonsterName = GetNameSafe(MonsterClassToSpawn);
-		// [수정] FString 변수를 만들지 않고 매크로에 직접 전달합니다.
 		RID_LOG(FColor::Cyan, TEXT("Spawner '%s' received command: Spawn %d of '%s'."), *GetName(), Count, *MonsterName);
 	}
-	// -----------------------------------------
 
 	if (MonsterClassToSpawn && TotalToSpawn > 0)
 	{
@@ -70,6 +70,9 @@ void AMonsterSpawner::BeginSpawning(TSubclassOf<AMonsterBaseCharacter> MonsterCl
 
 void AMonsterSpawner::SpawnMonster()
 {
+	// 서버에서만 스폰
+	if (!HasAuthority()) return;
+
 	if (SpawnCounter < TotalToSpawn && MonsterClassToSpawn)
 	{
 		UWorld* World = GetWorld();
@@ -83,33 +86,78 @@ void AMonsterSpawner::SpawnMonster()
 
 			if (SpawnedMonster)
 			{
-				// 스폰된 몬스터에게 "너를 스폰한 스포너는 나야" 라고 알려줍니다.
 				SpawnedMonster->SetSpawner(this);
-				CurrentMonsterCount++; // 스폰 성공 시 카운트 증가
-				if (HasAuthority()) OnRep_CurrentMonsterCount();
+				CurrentMonsterCount++;
+				OnRep_CurrentMonsterCount(); // 서버 UI 즉시 업데이트
+
+				// 1. GameState에서 현재 웨이브 가져오기
+				AMyGameState* MyGameState = World->GetGameState<AMyGameState>();
+				if (MyGameState)
+				{
+					int32 CurrentWave = MyGameState->GetCurrentWave(); // (1부터 시작)
+
+					// [추가] 보스 웨이브인지 확인 (GameMode 로직과 동일)
+					const bool bIsBossWave = (CurrentWave > 0 && CurrentWave % 10 == 0);
+
+					// [수정] 보스 웨이브가 아닐 때(!bIsBossWave)만 머티리얼 변경 로직 실행
+					if (!bIsBossWave)
+					{
+						// 2. 몬스터의 머티리얼 목록 가져오기
+						const TArray<TObjectPtr<UMaterialInterface>>& WaveMaterials = SpawnedMonster->GetWaveMaterials();
+
+						// 3. 머티리얼 배열이 9개(인덱스 0~8)인지 확인 (매우 중요)
+						if (WaveMaterials.Num() == 9)
+						{
+							// 4. 웨이브의 '일의 자리' 숫자를 인덱스로 사용합니다. (0~8)
+							// Wave 1 -> (1 % 10) - 1 = 0 (인덱스 0)
+							// Wave 9 -> (9 % 10) - 1 = 8 (인덱스 8)
+							// Wave 11 -> (11 % 10) - 1 = 0 (인덱스 0)
+							int32 MaterialIndex = (CurrentWave % 10) - 1;
+
+							// (혹시 모를 음수 인덱스 방지 - 로직상 발생 안 함)
+							if (MaterialIndex >= 0 && MaterialIndex < WaveMaterials.Num())
+							{
+								UMaterialInterface* MaterialToApply = WaveMaterials[MaterialIndex];
+
+								// 5. 몬스터에 머티리얼 설정 (서버 전용 함수 호출)
+								if (MaterialToApply)
+								{
+									SpawnedMonster->SetWaveMaterial(MaterialToApply);
+								}
+								else
+								{
+									// (디버그 로그) 해당 인덱스에 머티리얼이 비어있음
+									RID_LOG(FColor::Yellow, TEXT("Spawner: WaveMaterials[%d] is NULL for Wave %d."), MaterialIndex, CurrentWave);
+								}
+							}
+						}
+						else
+						{
+							// (디버그 로그) 몬스터 BP에 머티리얼이 9개 설정되지 않음
+							RID_LOG(FColor::Red, TEXT("Spawner ERROR: Monster BP '%s' must have exactly 9 elements in WaveMaterials (found %d)."),
+								*GetNameSafe(MonsterClassToSpawn), WaveMaterials.Num());
+						}
+					}
+					// (else: 보스 웨이브인 경우, 아무것도 하지 않고 몬스터의 기본 머티리얼을 사용합니다)
+				}
+				// --- [코드 수정 끝] ---
 			}
 
 			SpawnCounter++;
 
 			if (bEnableDebug)
 			{
-				// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
-				// [수정] FString 변수를 만들지 않고 매크로에 직접 전달합니다.
 				RID_LOG(FColor::Green, TEXT("Spawner '%s' spawned monster #%d/%d. (Live: %d)"), *GetName(), SpawnCounter, TotalToSpawn, CurrentMonsterCount);
-				// -----------------------------------------
 				DrawDebugSphere(GetWorld(), GetActorLocation(), 100.0f, 12, FColor::Green, false, 2.0f);
 			}
 		}
 	}
 	else
 	{
-		// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
 		if (bEnableDebug)
 		{
-			// [수정] FString 변수를 만들지 않고 매크로에 직접 전달합니다.
 			RID_LOG(FColor::White, TEXT("Spawner '%s' finished spawning wave."), *GetName());
 		}
-		// -----------------------------------------
 		GetWorld()->GetTimerManager().ClearTimer(SpawnTimerHandle);
 	}
 }
@@ -128,11 +176,8 @@ void AMonsterSpawner::SetGameOver()
 	bIsGameOver = true;
 	GetWorld()->GetTimerManager().ClearTimer(SpawnTimerHandle);
 
-	// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
 	if (bEnableDebug)
 	{
-		// [수정] FString 변수를 만들지 않고 매크로에 직접 전달합니다.
 		RID_LOG(FColor::Magenta, TEXT("Spawner '%s' is now in GAME OVER state."), *GetName());
 	}
-	// -----------------------------------------
 }

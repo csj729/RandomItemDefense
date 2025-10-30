@@ -64,11 +64,15 @@ protected:
 	UPROPERTY()
 	TObjectPtr<UMyAttributeSet> AttributeSet;
 
-	UPROPERTY(EditDefaultsOnly, Category = "GAS|Abilities")
-	TSubclassOf<UGameplayAbility> DefaultAttackAbility;
-
 	UPROPERTY(EditDefaultsOnly, Category = "GAS")
 	TSubclassOf<class UGameplayEffect> DefaultStatsEffect;
+
+	/**
+	 * @brief 캐릭터가 기본적으로 보유할 어빌리티 목록입니다.
+	 * (GA_AttackSelector, GA_MeteorStrike_BP, GA_ArcaneBind_BP 등)
+	 */
+	UPROPERTY(EditDefaultsOnly, Category = "GAS|Abilities")
+	TArray<TSubclassOf<class UGameplayAbility>> DefaultAbilities;
 
 	void ApplyDefaultStats();
 

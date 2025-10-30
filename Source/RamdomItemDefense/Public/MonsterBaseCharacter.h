@@ -1,14 +1,39 @@
 #pragma once
 
+#include "RamdomItemDefense.h"
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "AbilitySystemInterface.h"
 #include "AbilitySystemComponent.h"
+#include "GameplayTagContainer.h"
 #include "MonsterBaseCharacter.generated.h"
 
 class UMonsterAttributeSet;
 class AMonsterSpawner;
 class UAnimMontage;
+class UMaterialInterface;
+// --- [코드 수정] ---
+class UParticleSystem; // Niagara -> Particle System
+// --- [코드 수정 끝] ---
+class USoundBase;
+
+/** @brief 태그별 피격 효과(파티클, 사운드)를 정의하는 구조체 */
+USTRUCT(BlueprintType)
+struct FHitEffectData
+{
+	GENERATED_BODY()
+
+	// --- [코드 수정] ---
+	/** 피격 시 스폰할 파티클 이펙트 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TObjectPtr<UParticleSystem> HitEffect; // Niagara -> Particle System
+	// --- [코드 수정 끝] ---
+
+	/** 피격 시 재생할 사운드 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TObjectPtr<USoundBase> HitSound;
+};
+
 
 UCLASS()
 class RAMDOMITEMDEFENSE_API AMonsterBaseCharacter : public ACharacter, public IAbilitySystemInterface
@@ -18,23 +43,22 @@ class RAMDOMITEMDEFENSE_API AMonsterBaseCharacter : public ACharacter, public IA
 public:
 	AMonsterBaseCharacter();
 	virtual class UAbilitySystemComponent* GetAbilitySystemComponent() const override;
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
-	// Spawner가 자신을 등록하기 위해 호출할 함수
 	void SetSpawner(AMonsterSpawner* InSpawner);
 
-	/** @brief 몬스터가 죽었을 때 지급할 골드량을 반환합니다. */
 	UFUNCTION(BlueprintPure, Category = "Stats")
 	FORCEINLINE int32 GetGoldOnDeath() const { return GoldOnDeath; }
 
-	/**
-	 * @brief 몬스터의 죽음 처리를 시작합니다. (AI 정지, 애니메이션 재생, 골드 지급 알림 등)
-	 * @param Killer 몬스터를 죽인 액터 (플레이어 캐릭터)
-	 */
 	virtual void Die(AActor* Killer);
 
-	/** @brief 몬스터가 이미 죽음 처리 중인지 확인합니다. */
 	UFUNCTION(BlueprintPure, Category = "Stats")
 	bool IsDying() const { return bIsDying; }
+
+	void SetWaveMaterial(UMaterialInterface* WaveMaterial);
+	const TArray<TObjectPtr<UMaterialInterface>>& GetWaveMaterials() const { return WaveMaterials; }
+	virtual void PlayHitEffect(const FGameplayTagContainer& EffectTags);
+
 
 protected:
 	virtual void BeginPlay() override;
@@ -48,18 +72,31 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Stats")
 	int32 GoldOnDeath;
 
-	/** 사망 시 재생할 애니메이션 몽타주 (블루프린트에서 설정) */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation")
 	TObjectPtr<UAnimMontage> DeathMontage;
 
-	// 체력 변화를 감지하여 죽음을 처리할 함수
 	virtual void HandleHealthChanged(const FOnAttributeChangeData& Data);
 
-	// 이 몬스터를 스폰한 스포너의 주소
 	UPROPERTY()
 	TObjectPtr<AMonsterSpawner> MySpawner;
 
-	/** 몬스터가 죽음 상태(골드 지급, 파괴 대기)에 진입했는지 여부입니다. */
 	UPROPERTY(VisibleAnywhere, Category = "Stats")
 	bool bIsDying;
+
+protected:
+	UPROPERTY(ReplicatedUsing = OnRep_WaveMaterial)
+	TObjectPtr<UMaterialInterface> CurrentWaveMaterial;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Visuals")
+	TArray<TObjectPtr<UMaterialInterface>> WaveMaterials;
+
+	UFUNCTION()
+	void OnRep_WaveMaterial();
+
+protected:
+	UPROPERTY(EditDefaultsOnly, Category = "Effects")
+	TMap<FGameplayTag, FHitEffectData> HitEffectsMap;
+
+	UFUNCTION(NetMulticast, Unreliable)
+	void Multicast_PlayHitEffect(const FGameplayTag& HitTag);
 };

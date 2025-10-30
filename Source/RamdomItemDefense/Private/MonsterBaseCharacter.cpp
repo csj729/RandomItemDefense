@@ -2,106 +2,156 @@
 #include "MonsterAttributeSet.h"
 #include "MonsterSpawner.h"
 #include "MonsterAIController.h"
-#include "BrainComponent.h" 
+#include "BrainComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "Net/UnrealNetwork.h"
+#include "Materials/MaterialInterface.h"
+// --- [코드 수정] ---
+#include "Particles/ParticleSystem.h" // Niagara -> Particle System
+// --- [코드 수정 끝] ---
+#include "Kismet/GameplayStatics.h"
+#include "GameplayTagContainer.h"
+#include "GameplayTagsManager.h"
+
 
 AMonsterBaseCharacter::AMonsterBaseCharacter()
 {
-    PrimaryActorTick.bCanEverTick = false;
+	PrimaryActorTick.bCanEverTick = false;
 
-    AbilitySystemComponent = CreateDefaultSubobject<UAbilitySystemComponent>(TEXT("AbilitySystemComponent"));
-    AbilitySystemComponent->SetIsReplicated(true);
-    AbilitySystemComponent->SetReplicationMode(EGameplayEffectReplicationMode::Minimal);
+	AbilitySystemComponent = CreateDefaultSubobject<UAbilitySystemComponent>(TEXT("AbilitySystemComponent"));
+	AbilitySystemComponent->SetIsReplicated(true);
+	AbilitySystemComponent->SetReplicationMode(EGameplayEffectReplicationMode::Minimal);
 
-    AttributeSet = CreateDefaultSubobject<UMonsterAttributeSet>(TEXT("AttributeSet"));
+	AttributeSet = CreateDefaultSubobject<UMonsterAttributeSet>(TEXT("AttributeSet"));
 
-    GoldOnDeath = 10;
-    bIsDying = false;
+	GoldOnDeath = 10;
+	bIsDying = false;
 
-    // 이 폰(Pawn)이 월드에 배치되거나 스폰될 때 AI 컨트롤러를 자동으로 갖도록 설정합니다.
-    AutoPossessAI = EAutoPossessAI::PlacedInWorldOrSpawned;
+	AutoPossessAI = EAutoPossessAI::PlacedInWorldOrSpawned;
+	CurrentWaveMaterial = nullptr;
+}
+
+void AMonsterBaseCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME(AMonsterBaseCharacter, CurrentWaveMaterial);
 }
 
 UAbilitySystemComponent* AMonsterBaseCharacter::GetAbilitySystemComponent() const
 {
-    return AbilitySystemComponent;
+	return AbilitySystemComponent;
 }
 
 void AMonsterBaseCharacter::BeginPlay()
 {
-    Super::BeginPlay();
+	Super::BeginPlay();
 
-    if (AbilitySystemComponent)
-    {
-        AbilitySystemComponent->InitAbilityActorInfo(this, this);
+	if (AbilitySystemComponent)
+	{
+		AbilitySystemComponent->InitAbilityActorInfo(this, this);
+		if (AttributeSet)
+		{
+			AbilitySystemComponent->GetGameplayAttributeValueChangeDelegate(AttributeSet->GetHealthAttribute()).AddUObject(this, &AMonsterBaseCharacter::HandleHealthChanged);
+		}
+	}
 
-        if (AttributeSet)
-        {
-            AbilitySystemComponent->GetGameplayAttributeValueChangeDelegate(AttributeSet->GetHealthAttribute()).AddUObject(this, &AMonsterBaseCharacter::HandleHealthChanged);
-        }
-    }
+	if (!HasAuthority() && CurrentWaveMaterial)
+	{
+		OnRep_WaveMaterial();
+	}
 }
 
 void AMonsterBaseCharacter::HandleHealthChanged(const FOnAttributeChangeData& Data)
 {
-    // --- [코드 수정] ---
-    // 이 함수는 이제 아무것도 하지 않거나, 체력바 UI 업데이트 등 단순한 작업만 수행합니다.
-    // Destroy() 및 Spawner 알림 로직을 모두 제거합니다.
-    if (Data.NewValue <= 0.f)
-    {
-        // 죽음 관련 로직은 모두 MonsterAttributeSet의 PostGameplayEffectExecute에서 Die()를 호출하여 처리합니다.
-    }
-    // ------------------
+	if (Data.NewValue <= 0.f) {}
 }
 
 void AMonsterBaseCharacter::SetSpawner(AMonsterSpawner* InSpawner)
 {
-    MySpawner = InSpawner;
+	MySpawner = InSpawner;
 }
 
 void AMonsterBaseCharacter::Die(AActor* Killer)
 {
-    if (bIsDying)
-    {
-        return;
-    }
-    bIsDying = true;
+	if (bIsDying) { return; }
+	bIsDying = true;
 
-    // 나를 생성한 스포너가 있다면, 죽음을 알립니다.
-    if (MySpawner)
-    {
-        MySpawner->OnMonsterKilled();
-    }
+	if (MySpawner) { MySpawner->OnMonsterKilled(); }
 
-    // 1. AI 정지
-    AMonsterAIController* AIController = Cast<AMonsterAIController>(GetController());
-    if (AIController && AIController->GetBrainComponent())
-    {
-        AIController->GetBrainComponent()->StopLogic(TEXT("Died"));
-    }
+	AMonsterAIController* AIController = Cast<AMonsterAIController>(GetController());
+	if (AIController && AIController->GetBrainComponent())
+	{
+		AIController->GetBrainComponent()->StopLogic(TEXT("Died"));
+	}
 
-    // 2. 콜리전(충돌)을 비활성화합니다.
-    GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
-    float DeathAnimLength = 0.1f; // 애니메이션이 없을 경우 기본 파괴 시간 (매우 짧게)
+	float DeathAnimLength = 0.1f;
+	if (DeathMontage)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Death"));
+		DeathAnimLength = PlayAnimMontage(DeathMontage);
+	}
 
-    // 3. 사망 애니메이션 재생
-    if (DeathMontage)
-    {
-        UE_LOG(LogTemp, Warning, TEXT("Death"));
-        // 몽타주를 재생하고 실제 길이를 받아옵니다.
-        DeathAnimLength = PlayAnimMontage(DeathMontage);
-    }
+	if (DeathAnimLength > 0.f) { SetLifeSpan(DeathAnimLength); }
+	else { SetLifeSpan(0.1f); }
+}
 
-    // 4. 애니메이션 길이만큼 LifeSpan 설정
-    // (길이가 0이거나 몽타주가 없으면 기본값(0.1f)을 사용해 즉시 파괴)
-    if (DeathAnimLength > 0.f)
-    {
-        SetLifeSpan(DeathAnimLength);
-    }
-    else
-    {
-        // 몽타주가 없거나 길이가 0이면 즉시 파괴되도록 매우 짧은 시간 설정
-        SetLifeSpan(0.1f);
-    }
+void AMonsterBaseCharacter::SetWaveMaterial(UMaterialInterface* WaveMaterial)
+{
+	if (HasAuthority())
+	{
+		CurrentWaveMaterial = WaveMaterial;
+		OnRep_WaveMaterial();
+	}
+}
+
+void AMonsterBaseCharacter::OnRep_WaveMaterial()
+{
+	if (CurrentWaveMaterial && GetMesh())
+	{
+		GetMesh()->SetMaterial(0, CurrentWaveMaterial);
+	}
+}
+
+void AMonsterBaseCharacter::PlayHitEffect(const FGameplayTagContainer& EffectTags)
+{
+	if (!HasAuthority()) { return; }
+
+	FGameplayTag SelectedTag = FGameplayTag::EmptyTag;
+	for (const auto& Elem : HitEffectsMap)
+	{
+		if (EffectTags.HasTag(Elem.Key))
+		{
+			SelectedTag = Elem.Key;
+			break;
+		}
+	}
+
+	if (SelectedTag.IsValid())
+	{
+		Multicast_PlayHitEffect(SelectedTag);
+	}
+}
+
+void AMonsterBaseCharacter::Multicast_PlayHitEffect_Implementation(const FGameplayTag& HitTag)
+{
+	const FHitEffectData* EffectData = HitEffectsMap.Find(HitTag);
+	if (!EffectData) { return; }
+
+	// --- [코드 수정] ---
+	// 이펙트 재생
+	if (EffectData->HitEffect)
+	{
+		FVector SpawnLocation = GetActorLocation();
+		// Niagara -> GameplayStatics
+		UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), EffectData->HitEffect, SpawnLocation);
+	}
+	// --- [코드 수정 끝] ---
+
+	// 사운드 재생
+	if (EffectData->HitSound)
+	{
+		UGameplayStatics::PlaySoundAtLocation(this, EffectData->HitSound, GetActorLocation());
+	}
 }

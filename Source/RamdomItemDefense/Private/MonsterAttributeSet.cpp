@@ -23,22 +23,30 @@ void UMonsterAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCal
 {
 	Super::PostGameplayEffectExecute(Data);
 
+	// [로그 1: 함수 진입 확인]
+	RID_LOG(FColor::White, TEXT("MonsterAttributeSet: PostGameplayEffectExecute CALLED. Attribute: %s"), *Data.EvaluatedData.Attribute.GetName());
+
 	if (Data.EvaluatedData.Attribute == GetHealthAttribute())
 	{
-		// --- [코드 수정] ---
-		// 데미지 적용 *후*의 실제 체력 값을 가져옵니다.
-		const float NewHealth = GetHealth();
+		// [로그 2: 체력 속성 진입 확인]
+		RID_LOG(FColor::Cyan, TEXT("MonsterAttributeSet: Health Attribute CHANGED."));
 
-		// 1. 몬스터 액터를 먼저 가져옵니다.
+		const float NewHealth = GetHealth();
+		const float Magnitude = Data.EvaluatedData.Magnitude; // 데미지/힐량
+
+		// [로그 3: 상세 값 확인]
+		RID_LOG(FColor::Cyan, TEXT("MonsterAttributeSet: NewHealth: %.1f, Magnitude: %.1f"), NewHealth, Magnitude);
+
 		AMonsterBaseCharacter* Monster = Cast<AMonsterBaseCharacter>(GetOwningAbilitySystemComponent()->GetAvatarActor());
 
-		// 2. 몬스터가 유효하고, [핵심] 아직 죽음 상태(bIsDying)가 아닌지 확인합니다.
 		if (Monster && !Monster->IsDying())
 		{
-			// 3. 이 공격으로 인해 체력이 0 이하가 되었는지 확인합니다.
 			if (NewHealth <= 0.f)
 			{
-				// 킬러(Instigator/EffectCauser)를 찾습니다.
+				// [로그 4: 사망 처리 진입]
+				RID_LOG(FColor::Red, TEXT("MonsterAttributeSet: Monster is DYING (NewHealth <= 0)."));
+
+				// (기존 사망 로직)
 				AActor* InstigatorActor = Data.EffectSpec.GetContext().GetInstigator();
 				AActor* EffectCauserActor = Data.EffectSpec.GetContext().GetEffectCauser();
 
@@ -48,12 +56,8 @@ void UMonsterAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCal
 					KillerCharacter = Cast<ARamdomItemDefenseCharacter>(EffectCauserActor);
 				}
 
-				// (디버깅 로그는 유지하셔도 좋습니다)
-
-				// 4. Die() 함수를 호출합니다. (이 함수 내부에서 bIsDying이 true로 설정됩니다)
 				Monster->Die(KillerCharacter);
 
-				// 5. 킬러가 유효하면 골드를 지급합니다.
 				if (KillerCharacter)
 				{
 					AMyPlayerState* PS = KillerCharacter->GetPlayerState<AMyPlayerState>();
@@ -61,20 +65,58 @@ void UMonsterAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCal
 					{
 						const int32 GoldAmount = Monster->GetGoldOnDeath();
 						PS->AddGold(GoldAmount);
-
-						// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
 						RID_LOG(FColor::Yellow, TEXT("Awarded %d gold to %s for killing %s"),
 							GoldAmount,
 							*PS->GetPlayerName(),
 							*Monster->GetName()
 						);
-						// -----------------------------------------
 					}
 				}
-				// (킬러 정보가 없는 디버그 로그는 유지하셔도 좋습니다)
+
+				// --- [ ★★★ 코드 추가 ★★★ ] ---
+				// 몬스터가 죽는 순간에도 피격 이펙트를 재생합니다.
+				RID_LOG(FColor::Yellow, TEXT("MonsterAttributeSet: Playing HIT effect on DEATH. Checking Asset Tags..."));
+
+				FGameplayTagContainer EffectTags;
+				Data.EffectSpec.GetAllAssetTags(EffectTags);
+
+				if (EffectTags.Num() > 0)
+				{
+					RID_LOG(FColor::Green, TEXT("MonsterAttributeSet: Death Hit! Tags found: %s"), *EffectTags.ToString());
+				}
+				else
+				{
+					RID_LOG(FColor::Red, TEXT("MonsterAttributeSet: Death Hit! BUT NO ASSET TAGS FOUND ON GE!"));
+				}
+
+				Monster->PlayHitEffect(EffectTags);
+				// --- [ 코드 추가 끝 ] ---
+			}
+			else if (Magnitude < 0.f)
+			{
+				// [로그 5: 피격 처리 진입]
+				RID_LOG(FColor::Yellow, TEXT("MonsterAttributeSet: Monster was HIT (Magnitude < 0 and NewHealth > 0). Checking Asset Tags..."));
+
+				FGameplayTagContainer EffectTags;
+				Data.EffectSpec.GetAllAssetTags(EffectTags);
+
+				if (EffectTags.Num() > 0)
+				{
+					RID_LOG(FColor::Green, TEXT("MonsterAttributeSet: Hit Detected! Tags found: %s"), *EffectTags.ToString());
+				}
+				else
+				{
+					RID_LOG(FColor::Red, TEXT("MonsterAttributeSet: Hit Detected! BUT NO ASSET TAGS FOUND ON GE!"));
+				}
+
+				Monster->PlayHitEffect(EffectTags);
+			}
+			else
+			{
+				// [로그 6: 아무 조건도 맞지 않음]
+				RID_LOG(FColor::Orange, TEXT("MonsterAttributeSet: Health changed, but NOT hit (Magnitude: %.1f) and NOT dead (NewHealth: %.1f)."), Magnitude, NewHealth);
 			}
 		}
-		// ------------------
 	}
 }
 

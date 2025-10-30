@@ -99,9 +99,16 @@ void ARamdomItemDefenseCharacter::PossessedBy(AController* NewController)
 	{
 		AbilitySystemComponent->InitAbilityActorInfo(this, this);
 		ApplyDefaultStats();
-		if (DefaultAttackAbility != nullptr)
+
+		for (TSubclassOf<UGameplayAbility> AbilityClass : DefaultAbilities)
 		{
-			AbilitySystemComponent->GiveAbility(FGameplayAbilitySpec(DefaultAttackAbility));
+			if (AbilityClass)
+			{
+				// FGameplayAbilitySpec을 생성하여 어빌리티를 부여합니다.
+				// (레벨 1, 입력 ID 없음, 소스 오브젝트는 this)
+				FGameplayAbilitySpec Spec(AbilityClass, 1, INDEX_NONE, this);
+				AbilitySystemComponent->GiveAbility(Spec);
+			}
 		}
 	}
 
