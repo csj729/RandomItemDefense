@@ -1,26 +1,22 @@
-// Source/RamdomItemDefense/Private/GA_MagicFighter_DarkPulse.cpp
+// Source/RamdomItemDefense/Private/GA_MagicFighter_DarkPulse.cpp (수정)
 
 #include "GA_MagicFighter_DarkPulse.h"
 #include "RamdomItemDefenseCharacter.h"
-// --- [코드 수정] ---
-// 시각 효과용 투사체를 다시 스폰할 것이므로 헤더를 포함합니다.
 #include "DarkPulseProjectile.h"
-// --- [코드 수정 끝] ---
 #include "AbilitySystemComponent.h"
 #include "MyAttributeSet.h"
 #include "Kismet/KismetMathLibrary.h"
 #include "GameplayEffectTypes.h"
 #include "Kismet/GameplayStatics.h"
-#include "RamdomItemDefense.h" // RID_LOG 사용을 위해
+#include "RamdomItemDefense.h" 
 
-// 폭발 로직에 필요한 헤더들
 #include "Kismet/KismetSystemLibrary.h"
 #include "AbilitySystemBlueprintLibrary.h"
 #include "MonsterBaseCharacter.h"
 #include "DrawDebugHelpers.h"
-// --- [코드 추가] ---
-// 투사체 이동 컴포넌트 헤더 (변수 직접 접근 시 필요)
 #include "GameFramework/ProjectileMovementComponent.h"
+// --- [코드 추가] ---
+#include "RID_DamageStatics.h" // 데미지 계산 헬퍼 포함
 // --- [코드 추가 끝] ---
 
 
@@ -100,13 +96,10 @@ void UGA_MagicFighter_DarkPulse::ActivateAbility(const FGameplayAbilitySpecHandl
 
 		if (VisualProjectile)
 		{
-			// --- [코드 수정] ---
-			// GetProjectileMovement() 대신 ProjectileMovement 변수에 직접 접근합니다.
 			if (VisualProjectile->ProjectileMovement)
 			{
 				VisualProjectile->ProjectileMovement->HomingTargetComponent = TargetActor->GetRootComponent();
 			}
-			// --- [코드 수정 끝] ---
 
 			UGameplayStatics::FinishSpawningActor(VisualProjectile, FTransform(SpawnRotation, StartLocation));
 			//RID_LOG(FColor::Cyan, TEXT("GA_DarkPulse: Spawned VISUAL projectile."));
@@ -125,7 +118,6 @@ void UGA_MagicFighter_DarkPulse::ActivateAbility(const FGameplayAbilitySpecHandl
 	//RID_LOG(FColor::Green, TEXT("GA_DarkPulse: Timer SET. Waiting for Explode..."));
 }
 
-/** 타이머가 만료되었을 때 실제 폭발을 실행하는 함수 */
 void UGA_MagicFighter_DarkPulse::Explode()
 {
 	// 1. 현재 어빌리티 정보 가져오기
@@ -144,81 +136,73 @@ void UGA_MagicFighter_DarkPulse::Explode()
 		return;
 	}
 
-	// 3. 폭발 이펙트 및 사운드 재생 (저장된 TargetImpactLocation 사용)
-	if (ExplosionEffect)
-	{
-		UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), ExplosionEffect, TargetImpactLocation);
-	}
-	if (ExplosionSound)
-	{
-		UGameplayStatics::PlaySoundAtLocation(this, ExplosionSound, TargetImpactLocation);
-	}
+	// 3. 폭발 이펙트 및 사운드 재생
+	if (ExplosionEffect) UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), ExplosionEffect, TargetImpactLocation);
+	if (ExplosionSound) UGameplayStatics::PlaySoundAtLocation(this, ExplosionSound, TargetImpactLocation);
 
 	// 4. 데미지 계산
 	const float OwnerAttackDamage = AttributeSet->GetAttackDamage();
-	const float FinalDamage = -(50.f + (OwnerAttackDamage * 0.3f));
+	const float BaseDamage = 50.f + (OwnerAttackDamage * 0.3f);
+
+	// --- [ ★★★ 범위 스킬 치명타 로직 수정 ★★★ ] ---
+
+	// 4-1. 치명타 굴림을 '단 한 번' 수행합니다. (bIsSkillAttack: true)
+	const bool bDidCrit = URID_DamageStatics::CheckForCrit(CasterASC, true);
+
+	// 4-2. 치명타 여부에 따라 '최종 데미지'를 '단 한 번' 계산합니다.
+	float FinalDamage = BaseDamage;
+	if (bDidCrit)
+	{
+		FinalDamage = BaseDamage * URID_DamageStatics::GetCritMultiplier(CasterASC);
+	}
+	// --- [ ★★★ 로직 수정 끝 ★★★ ] ---
+
 
 	// 5. 디버그 구체 그리기
-	DrawDebugSphere(
-		GetWorld(),
-		TargetImpactLocation,
-		ExplosionRadius,
-		12,
-		FColor::Red,
-		false,
-		2.0f,
-		0,
-		1.0f
-	);
+	DrawDebugSphere(GetWorld(), TargetImpactLocation, ExplosionRadius, 12, FColor::Red, false, 2.0f, 0, 1.0f);
 
 	// 6. 범위 내 몬스터 찾기
 	TArray<AActor*> OverlappedActors;
 	TArray<TEnumAsByte<EObjectTypeQuery>> ObjectTypes;
 	ObjectTypes.Add(UEngineTypes::ConvertToObjectType(ECollisionChannel::ECC_Pawn));
+	UKismetSystemLibrary::SphereOverlapActors(GetWorld(), TargetImpactLocation, ExplosionRadius, ObjectTypes, AMonsterBaseCharacter::StaticClass(), {}, OverlappedActors);
 
-	UKismetSystemLibrary::SphereOverlapActors(
-		GetWorld(),
-		TargetImpactLocation,
-		ExplosionRadius,
-		ObjectTypes,
-		AMonsterBaseCharacter::StaticClass(),
-		{},
-		OverlappedActors
-	);
-
-	RID_LOG(FColor::Cyan, TEXT("GA_DarkPulse Exploded (Delayed)! FinalDamage: %.1f, Hit %d monsters."), FinalDamage, OverlappedActors.Num());
+	RID_LOG(FColor::Cyan, TEXT("GA_DarkPulse Exploded! Damage: %.1f (Crit: %s), Hit %d monsters."), FinalDamage, bDidCrit ? TEXT("YES") : TEXT("NO"), OverlappedActors.Num());
 
 	// 7. 찾은 몬스터들에게 데미지 적용
 	if (DamageByCallerTag.IsValid())
 	{
 		FGameplayEffectContextHandle ContextHandle = MakeEffectContext(Handle, ActorInfo);
-		FGameplayEffectSpecHandle SpecHandle = CasterASC->MakeOutgoingSpec(DamageEffectClass, 1.0f, ContextHandle);
 
+		// 7-1. 데미지 GE Spec을 '단 한 번' 생성합니다.
+		FGameplayEffectSpecHandle SpecHandle = CasterASC->MakeOutgoingSpec(DamageEffectClass, 1.0f, ContextHandle);
 		if (SpecHandle.IsValid())
 		{
-			SpecHandle.Data.Get()->SetSetByCallerMagnitude(DamageByCallerTag, FinalDamage);
+			// 7-2. Spec에 '최종 데미지'를 '단 한 번' 설정합니다.
+			SpecHandle.Data.Get()->SetSetByCallerMagnitude(DamageByCallerTag, -FinalDamage);
 
 			for (AActor* HitActor : OverlappedActors)
 			{
 				AMonsterBaseCharacter* HitMonster = Cast<AMonsterBaseCharacter>(HitActor);
-				if (!HitMonster || HitMonster->IsDying())
-				{
-					continue;
-				}
+				if (!HitMonster || HitMonster->IsDying()) continue;
 
 				UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(HitMonster);
 				if (TargetASC)
 				{
-					// [데미지 적용]
+					// 7-3. [데미지 적용] 미리 만들어둔 '동일한 Spec'을 모든 타겟에게 적용합니다.
 					CasterASC->ApplyGameplayEffectSpecToTarget(*SpecHandle.Data.Get(), TargetASC);
 
-					// --- [ ★★★ 슬로우 효과 적용 추가 ★★★ ] ---
+					// 7-4. [치명타 텍스트] 치명타가 발생했다면, 이 몬스터에게 델리게이트를 방송합니다.
+					if (bDidCrit)
+					{
+						URID_DamageStatics::OnCritDamageOccurred.Broadcast(HitMonster, FinalDamage);
+					}
+
+					// 7-5. [슬로우 효과 적용]
 					if (SlowEffectClass)
 					{
-						// 데미지와 동일한 EffectContext를 사용하여 슬로우 GE를 적용합니다.
 						TargetASC->ApplyGameplayEffectToSelf(SlowEffectClass->GetDefaultObject<UGameplayEffect>(), 1.0f, ContextHandle);
 					}
-					// --- [ ★★★ 코드 추가 끝 ★★★ ] ---
 				}
 			}
 		}

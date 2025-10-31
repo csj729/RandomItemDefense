@@ -17,6 +17,7 @@ class UParticleSystem;
 class USoundBase;
 class AMonsterAIController;
 struct FOnAttributeChangeData;
+class UDamageTextWidget;
 
 
 /** @brief 태그별 피격 효과(파티클, 사운드)를 정의하는 구조체 */
@@ -131,4 +132,17 @@ protected:
 	/** (블루프린트 구현용) 슬로우 상태가 변경될 때 호출됩니다. */
 	UFUNCTION(BlueprintImplementableEvent, Category = "Animation")
 	void OnSlowStateChanged(bool bIsSlowed);
+
+	/**
+	 * @brief (블루프린트에서 설정) 몬스터 머리 위에 띄울 데미지 텍스트 위젯
+	 * (WBP_DamageText로 설정, 부모는 UDamageTextWidget이어야 함)
+	 */
+	UPROPERTY(EditDefaultsOnly, Category = "Config|UI")
+	TSubclassOf<UDamageTextWidget> DamageTextWidgetClass;
+
+	/**
+	 * @brief URID_DamageStatics의 치명타 델리게이트에 바인딩될 함수
+	 */
+	UFUNCTION()
+	void OnCritDamageOccurred(AActor* TargetActor, float CritDamageAmount);
 };

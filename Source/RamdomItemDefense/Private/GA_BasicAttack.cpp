@@ -4,6 +4,7 @@
 #include "RamdomItemDefenseCharacter.h" // 캐릭터 헤더 포함 (AttributeSet 가져오기 위해)
 #include "GameplayEffectTypes.h" // FGameplayEventData 사용
 #include "AbilitySystemBlueprintLibrary.h" // GetAbilitySystemComponent 사용
+#include "RID_DamageStatics.h"
 #include "RamdomItemDefense.h" // 로그 사용
 
 UGA_BasicAttack::UGA_BasicAttack()
@@ -22,7 +23,6 @@ void UGA_BasicAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle, c
 	// 1. 필요한 데이터 확인 (데미지 이펙트, 타겟)
 	if (!DamageEffectClass)
 	{
-		UE_LOG(LogRamdomItemDefense, Warning, TEXT("GA_BasicAttack: DamageEffectClass is not set in Blueprint."));
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
@@ -30,7 +30,6 @@ void UGA_BasicAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle, c
 	// TriggerEventData와 그 안의 Target 포인터 유효성 검사
 	if (!TriggerEventData || !TriggerEventData->Target)
 	{
-		UE_LOG(LogRamdomItemDefense, Warning, TEXT("GA_BasicAttack: TriggerEventData or Target is NULL."));
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
@@ -66,10 +65,13 @@ void UGA_BasicAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle, c
 	}
 	const float OwnerAttackDamage = AttributeSet->GetAttackDamage();
 
-	// 4. 최종 데미지 계산
-	const float FinalDamage = OwnerAttackDamage * DamageCoefficient;
-	RID_LOG(FColor::White, TEXT("GA_BasicAttack: Applying Damage: %.1f (AD: %.1f * Coeff: %.1f)"), FinalDamage, OwnerAttackDamage, DamageCoefficient);
+	// 4-1. 기본 데미지 계산
+	const float BaseDamage = OwnerAttackDamage * DamageCoefficient;
 
+	// 4-2. 치명타 적용 (bIsSkillAttack: false)
+	const float FinalDamage = URID_DamageStatics::ApplyCritDamage(BaseDamage, SourceASC, TargetActor, false);
+
+	RID_LOG(FColor::White, TEXT("GA_BasicAttack: Applying Damage: %.1f (AD: %.1f * Coeff: %.1f) -> CritApplied: %.1f"), BaseDamage, OwnerAttackDamage, DamageCoefficient, FinalDamage);
 	// 5. 데미지 GE Spec 생성 및 SetByCaller로 최종 데미지 값 주입
 	FGameplayEffectSpecHandle SpecHandle = SourceASC->MakeOutgoingSpec(DamageEffectClass, 1.0f, SourceASC->MakeEffectContext());
 	if (SpecHandle.IsValid() && DamageDataTag.IsValid())

@@ -104,7 +104,7 @@ void UMyAttributeSet::AdjustBaseCritDamage(float Delta)
 	if (ASC && ASC->IsOwnerActorAuthoritative() && FMath::Abs(Delta) > SMALL_NUMBER)
 	{
 		// --- [코드 수정] ---
-		ASC->SetNumericAttributeBase(GetCritDamageAttribute(), CritDamage.GetBaseValue() + Delta * 100.f);
+		ASC->SetNumericAttributeBase(GetCritDamageAttribute(), CritDamage.GetBaseValue() + Delta);
 		// --- ----------- ---
 	}
 }

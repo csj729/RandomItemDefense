@@ -13,6 +13,9 @@
 class UAttackComponent;
 class UInventoryComponent;
 class UAnimMontage;
+class UWidgetComponent;
+class UUserWidget;
+class UMyAttributeSet;
 
 UCLASS(Blueprintable)
 class ARamdomItemDefenseCharacter : public ACharacter, public IAbilitySystemInterface

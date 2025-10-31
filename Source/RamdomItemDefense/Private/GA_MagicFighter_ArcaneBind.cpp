@@ -1,3 +1,5 @@
+// Source/RamdomItemDefense/Private/GA_MagicFighter_ArcaneBind.cpp (수정)
+
 #include "GA_MagicFighter_ArcaneBind.h"
 #include "AbilitySystemComponent.h"
 #include "MyAttributeSet.h"
@@ -5,6 +7,9 @@
 #include "GameplayEffectTypes.h"
 #include "AbilitySystemBlueprintLibrary.h"
 #include "RamdomItemDefense.h"
+// --- [코드 추가] ---
+#include "RID_DamageStatics.h" // 데미지 계산 헬퍼 포함
+// --- [코드 추가 끝] ---
 
 UGA_MagicFighter_ArcaneBind::UGA_MagicFighter_ArcaneBind()
 {
@@ -55,16 +60,25 @@ void UGA_MagicFighter_ArcaneBind::ActivateAbility(const FGameplayAbilitySpecHand
 		return;
 	}
 
-	// 4. 최종 데미지 계산 (기본 200 + 공격력 * 0.5)
+	// 4. 최종 데미지 계산
+	// --- [코드 수정] ---
 	const float OwnerAttackDamage = AttributeSet->GetAttackDamage();
-	const float FinalDamage = -(200.0f + (OwnerAttackDamage * 0.5f));
-	RID_LOG(FColor::Cyan, TEXT("GA_ArcaneBind: Applying Damage: %.1f (Base: 200, AD: %.1f * 0.5)"), FinalDamage, OwnerAttackDamage);
+
+	// 4-1. 기본 데미지 계산 (양수)
+	const float BaseDamage = 200.0f + (OwnerAttackDamage * 0.5f);
+
+	// 4-2. 치명타 적용 (bIsSkillAttack: true)
+	const float FinalDamage = URID_DamageStatics::ApplyCritDamage(BaseDamage, SourceASC, TargetActor, true);
+
+	RID_LOG(FColor::Cyan, TEXT("GA_ArcaneBind: Applying Damage: %.1f (Base: 200, AD: %.1f * 0.5) -> CritApplied: %.1f"), BaseDamage, OwnerAttackDamage, FinalDamage);
+	// --- [코드 수정 끝] ---
 
 	// 5. 데미지 GE Spec 생성 및 SetByCaller로 최종 데미지 값 주입
 	FGameplayEffectSpecHandle DamageSpecHandle = SourceASC->MakeOutgoingSpec(DamageEffectClass, 1.0f, SourceASC->MakeEffectContext());
 	if (DamageSpecHandle.IsValid() && DamageByCallerTag.IsValid())
 	{
-		DamageSpecHandle.Data.Get()->SetSetByCallerMagnitude(DamageByCallerTag, FinalDamage);
+		// 5-1. 최종 데미지를 음수로 변환하여 적용
+		DamageSpecHandle.Data.Get()->SetSetByCallerMagnitude(DamageByCallerTag, -FinalDamage);
 
 		// 6. 대상에게 데미지 GE 적용
 		RID_LOG(FColor::Green, TEXT("GA_ArcaneBind: Applying Damage Spec to %s..."), *GetNameSafe(TargetActor));
@@ -89,7 +103,6 @@ void UGA_MagicFighter_ArcaneBind::ActivateAbility(const FGameplayAbilitySpecHand
 	{
 		UE_LOG(LogRamdomItemDefense, Warning, TEXT("GA_ArcaneBind: Failed to make Stun SpecHandle."));
 	}
-
 
 	// 어빌리티 종료
 	EndAbility(Handle, ActorInfo, ActivationInfo, true, false);

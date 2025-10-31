@@ -224,7 +224,8 @@ void UStatUpgradeWidget::HandleAttackSpeedChanged(const FOnAttributeChangeData& 
 
 void UStatUpgradeWidget::HandleCritDamageChanged(const FOnAttributeChangeData& Data)
 {
-	if (CritDmg_ValueText) CritDmg_ValueText->SetText(FText::AsNumber(FMath::RoundToInt(Data.NewValue)));
+
+	if (CritDmg_ValueText) CritDmg_ValueText->SetText(FText::FromString(FString::Printf(TEXT("%.1f%%"), Data.NewValue * 100.0f)));
 }
 
 void UStatUpgradeWidget::HandleArmorReductionChanged(const FOnAttributeChangeData& Data)

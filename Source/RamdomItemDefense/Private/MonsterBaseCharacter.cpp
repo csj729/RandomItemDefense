@@ -12,6 +12,9 @@
 #include "GameplayTagsManager.h"
 #include "BehaviorTree/BlackboardComponent.h" 
 #include "AbilitySystemComponent.h"
+#include "RID_DamageStatics.h"         // 델리게이트 구독용
+#include "DamageTextWidget.h"        // 데미지 위젯 클래스
+#include "Blueprint/UserWidget.h"      // CreateWidget
 
 AMonsterBaseCharacter::AMonsterBaseCharacter()
 {
@@ -90,6 +93,8 @@ void AMonsterBaseCharacter::PossessedBy(AController* NewController)
 					BaseMoveSpeed,
 					CurrentSpeedMultiplier);
 			}
+
+			URID_DamageStatics::OnCritDamageOccurred.AddDynamic(this, &AMonsterBaseCharacter::OnCritDamageOccurred);
 			// --- [ 코드 수정 끝 ] ---
 		}
 
@@ -271,5 +276,43 @@ void AMonsterBaseCharacter::OnSlowTagChanged(const FGameplayTag Tag, int32 NewCo
 	else
 	{
 		RID_LOG(FColor::Blue, TEXT("%s SLOW ENDED (BP Event Called)"), *GetName());
+	}
+}
+
+/** 치명타 델리게이트 핸들러 구현 */
+void AMonsterBaseCharacter::OnCritDamageOccurred(AActor* TargetActor, float CritDamageAmount)
+{
+	// 1. 이벤트 대상이 이 몬스터가 아니거나, 위젯 클래스가 없으면 무시
+	if (TargetActor != this || !DamageTextWidgetClass)
+	{
+		return;
+	}
+
+	// 2. 이 몬스터가 로컬 플레이어 화면에 보여야 하므로 로컬 PC가 필요
+	// (멀티플레이 환경에서는 이 PC가 로컬 플레이어인지 추가 확인 필요)
+	APlayerController* PC = UGameplayStatics::GetPlayerController(GetWorld(), 0);
+	if (!PC)
+	{
+		return;
+	}
+
+	// 3. 위젯 생성
+	UDamageTextWidget* DamageWidget = CreateWidget<UDamageTextWidget>(PC, DamageTextWidgetClass);
+	if (DamageWidget)
+	{
+		// 4. 데미지 텍스트 설정 (예: "1050!")
+		FString DamageString = FString::Printf(TEXT("%.0f!"), CritDamageAmount);
+		DamageWidget->SetDamageText(FText::FromString(DamageString));
+
+		// 5. 몬스터의 월드 위치를 스크린 위치로 변환
+		FVector2D ScreenPosition;
+		if (PC->ProjectWorldLocationToScreen(GetActorLocation() + FVector(0, 0, 50.f), ScreenPosition)) // 머리 위 50cm
+		{
+			// 6. 뷰포트에 추가하고 애니메이션 재생
+			DamageWidget->SetPositionInViewport(ScreenPosition);
+			DamageWidget->AddToViewport();
+			DamageWidget->PlayRiseAndFade();
+			UE_LOG(LogTemp, Warning, TEXT("CritDam Ocurred"));
+		}
 	}
 }

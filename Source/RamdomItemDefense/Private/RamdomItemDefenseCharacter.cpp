@@ -17,7 +17,11 @@
 #include "ItemTypes.h"
 #include "AbilitySystemBlueprintLibrary.h"
 #include "Engine/Engine.h"
-#include "RamdomItemDefense.h" // RID_LOG 매크로용
+#include "RamdomItemDefense.h"
+#include "DamageTextWidget.h" // 생성할 위젯의 헤더 (직접 만든 위젯 클래스 이름으로 변경)
+#include "Components/WidgetComponent.h" // 위젯 컴포넌트 사용 시
+#include "RID_DamageStatics.h" // 델리게이트 바인딩을 위해 포함
+#include "Blueprint/UserWidget.h"
 
 ARamdomItemDefenseCharacter::ARamdomItemDefenseCharacter()
 {
