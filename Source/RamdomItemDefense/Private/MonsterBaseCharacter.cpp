@@ -176,7 +176,6 @@ void AMonsterBaseCharacter::Die(AActor* Killer)
 	float DeathAnimLength = 0.1f;
 	if (DeathMontage)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("Death"));
 		DeathAnimLength = PlayAnimMontage(DeathMontage);
 	}
 
