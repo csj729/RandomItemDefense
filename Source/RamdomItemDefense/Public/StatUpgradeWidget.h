@@ -19,6 +19,9 @@ class RAMDOMITEMDEFENSE_API UStatUpgradeWidget : public UUserWidget
 	GENERATED_BODY()
 
 protected:
+	/** 위젯 생성 시 '단 한 번' 호출됩니다. (버튼 바인딩용) */
+	virtual void NativeOnInitialized() override;
+
 	/** 위젯 생성 시 호출 (블루프린트의 Event Construct) */
 	virtual void NativeConstruct() override;
 
@@ -88,6 +91,11 @@ protected:
 
 	/** 모든 스탯 라인의 UI를 업데이트합니다. */
 	void UpdateAllStatLines();
+
+	// --- [ ★★★ 코드 추가 ★★★ ] ---
+	/** 모든 업그레이드 버튼을 일시적으로 비활성화합니다. (RPC 중복 전송 방지) */
+	void DisableAllUpgradeButtons();
+	// --- [ 코드 추가 끝 ] ---
 
 	// --- 개별 스탯 값 변경 핸들러 선언 ---
 	// ASC의 Attribute 값이 변경될 때 호출됩니다.

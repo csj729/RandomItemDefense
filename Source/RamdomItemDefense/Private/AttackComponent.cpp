@@ -230,7 +230,7 @@ void UAttackComponent::PerformAttack()
 				UAbilitySystemBlueprintLibrary::SendGameplayEventToActor(OwnerCharacter, EventTag, Payload);
 
 				// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
-				RID_LOG(FColor::Yellow, TEXT("Attacking -> %s"), *TargetToAttack->GetName());
+				//RID_LOG(FColor::Yellow, TEXT("Attacking -> %s"), *TargetToAttack->GetName());
 				// -----------------------------------------
 			}
 		}

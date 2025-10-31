@@ -5,6 +5,10 @@
 #include "RamdomItemDefenseCharacter.h"
 #include "InventoryComponent.h"
 #include "RamdomItemDefense.h" // RID_LOG 매크로용
+// --- [ ★★★ 코드 추가 ★★★ ] ---
+#include "MyGameState.h"       // GetCurrentWave() 사용
+#include "Engine/World.h"      // GetWorld() 사용
+// --- [ 코드 추가 끝 ] ---
 
 AMyPlayerState::AMyPlayerState()
 {
@@ -121,10 +125,24 @@ void AMyPlayerState::Server_UseRoundChoice_Implementation(bool bChoseItemGacha)
 	}
 	else
 	{
-		// TODO: 골드 도박 로직 (랜덤 골드 AddGold)
-		const int32 GambleAmount = FMath::RandRange(100, 500); // 예: 100~500 골드
+		// --- [ ★★★ 골드 도박 로직 수정 ★★★ ] ---
+
+		// 1. GameState에서 현재 웨이브 가져오기
+		AMyGameState* MyGameState = GetWorld() ? GetWorld()->GetGameState<AMyGameState>() : nullptr;
+		int32 CurrentWave = 1; // GameState가 없거나 웨이브가 0이면 1로 간주
+		if (MyGameState && MyGameState->GetCurrentWave() > 0)
+		{
+			CurrentWave = MyGameState->GetCurrentWave();
+		}
+
+		// 2. 웨이브 기반으로 골드 계산 (기본값: 50 * Wave, 범위: ± 30)
+		const int32 BaseAmount = 50 * CurrentWave;
+		const int32 RandomBonus = FMath::RandRange(-30, 30); // TodoList "± 일정값"
+		const int32 GambleAmount = FMath::Max(1, BaseAmount + RandomBonus); // 최소 1골드
+
 		AddGold(GambleAmount);
-		RID_LOG(FColor::Cyan, TEXT("Player chose: Gold Gamble (+%d)"), GambleAmount);
+		RID_LOG(FColor::Cyan, TEXT("Player chose: Gold Gamble (Wave: %d, Base: %d, Final: +%d)"), CurrentWave, BaseAmount, GambleAmount);
+		// --- [ ★★★ 로직 수정 끝 ★★★ ] ---
 	}
 }
 

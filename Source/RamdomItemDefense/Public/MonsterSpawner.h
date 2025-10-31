@@ -42,6 +42,9 @@ protected:
 	UFUNCTION()
 	virtual void OnRep_CurrentMonsterCount();
 
+	UPROPERTY(EditDefaultsOnly, Category = "Spawning|GAS")
+	TSubclassOf<UGameplayEffect> MonsterStatInitEffect;
+
 private:
 	// 몬스터를 실제로 스폰하는 함수
 	void SpawnMonster();

@@ -6,16 +6,18 @@
 #include "AbilitySystemInterface.h"
 #include "AbilitySystemComponent.h"
 #include "GameplayTagContainer.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "MonsterBaseCharacter.generated.h"
 
 class UMonsterAttributeSet;
 class AMonsterSpawner;
 class UAnimMontage;
 class UMaterialInterface;
-// --- [코드 수정] ---
-class UParticleSystem; // Niagara -> Particle System
-// --- [코드 수정 끝] ---
+class UParticleSystem;
 class USoundBase;
+class AMonsterAIController;
+struct FOnAttributeChangeData;
+
 
 /** @brief 태그별 피격 효과(파티클, 사운드)를 정의하는 구조체 */
 USTRUCT(BlueprintType)
@@ -23,11 +25,9 @@ struct FHitEffectData
 {
 	GENERATED_BODY()
 
-	// --- [코드 수정] ---
 	/** 피격 시 스폰할 파티클 이펙트 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	TObjectPtr<UParticleSystem> HitEffect; // Niagara -> Particle System
-	// --- [코드 수정 끝] ---
+	TObjectPtr<UParticleSystem> HitEffect;
 
 	/** 피격 시 재생할 사운드 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
@@ -60,6 +60,10 @@ public:
 	virtual void PlayHitEffect(const FGameplayTagContainer& EffectTags);
 
 
+	/** (AIController가 폰에 빙의될 때 호출됨) AI 관련 초기화 수행 */
+	virtual void PossessedBy(AController* NewController) override;
+
+
 protected:
 	virtual void BeginPlay() override;
 
@@ -75,7 +79,16 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation")
 	TObjectPtr<UAnimMontage> DeathMontage;
 
+	// --- [ ★★★ 코드 수정 ★★★ ] ---
+	/** Health 속성 변경 콜백 (BeginPlay -> PossessedBy로 이동 예정) */
 	virtual void HandleHealthChanged(const FOnAttributeChangeData& Data);
+
+	/** MoveSpeed 속성 변경 콜백 */
+	virtual void HandleMoveSpeedChanged(const FOnAttributeChangeData& Data);
+	// --- [ 코드 수정 끝 ] ---
+
+	UPROPERTY(EditDefaultsOnly, Category = "Stats")
+	float BaseMoveSpeed;
 
 	UPROPERTY()
 	TObjectPtr<AMonsterSpawner> MySpawner;
@@ -99,4 +112,23 @@ protected:
 
 	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlayHitEffect(const FGameplayTag& HitTag);
+
+protected:
+	/** State.Stun 태그가 변경될 때 호출될 콜백 함수 */
+	void OnStunTagChanged(const FGameplayTag Tag, int32 NewCount);
+
+	/** State.Slow 태그가 변경될 때 호출될 콜백 함수 */
+	void OnSlowTagChanged(const FGameplayTag Tag, int32 NewCount);
+
+	/** 이 몬스터를 제어하는 AI 컨트롤러 캐시 */
+	UPROPERTY()
+	TWeakObjectPtr<AMonsterAIController> MonsterAIController;
+
+	/** (블루프린트 구현용) 스턴 상태가 변경될 때 호출됩니다. */
+	UFUNCTION(BlueprintImplementableEvent, Category = "Animation")
+	void OnStunStateChanged(bool bIsStunned);
+
+	/** (블루프린트 구현용) 슬로우 상태가 변경될 때 호출됩니다. */
+	UFUNCTION(BlueprintImplementableEvent, Category = "Animation")
+	void OnSlowStateChanged(bool bIsSlowed);
 };

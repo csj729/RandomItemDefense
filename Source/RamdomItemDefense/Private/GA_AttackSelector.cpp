@@ -40,7 +40,7 @@ void UGA_AttackSelector::ActivateAbility(const FGameplayAbilitySpecHandle Handle
 		{
 			// 결정된 공격 실행 이벤트 전송
 			SendExecuteAttackEvent(TargetActor, SelectedAttackTag);
-			RID_LOG(FColor::Cyan, TEXT("GA_AttackSelector: Sending execute event: %s"), *SelectedAttackTag.ToString());
+			//RID_LOG(FColor::Cyan, TEXT("GA_AttackSelector: Sending execute event: %s"), *SelectedAttackTag.ToString());
 		}
 		else
 		{
@@ -62,10 +62,10 @@ void UGA_AttackSelector::SendExecuteAttackEvent(AActor* TargetActor, FGameplayTa
 	// --- [디버깅 1] ---
 	// 함수가 호출되었는지, 파라미터가 올바르게 들어왔는지 확인
 	// GetNameSafe()는 액터가 Null일 경우 "None"을, 유효할 경우 액터 이름을 안전하게 반환합니다.
-	RID_LOG(FColor::Cyan, TEXT("[GA_AttackSelector] SendExecuteAttackEvent: CALLED. Target=[%s], ExecuteTag=[%s]"),
+	/*RID_LOG(FColor::Cyan, TEXT("[GA_AttackSelector] SendExecuteAttackEvent: CALLED. Target=[%s], ExecuteTag=[%s]"),
 		*GetNameSafe(TargetActor),
 		*ExecuteTag.ToString()
-	);
+	);*/
 
 	if (!TargetActor || !ExecuteTag.IsValid())
 	{
@@ -85,10 +85,10 @@ void UGA_AttackSelector::SendExecuteAttackEvent(AActor* TargetActor, FGameplayTa
 
 	// --- [디버깅 3] ---
 	// Payload가 올바르게 생성되었는지 확인
-	RID_LOG(FColor::Green, TEXT("[GA_AttackSelector] SendExecuteAttackEvent: Payload created. Instigator=[%s], Target=[%s]"),
+	/*RID_LOG(FColor::Green, TEXT("[GA_AttackSelector] SendExecuteAttackEvent: Payload created. Instigator=[%s], Target=[%s]"),
 		*GetNameSafe(Payload.Instigator),
 		*GetNameSafe(Payload.Target)
-	);
+	);*/
 
 	// 현재 어빌리티 소유자에게 Gameplay Event 전송
 	AActor* AvatarActor = GetAvatarActorFromActorInfo();
@@ -104,8 +104,8 @@ void UGA_AttackSelector::SendExecuteAttackEvent(AActor* TargetActor, FGameplayTa
 
 	// --- [디버깅 5] ---
 	// 이벤트가 성공적으로 전송되었음을 확인
-	RID_LOG(FColor::Green, TEXT("[GA_AttackSelector] SendExecuteAttackEvent: SUCCESS. Event [%s] SENT to [%s]"),
+	/*RID_LOG(FColor::Green, TEXT("[GA_AttackSelector] SendExecuteAttackEvent: SUCCESS. Event [%s] SENT to [%s]"),
 		*ExecuteTag.ToString(),
 		*GetNameSafe(AvatarActor)
-	);
+	);*/
 }

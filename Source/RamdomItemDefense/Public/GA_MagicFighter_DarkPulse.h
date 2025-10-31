@@ -1,3 +1,5 @@
+// Source/RamdomItemDefense/Public/GA_MagicFighter_DarkPulse.h
+
 #pragma once
 
 #include "RamdomItemDefense.h" 
@@ -6,7 +8,12 @@
 #include "GA_BaseSkill.h"
 #include "GA_MagicFighter_DarkPulse.generated.h"
 
-class ADarkPulseProjectile;
+// --- [코드 추가] ---
+class UParticleSystem;
+class USoundBase;
+class ADarkPulseProjectile; // 시각 효과용 투사체 클래스를 다시 전방 선언
+// --- [코드 추가 끝] ---
+
 class UGameplayEffect;
 
 UCLASS()
@@ -21,15 +28,43 @@ protected:
 	/** 어빌리티가 실제로 활성화될 때 (Gameplay Event 포함) */
 	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
 
-	/** (블루프린트에서 설정) 스폰할 투사체 클래스 (BP_DarkPulseProjectile) */
+	// --- [코드 수정] ---
+	// ProjectileClass를 다시 추가합니다 (시각 효과용)
+	/** (블루프린트에서 설정) 스폰할 시각 효과용 투사체 클래스 (BP_DarkPulseProjectile) */
 	UPROPERTY(EditDefaultsOnly, Category = "Config")
 	TSubclassOf<ADarkPulseProjectile> ProjectileClass;
 
-	/** (블루프린트에서 설정) 플레이어 전방 몇 cm 앞에서 발사할지 (예: 100) */
+	/** (블루프린트에서 설정) 시각적으로 날아가는 투사체 속도 (예: 1500) */
 	UPROPERTY(EditDefaultsOnly, Category = "Config")
-	float SpawnDistanceForward;
+	float VisualProjectileSpeed;
+
+	/** (블루프린트에서 설정) 폭발 반경 (예: 300) */
+	UPROPERTY(EditDefaultsOnly, Category = "Config")
+	float ExplosionRadius;
+
+	/** (블루프린트에서 설정) 적중 시 스폰할 폭발 이펙트 */
+	UPROPERTY(EditDefaultsOnly, Category = "Config|FX")
+	TObjectPtr<UParticleSystem> ExplosionEffect;
+
+	/** (블루프린트에서 설정) 폭발 사운드 */
+	UPROPERTY(EditDefaultsOnly, Category = "Config|FX")
+	TObjectPtr<USoundBase> ExplosionSound;
+	// --- [코드 수정 끝] ---
 
 	UPROPERTY(EditDefaultsOnly, Category = "Config|GAS")
 	TSubclassOf<UGameplayEffect> SlowEffectClass;
-};
 
+private:
+	/** 폭발 타이머 핸들 */
+	FTimerHandle ImpactTimerHandle;
+
+	/** 폭발이 일어날 위치 (타겟의 초기 위치) */
+	UPROPERTY()
+	FVector TargetImpactLocation;
+
+	/**
+	 * @brief 타이머 만료 시 실제 폭발 및 데미지를 적용하는 함수
+	 */
+	UFUNCTION()
+	void Explode();
+};

@@ -9,6 +9,22 @@
 #include "Engine/Engine.h" // GEngine 디버그 메시지 (선택 사항)
 #include "RamdomItemDefense.h" // RID_LOG 매크로용 (디버깅 없으면 불필요)
 
+// --- [ ★★★ 코드 추가 ★★★ ] ---
+/** 위젯 생성 시 '단 한 번' 호출됩니다. (버튼 바인딩용) */
+void UStatUpgradeWidget::NativeOnInitialized()
+{
+	Super::NativeOnInitialized();
+
+	// 버튼 클릭 이벤트는 위젯이 생성될 때 단 한 번만 바인딩합니다.
+	if (AtkDmg_UpgradeButton) AtkDmg_UpgradeButton->OnClicked.AddDynamic(this, &UStatUpgradeWidget::HandleUpgradeAtkDmg);
+	if (AtkSpd_UpgradeButton) AtkSpd_UpgradeButton->OnClicked.AddDynamic(this, &UStatUpgradeWidget::HandleUpgradeAtkSpd);
+	if (CritDmg_UpgradeButton) CritDmg_UpgradeButton->OnClicked.AddDynamic(this, &UStatUpgradeWidget::HandleUpgradeCritDmg);
+	if (ArmorReduction_UpgradeButton) ArmorReduction_UpgradeButton->OnClicked.AddDynamic(this, &UStatUpgradeWidget::HandleUpgradeArmorReduction);
+	if (SkillChance_UpgradeButton) SkillChance_UpgradeButton->OnClicked.AddDynamic(this, &UStatUpgradeWidget::HandleUpgradeSkillChance);
+}
+// --- [ 코드 추가 끝 ] ---
+
+/** 위젯이 뷰포트에 '추가될 때마다' 호출됩니다. (델리게이트 바인딩용) */
 void UStatUpgradeWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
@@ -70,12 +86,9 @@ void UStatUpgradeWidget::NativeConstruct()
 	}
 
 
-	// 버튼 클릭 이벤트 바인딩
-	if (AtkDmg_UpgradeButton) AtkDmg_UpgradeButton->OnClicked.AddDynamic(this, &UStatUpgradeWidget::HandleUpgradeAtkDmg);
-	if (AtkSpd_UpgradeButton) AtkSpd_UpgradeButton->OnClicked.AddDynamic(this, &UStatUpgradeWidget::HandleUpgradeAtkSpd);
-	if (CritDmg_UpgradeButton) CritDmg_UpgradeButton->OnClicked.AddDynamic(this, &UStatUpgradeWidget::HandleUpgradeCritDmg);
-	if (ArmorReduction_UpgradeButton) ArmorReduction_UpgradeButton->OnClicked.AddDynamic(this, &UStatUpgradeWidget::HandleUpgradeArmorReduction);
-	if (SkillChance_UpgradeButton) SkillChance_UpgradeButton->OnClicked.AddDynamic(this, &UStatUpgradeWidget::HandleUpgradeSkillChance);
+	// --- [ ★★★ 코드 이동 ★★★ ] ---
+	// 버튼 클릭 이벤트 바인딩 로직은 모두 NativeOnInitialized()로 이동했습니다.
+	// --- [ 코드 이동 끝 ] ---
 }
 
 // 골드 변경 시 호출
@@ -227,9 +240,57 @@ void UStatUpgradeWidget::HandleSkillChanceChanged(const FOnAttributeChangeData& 
 // (필요시 다른 스탯 값 핸들러도 구현 - 골드 강화 불가 스탯 포함 가능)
 
 
+/** 모든 업그레이드 버튼을 일시적으로 비활성화합니다. (RPC 중복 전송 방지) */
+void UStatUpgradeWidget::DisableAllUpgradeButtons()
+{
+	if (AtkDmg_UpgradeButton) AtkDmg_UpgradeButton->SetIsEnabled(false);
+	if (AtkSpd_UpgradeButton) AtkSpd_UpgradeButton->SetIsEnabled(false);
+	if (CritDmg_UpgradeButton) CritDmg_UpgradeButton->SetIsEnabled(false);
+	if (ArmorReduction_UpgradeButton) ArmorReduction_UpgradeButton->SetIsEnabled(false);
+	if (SkillChance_UpgradeButton) SkillChance_UpgradeButton->SetIsEnabled(false);
+}
+
+
 // --- 버튼 클릭 핸들러 구현 (PlayerState의 서버 함수 호출) ---
-void UStatUpgradeWidget::HandleUpgradeAtkDmg() { if (MyPlayerState) MyPlayerState->Server_RequestStatUpgrade(EItemStatType::AttackDamage); }
-void UStatUpgradeWidget::HandleUpgradeAtkSpd() { if (MyPlayerState) MyPlayerState->Server_RequestStatUpgrade(EItemStatType::AttackSpeed); }
-void UStatUpgradeWidget::HandleUpgradeCritDmg() { if (MyPlayerState) MyPlayerState->Server_RequestStatUpgrade(EItemStatType::CritDamage); }
-void UStatUpgradeWidget::HandleUpgradeArmorReduction() { if (MyPlayerState) MyPlayerState->Server_RequestStatUpgrade(EItemStatType::ArmorReduction); }
-void UStatUpgradeWidget::HandleUpgradeSkillChance() { if (MyPlayerState) MyPlayerState->Server_RequestStatUpgrade(EItemStatType::SkillActivationChance); }
+// (RPC 중복 전송 방지 로직 포함)
+void UStatUpgradeWidget::HandleUpgradeAtkDmg()
+{
+	// 버튼이 활성화 상태일 때만 RPC 전송
+	if (MyPlayerState && AtkDmg_UpgradeButton && AtkDmg_UpgradeButton->GetIsEnabled())
+	{
+		DisableAllUpgradeButtons(); // (추가) 즉시 모든 버튼 비활성화
+		MyPlayerState->Server_RequestStatUpgrade(EItemStatType::AttackDamage);
+	}
+}
+void UStatUpgradeWidget::HandleUpgradeAtkSpd()
+{
+	if (MyPlayerState && AtkSpd_UpgradeButton && AtkSpd_UpgradeButton->GetIsEnabled())
+	{
+		DisableAllUpgradeButtons(); // (추가) 즉시 모든 버튼 비활성화
+		MyPlayerState->Server_RequestStatUpgrade(EItemStatType::AttackSpeed);
+	}
+}
+void UStatUpgradeWidget::HandleUpgradeCritDmg()
+{
+	if (MyPlayerState && CritDmg_UpgradeButton && CritDmg_UpgradeButton->GetIsEnabled())
+	{
+		DisableAllUpgradeButtons(); // (추가) 즉시 모든 버튼 비활성화
+		MyPlayerState->Server_RequestStatUpgrade(EItemStatType::CritDamage);
+	}
+}
+void UStatUpgradeWidget::HandleUpgradeArmorReduction()
+{
+	if (MyPlayerState && ArmorReduction_UpgradeButton && ArmorReduction_UpgradeButton->GetIsEnabled())
+	{
+		DisableAllUpgradeButtons(); // (추가) 즉시 모든 버튼 비활성화
+		MyPlayerState->Server_RequestStatUpgrade(EItemStatType::ArmorReduction);
+	}
+}
+void UStatUpgradeWidget::HandleUpgradeSkillChance()
+{
+	if (MyPlayerState && SkillChance_UpgradeButton && SkillChance_UpgradeButton->GetIsEnabled())
+	{
+		DisableAllUpgradeButtons(); // (추가) 즉시 모든 버튼 비활성화
+		MyPlayerState->Server_RequestStatUpgrade(EItemStatType::SkillActivationChance);
+	}
+}

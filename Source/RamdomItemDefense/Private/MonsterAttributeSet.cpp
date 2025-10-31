@@ -7,7 +7,9 @@
 #include "MonsterBaseCharacter.h"
 #include "RamdomItemDefenseCharacter.h"
 #include "MyPlayerState.h"
-#include "RamdomItemDefense.h" // RID_LOG 매크로용
+#include "RamdomItemDefense.h"
+#include "MyGameState.h"       // GetCurrentWave() 사용
+#include "Engine/World.h"      // GetWorld() 사용
 
 void UMonsterAttributeSet::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
@@ -23,19 +25,10 @@ void UMonsterAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCal
 {
 	Super::PostGameplayEffectExecute(Data);
 
-	// [로그 1: 함수 진입 확인]
-	RID_LOG(FColor::White, TEXT("MonsterAttributeSet: PostGameplayEffectExecute CALLED. Attribute: %s"), *Data.EvaluatedData.Attribute.GetName());
-
 	if (Data.EvaluatedData.Attribute == GetHealthAttribute())
 	{
-		// [로그 2: 체력 속성 진입 확인]
-		RID_LOG(FColor::Cyan, TEXT("MonsterAttributeSet: Health Attribute CHANGED."));
-
 		const float NewHealth = GetHealth();
 		const float Magnitude = Data.EvaluatedData.Magnitude; // 데미지/힐량
-
-		// [로그 3: 상세 값 확인]
-		RID_LOG(FColor::Cyan, TEXT("MonsterAttributeSet: NewHealth: %.1f, Magnitude: %.1f"), NewHealth, Magnitude);
 
 		AMonsterBaseCharacter* Monster = Cast<AMonsterBaseCharacter>(GetOwningAbilitySystemComponent()->GetAvatarActor());
 
@@ -43,9 +36,6 @@ void UMonsterAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCal
 		{
 			if (NewHealth <= 0.f)
 			{
-				// [로그 4: 사망 처리 진입]
-				RID_LOG(FColor::Red, TEXT("MonsterAttributeSet: Monster is DYING (NewHealth <= 0)."));
-
 				// (기존 사망 로직)
 				AActor* InstigatorActor = Data.EffectSpec.GetContext().GetInstigator();
 				AActor* EffectCauserActor = Data.EffectSpec.GetContext().GetEffectCauser();
@@ -63,51 +53,51 @@ void UMonsterAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCal
 					AMyPlayerState* PS = KillerCharacter->GetPlayerState<AMyPlayerState>();
 					if (PS)
 					{
-						const int32 GoldAmount = Monster->GetGoldOnDeath();
+						// --- [ ★★★ 몬스터 처치 골드 계산 로직 수정 ★★★ ] ---
+
+						// 1. GameState에서 현재 웨이브 가져오기
+						AMyGameState* MyGameState = GetWorld() ? GetWorld()->GetGameState<AMyGameState>() : nullptr;
+						int32 CurrentWave = 1; // GameState가 없거나 웨이브가 0이면 1로 간주
+						if (MyGameState && MyGameState->GetCurrentWave() > 0)
+						{
+							CurrentWave = MyGameState->GetCurrentWave();
+						}
+
+						// 2. 웨이브 기반으로 골드 계산 (10 + (Wave - 1) * 5)
+						// const int32 GoldAmount = Monster->GetGoldOnDeath(); // (기존 코드)
+						const int32 BaseGold = 10;
+						const int32 BonusGold = (CurrentWave - 1) * 5;
+						const int32 GoldAmount = FMath::Max(BaseGold, BaseGold + BonusGold); // Wave 1일 때 10골드 보장
+
+						// --- [ ★★★ 로직 수정 끝 ★★★ ] ---
+
 						PS->AddGold(GoldAmount);
-						RID_LOG(FColor::Yellow, TEXT("Awarded %d gold to %s for killing %s"),
+						RID_LOG(FColor::Yellow, TEXT("Awarded %d gold to %s for killing %s (Wave: %d)"),
 							GoldAmount,
 							*PS->GetPlayerName(),
-							*Monster->GetName()
+							*Monster->GetName(),
+							CurrentWave
 						);
 					}
 				}
 
-				// --- [ ★★★ 코드 추가 ★★★ ] ---
-				// 몬스터가 죽는 순간에도 피격 이펙트를 재생합니다.
+				// --- [ 피격 이펙트 재생 (사망 시) ] ---
 				RID_LOG(FColor::Yellow, TEXT("MonsterAttributeSet: Playing HIT effect on DEATH. Checking Asset Tags..."));
 
 				FGameplayTagContainer EffectTags;
 				Data.EffectSpec.GetAllAssetTags(EffectTags);
 
-				if (EffectTags.Num() > 0)
-				{
-					RID_LOG(FColor::Green, TEXT("MonsterAttributeSet: Death Hit! Tags found: %s"), *EffectTags.ToString());
-				}
-				else
-				{
-					RID_LOG(FColor::Red, TEXT("MonsterAttributeSet: Death Hit! BUT NO ASSET TAGS FOUND ON GE!"));
-				}
-
 				Monster->PlayHitEffect(EffectTags);
-				// --- [ 코드 추가 끝 ] ---
+				// --- [ 코드 끝 ] ---
 			}
 			else if (Magnitude < 0.f)
 			{
 				// [로그 5: 피격 처리 진입]
-				RID_LOG(FColor::Yellow, TEXT("MonsterAttributeSet: Monster was HIT (Magnitude < 0 and NewHealth > 0). Checking Asset Tags..."));
+				//RID_LOG(FColor::Yellow, TEXT("MonsterAttributeSet: Monster was HIT (Magnitude < 0 and NewHealth > 0). Checking Asset Tags..."));
 
 				FGameplayTagContainer EffectTags;
 				Data.EffectSpec.GetAllAssetTags(EffectTags);
 
-				if (EffectTags.Num() > 0)
-				{
-					RID_LOG(FColor::Green, TEXT("MonsterAttributeSet: Hit Detected! Tags found: %s"), *EffectTags.ToString());
-				}
-				else
-				{
-					RID_LOG(FColor::Red, TEXT("MonsterAttributeSet: Hit Detected! BUT NO ASSET TAGS FOUND ON GE!"));
-				}
 
 				Monster->PlayHitEffect(EffectTags);
 			}
@@ -118,6 +108,22 @@ void UMonsterAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCal
 			}
 		}
 	}
+	// --- [ Health/MaxHealth 동기화 로직 ] ---
+	else if (Data.EvaluatedData.Attribute == GetMaxHealthAttribute())
+	{
+		// [로그 7: MaxHealth 변경 감지]
+		//RID_LOG(FColor::Green, TEXT("MonsterAttributeSet: MaxHealth Attribute CHANGED."));
+
+		// 새 MaxHealth 값을 가져옵니다.
+		const float NewMaxHealth = GetMaxHealth();
+
+		// 현재 Health 값을 새 MaxHealth 값으로 즉시 설정합니다.
+		SetHealth(NewMaxHealth);
+
+		// [로그 8: Health 동기화 완료]
+		//RID_LOG(FColor::Green, TEXT("MonsterAttributeSet: Health SYNCED to NewMaxHealth: %.1f"), NewMaxHealth);
+	}
+	// --- [ 로직 끝 ] ---
 }
 
 // RepNotify 함수들 구현

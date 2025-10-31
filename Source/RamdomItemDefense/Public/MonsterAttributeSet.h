@@ -7,6 +7,8 @@
 #include "AbilitySystemComponent.h"
 #include "MonsterAttributeSet.generated.h"
 
+class AMyGameState;
+
 #define ATTRIBUTE_ACCESSORS(ClassName, PropertyName) \
     GAMEPLAYATTRIBUTE_PROPERTY_GETTER(ClassName, PropertyName) \
     GAMEPLAYATTRIBUTE_VALUE_GETTER(PropertyName) \

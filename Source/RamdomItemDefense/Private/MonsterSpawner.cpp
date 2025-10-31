@@ -8,6 +8,8 @@
 #include "RamdomItemDefense.h" // RID_LOG 매크로용
 #include "MyGameState.h"
 #include "Materials/MaterialInterface.h"
+#include "AbilitySystemComponent.h" // ASC 사용을 위해 추가
+#include "GameplayTagContainer.h" // FGameplayTag 사용을 위해 추가
 
 
 AMonsterSpawner::AMonsterSpawner()
@@ -51,8 +53,8 @@ void AMonsterSpawner::BeginSpawning(TSubclassOf<AMonsterBaseCharacter> MonsterCl
 
 	if (bEnableDebug)
 	{
-		FString MonsterName = GetNameSafe(MonsterClassToSpawn);
-		RID_LOG(FColor::Cyan, TEXT("Spawner '%s' received command: Spawn %d of '%s'."), *GetName(), Count, *MonsterName);
+		// FString MonsterName = GetNameSafe(MonsterClassToSpawn);
+		// RID_LOG(FColor::Cyan, TEXT("Spawner '%s' received command: Spawn %d of '%s'."), *GetName(), Count, *MonsterName); // [로그 제거]
 	}
 
 	if (MonsterClassToSpawn && TotalToSpawn > 0)
@@ -96,6 +98,45 @@ void AMonsterSpawner::SpawnMonster()
 				{
 					int32 CurrentWave = MyGameState->GetCurrentWave(); // (1부터 시작)
 
+					// --- [ ★★★ 웨이브 스케일링 스탯 적용 로직 (수정됨) ★★★ ] ---
+					UAbilitySystemComponent* MonsterASC = SpawnedMonster->GetAbilitySystemComponent();
+					if (MonsterASC)
+					{
+						// 2. (중요) 스폰된 액터의 ASC를 즉시 초기화합니다.
+						// (BeginPlay보다 먼저 실행되므로, 여기서 수동으로 해줘야 합니다)
+						MonsterASC->InitAbilityActorInfo(SpawnedMonster, SpawnedMonster);
+
+						if (MonsterStatInitEffect) // (h파일에 추가한 변수)
+						{
+							// 3. 스펙(Spec) 생성
+							FGameplayEffectContextHandle ContextHandle = MonsterASC->MakeEffectContext();
+							ContextHandle.AddSourceObject(this);
+							FGameplayEffectSpecHandle SpecHandle = MonsterASC->MakeOutgoingSpec(MonsterStatInitEffect, 1.0f, ContextHandle);
+
+							if (SpecHandle.IsValid())
+							{
+								// 4. 웨이브 보너스 HP 계산 (Wave 1 = 0, Wave 2 = 50, ...)
+								// (요구사항: 스테이지마다 50씩 상승)
+								// (CurrentWave 1 기준 0)
+								float BonusHP = FMath::Max(0.f, (float)(CurrentWave - 1) * 50.f);
+
+								// 5. SetByCaller로 보너스 HP 값 주입
+								// (주의: 태그 이름이 "Data.Wave.BonusHP"로 정확해야 함)
+								SpecHandle.Data.Get()->SetSetByCallerMagnitude(FGameplayTag::RequestGameplayTag(FName("Data.Wave.BonusHP")), BonusHP);
+
+								// 6. 스펙 적용
+								MonsterASC->ApplyGameplayEffectSpecToSelf(*SpecHandle.Data.Get());
+
+								//RID_LOG(FColor::Green, TEXT("Applied GE_MonsterStatInit to %s. Wave: %d, BonusHP: %.1f"), *SpawnedMonster->GetName(), CurrentWave, BonusHP);
+							}
+						}
+						else
+						{
+							RID_LOG(FColor::Red, TEXT("Spawner ERROR: MonsterStatInitEffect is not set on the Spawner BP!"));
+						}
+					}
+					// --- [ 스탯 적용 로직 끝 ] ---
+
 					// [추가] 보스 웨이브인지 확인 (GameMode 로직과 동일)
 					const bool bIsBossWave = (CurrentWave > 0 && CurrentWave % 10 == 0);
 
@@ -127,15 +168,15 @@ void AMonsterSpawner::SpawnMonster()
 								else
 								{
 									// (디버그 로그) 해당 인덱스에 머티리얼이 비어있음
-									RID_LOG(FColor::Yellow, TEXT("Spawner: WaveMaterials[%d] is NULL for Wave %d."), MaterialIndex, CurrentWave);
+									// RID_LOG(FColor::Yellow, TEXT("Spawner: WaveMaterials[%d] is NULL for Wave %d."), MaterialIndex, CurrentWave); // [로그 제거]
 								}
 							}
 						}
 						else
 						{
 							// (디버그 로그) 몬스터 BP에 머티리얼이 9개 설정되지 않음
-							RID_LOG(FColor::Red, TEXT("Spawner ERROR: Monster BP '%s' must have exactly 9 elements in WaveMaterials (found %d)."),
-								*GetNameSafe(MonsterClassToSpawn), WaveMaterials.Num());
+							// RID_LOG(FColor::Red, TEXT("Spawner ERROR: Monster BP '%s' must have exactly 9 elements in WaveMaterials (found %d)."), // [로그 제거]
+								// *GetNameSafe(MonsterClassToSpawn), WaveMaterials.Num()); // [로그 제거]
 						}
 					}
 					// (else: 보스 웨이브인 경우, 아무것도 하지 않고 몬스터의 기본 머티리얼을 사용합니다)
@@ -147,7 +188,7 @@ void AMonsterSpawner::SpawnMonster()
 
 			if (bEnableDebug)
 			{
-				RID_LOG(FColor::Green, TEXT("Spawner '%s' spawned monster #%d/%d. (Live: %d)"), *GetName(), SpawnCounter, TotalToSpawn, CurrentMonsterCount);
+				// RID_LOG(FColor::Green, TEXT("Spawner '%s' spawned monster #%d/%d. (Live: %d)"), *GetName(), SpawnCounter, TotalToSpawn, CurrentMonsterCount); // [로그 제거]
 				DrawDebugSphere(GetWorld(), GetActorLocation(), 100.0f, 12, FColor::Green, false, 2.0f);
 			}
 		}
@@ -156,7 +197,7 @@ void AMonsterSpawner::SpawnMonster()
 	{
 		if (bEnableDebug)
 		{
-			RID_LOG(FColor::White, TEXT("Spawner '%s' finished spawning wave."), *GetName());
+			// RID_LOG(FColor::White, TEXT("Spawner '%s' finished spawning wave."), *GetName()); // [로그 제거]
 		}
 		GetWorld()->GetTimerManager().ClearTimer(SpawnTimerHandle);
 	}
@@ -178,6 +219,6 @@ void AMonsterSpawner::SetGameOver()
 
 	if (bEnableDebug)
 	{
-		RID_LOG(FColor::Magenta, TEXT("Spawner '%s' is now in GAME OVER state."), *GetName());
+		// RID_LOG(FColor::Magenta, TEXT("Spawner '%s' is now in GAME OVER state."), *GetName()); // [로그 제거]
 	}
 }

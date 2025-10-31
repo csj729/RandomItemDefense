@@ -16,12 +16,6 @@ void AMonsterAIController::OnPossess(APawn* InPawn)
 {
 	Super::OnPossess(InPawn);
 
-	// ================== [AI 디버깅 1-1] ==================
-	// 컨트롤러가 폰에 빙의되었는지 확인
-	// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
-	RID_LOG(FColor::Cyan, TEXT("AIController: OnPossess called."));
-	// -----------------------------------------
-
 	if (BehaviorTree)
 	{
 		// 블랙보드를 초기화하고 비헤이비어 트리를 실행합니다.
@@ -39,15 +33,10 @@ void AMonsterAIController::OnPossess(APawn* InPawn)
 		{
 			PathActor = FoundPaths[0];
 			FString PathName = GetNameSafe(PathActor);
-			// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
-			RID_LOG(FColor::Green, TEXT("AIController: Found Path Actor '%s'."), *PathName);
-			// -----------------------------------------
 		}
 		else
 		{
-			// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
 			RID_LOG(FColor::Red, TEXT("AIController: ERROR! Could not find Actor with tag 'MonsterPath'."));
-			// -----------------------------------------
 		}
 		// =======================================================
 
@@ -56,16 +45,9 @@ void AMonsterAIController::OnPossess(APawn* InPawn)
 			// 블랙보드에 경로 액터와 시작 인덱스를 저장합니다.
 			BlackboardComponent->SetValueAsObject(TEXT("PathToFollow"), PathActor);
 			BlackboardComponent->SetValueAsInt(TEXT("CurrentSplinePointIndex"), 0);
-
-			// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
-			RID_LOG(FColor::Green, TEXT("AIController: Set 'PathToFollow' on Blackboard."));
-			// -----------------------------------------
 		}
 
 		RunBehaviorTree(BehaviorTree);
-		// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
-		RID_LOG(FColor::Cyan, TEXT("AIController: RunBehaviorTree called."));
-		// -----------------------------------------
 	}
 	else
 	{

@@ -6,6 +6,9 @@
 #include "MyPlayerState.generated.h"
 
 class AMonsterSpawner;
+// --- [ ★★★ 코드 추가 ★★★ ] ---
+class AMyGameState; // AMyGameState 전방 선언
+// --- [ 코드 추가 끝 ] ---
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnStatLevelChangedDelegate, EItemStatType, StatType, int32, NewLevel);
 

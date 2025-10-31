@@ -164,7 +164,7 @@ void ARamdomItemDefenseCharacter::ApplyStatUpgrade(EItemStatType StatType, int32
 	case EItemStatType::AttackSpeed: 			DeltaValue = 0.05f; break; // 레벨당 +5%
 	case EItemStatType::CritDamage: 			DeltaValue = 0.1f; break;  // 레벨당 +10%
 	case EItemStatType::ArmorReduction: 		DeltaValue = 10.0f; break;  // 레벨당 +10
-	case EItemStatType::SkillActivationChance: 	DeltaValue = 0.05f; break; // 레벨당 +5%
+	case EItemStatType::SkillActivationChance: 	DeltaValue = 0.03f; break; // 레벨당 +3%
 	default:
 		// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
 		RID_LOG(FColor::Red, TEXT("ApplyStatUpgrade Error: Invalid StatType for BaseValue modification: %s"), *UEnum::GetValueAsString(StatType));
