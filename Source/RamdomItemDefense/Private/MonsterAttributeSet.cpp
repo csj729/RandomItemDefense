@@ -1,10 +1,10 @@
-// MonsterAttributeSet.cpp
+// Source/RamdomItemDefense/Private/MonsterAttributeSet.cpp (수정)
 
 #include "MonsterAttributeSet.h"
 #include "Net/UnrealNetwork.h"
 #include "GameplayEffectExtension.h"
 #include "Engine/Engine.h"
-#include "MonsterBaseCharacter.h"
+#include "MonsterBaseCharacter.h" // [필수] IsBoss() 함수 사용
 #include "RamdomItemDefenseCharacter.h"
 #include "MyPlayerState.h"
 #include "RamdomItemDefense.h"
@@ -53,7 +53,7 @@ void UMonsterAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCal
 					AMyPlayerState* PS = KillerCharacter->GetPlayerState<AMyPlayerState>();
 					if (PS)
 					{
-						// --- [ ★★★ 몬스터 처치 골드 계산 로직 수정 ★★★ ] ---
+						// --- [ ★★★ 보스 처치 보상 로직 수정 ★★★ ] ---
 
 						// 1. GameState에서 현재 웨이브 가져오기
 						AMyGameState* MyGameState = GetWorld() ? GetWorld()->GetGameState<AMyGameState>() : nullptr;
@@ -63,21 +63,44 @@ void UMonsterAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCal
 							CurrentWave = MyGameState->GetCurrentWave();
 						}
 
-						// 2. 웨이브 기반으로 골드 계산 (10 + (Wave - 1) * 5)
-						// const int32 GoldAmount = Monster->GetGoldOnDeath(); // (기존 코드)
-						const int32 BaseGold = 10;
-						const int32 BonusGold = (CurrentWave - 1) * 5;
-						const int32 GoldAmount = FMath::Max(BaseGold, BaseGold + BonusGold); // Wave 1일 때 10골드 보장
+						// 2. [수정] 이 몬스터가 '보스' 몬스터인지 확인합니다.
+						if (Monster->IsBoss())
+						{
+							// --- 보스 처치 보상 ---
+							// 3a. 보스 단계 계산 (1, 2, 3...)
+							const int32 BossStage = CurrentWave / 10;
 
+							// 4a. '흔함 아이템 선택권' 보상 지급 (보스 단계 * 3)
+							const int32 ItemChoiceReward = BossStage * 3;
+							PS->AddCommonItemChoice(ItemChoiceReward);
+
+							// 5a. 골드 보상 지급 (3000 + (보스 단계 - 1) * 4000)
+							const int32 BaseGold = 3000;
+							const int32 BonusGold = (BossStage - 1) * 4000;
+							const int32 GoldAmount = BaseGold + BonusGold;
+							PS->AddGold(GoldAmount);
+
+							RID_LOG(FColor::Yellow, TEXT("Awarded BOSS reward to %s (Wave: %d, BossStage: %d)"), *PS->GetPlayerName(), CurrentWave, BossStage);
+							RID_LOG(FColor::Yellow, TEXT("  -> Gold: %d (Base: %d, Bonus: %d)"), GoldAmount, BaseGold, BonusGold);
+							RID_LOG(FColor::Yellow, TEXT("  -> Common Item Choices: %d"), ItemChoiceReward);
+						}
+						else
+						{
+							// --- 일반 몬스터 처치 보상 (보스 웨이브의 쫄 포함) ---
+							// 3b. 웨이브 기반으로 골드 계산 (10 + (Wave - 1) * 5)
+							const int32 BaseGold = 10;
+							const int32 BonusGold = (CurrentWave - 1) * 5;
+							const int32 GoldAmount = FMath::Max(BaseGold, BaseGold + BonusGold); // Wave 1일 때 10골드 보장
+							PS->AddGold(GoldAmount);
+
+							RID_LOG(FColor::Yellow, TEXT("Awarded %d gold to %s for killing %s (Wave: %d)"),
+								GoldAmount,
+								*PS->GetPlayerName(),
+								*Monster->GetName(),
+								CurrentWave
+							);
+						}
 						// --- [ ★★★ 로직 수정 끝 ★★★ ] ---
-
-						PS->AddGold(GoldAmount);
-						RID_LOG(FColor::Yellow, TEXT("Awarded %d gold to %s for killing %s (Wave: %d)"),
-							GoldAmount,
-							*PS->GetPlayerName(),
-							*Monster->GetName(),
-							CurrentWave
-						);
 					}
 				}
 

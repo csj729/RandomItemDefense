@@ -1,4 +1,4 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+// Source/RamdomItemDefense/Public/RamdomItemDefensePlayerController.h (수정)
 
 #pragma once
 
@@ -19,6 +19,7 @@ class UInventoryWidget;
 class URoundChoiceWidget;
 class AMyPlayerState;
 class UUserWidget;
+class UCommonItemChoiceWidget; // [코드 추가] 새 위젯 전방 선언
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
 
@@ -50,6 +51,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* SetDestinationTouchAction;
 
+	/** Ultimate Skill Input Action */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* UltimateSkillAction;
+
 public:
 	/** (추후 구현) 스탯 강화창 UI를 토글합니다. */
 	void ToggleStatUpgradeWidget();
@@ -75,9 +80,15 @@ protected:
 	virtual void BeginPlay();
 	virtual void OnPossess(APawn* InPawn) override;
 
-	/** PlayerState의 ChoiceCount 변경 시 호출될 함수 */
+	/** PlayerState의 (일반) ChoiceCount 변경 시 호출될 함수 */
 	UFUNCTION()
 	void OnPlayerChoiceCountChanged(int32 NewCount);
+
+	// --- [ ★★★ 코드 추가 ★★★ ] ---
+	/** PlayerState의 '흔함 아이템 선택권' 변경 시 호출될 함수 */
+	UFUNCTION()
+	void OnPlayerCommonChoiceCountChanged(int32 NewCount);
+	// --- [ ★★★ 코드 추가 끝 ★★★ ] ---
 
 	/** Input handlers for SetDestination action. */
 	void OnInputStarted();
@@ -85,6 +96,9 @@ protected:
 	void OnSetDestinationReleased();
 	void OnTouchTriggered();
 	void OnTouchReleased();
+
+	/** Input handler for UltimateSkill action. */
+	void OnUltimateSkillPressed();
 
 	/** WBP_MainHUD (블루프린트) 클래스를 에디터에서 지정할 변수 */
 	UPROPERTY(EditDefaultsOnly, Category = "UI")
@@ -102,6 +116,13 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "UI")
 	TSubclassOf<URoundChoiceWidget> RoundChoiceWidgetClass;
 
+	// --- [ ★★★ 코드 추가 ★★★ ] ---
+	/** WBP_CommonItemChoice 블루프린트 클래스 */
+	UPROPERTY(EditDefaultsOnly, Category = "UI")
+	TSubclassOf<UCommonItemChoiceWidget> CommonItemChoiceWidgetClass;
+	// --- [ ★★★ 코드 추가 끝 ★★★ ] ---
+
+
 	/** 실제 생성된 메인 HUD 위젯 인스턴스 */
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "UI")
 	TObjectPtr<UMainHUDWidget> MainHUDInstance;
@@ -117,6 +138,12 @@ protected:
 	/** 생성된 라운드 선택 위젯 인스턴스 */
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "UI")
 	TObjectPtr<URoundChoiceWidget> RoundChoiceInstance;
+
+	// --- [ ★★★ 코드 추가 ★★★ ] ---
+	/** 생성된 흔함 아이템 선택 위젯 인스턴스 */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "UI")
+	TObjectPtr<UCommonItemChoiceWidget> CommonItemChoiceInstance;
+	// --- [ ★★★ 코드 추가 끝 ★★★ ] ---
 
 	UPROPERTY()
 	TObjectPtr<AMyPlayerState> MyPlayerStateRef;

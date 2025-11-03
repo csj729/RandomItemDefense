@@ -1,3 +1,5 @@
+// Source/RamdomItemDefense/Private/MyPlayerState.cpp (수정)
+
 #include "MyPlayerState.h"
 #include "Net/UnrealNetwork.h"
 #include "Engine/Engine.h"
@@ -5,15 +7,15 @@
 #include "RamdomItemDefenseCharacter.h"
 #include "InventoryComponent.h"
 #include "RamdomItemDefense.h" // RID_LOG 매크로용
-// --- [ ★★★ 코드 추가 ★★★ ] ---
 #include "MyGameState.h"       // GetCurrentWave() 사용
 #include "Engine/World.h"      // GetWorld() 사용
-// --- [ 코드 추가 끝 ] ---
 
 AMyPlayerState::AMyPlayerState()
 {
 	Gold = 0;
 	ChoiceCount = 0;
+	CommonItemChoiceCount = 0; // [코드 추가] 초기화
+	UltimateCharge = 0;
 
 	// 모든 강화 가능한 스탯의 초기 레벨을 0으로 설정
 	AttackDamageLevel = 0;
@@ -29,6 +31,11 @@ void AMyPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 	DOREPLIFETIME(AMyPlayerState, Gold);
 	DOREPLIFETIME(AMyPlayerState, ChoiceCount);
 	DOREPLIFETIME(AMyPlayerState, MySpawner);
+
+	// --- [ ★★★ 코드 추가 ★★★ ] ---
+	DOREPLIFETIME(AMyPlayerState, CommonItemChoiceCount); // 복제 등록
+	DOREPLIFETIME(AMyPlayerState, UltimateCharge); // 복제 등록
+	// --- [ ★★★ 코드 추가 끝 ★★★ ] ---
 
 	DOREPLIFETIME(AMyPlayerState, AttackDamageLevel);
 	DOREPLIFETIME(AMyPlayerState, AttackSpeedLevel);
@@ -74,10 +81,10 @@ void AMyPlayerState::OnRep_MySpawner()
 	OnSpawnerAssignedDelegate.Broadcast(0); // 0은 의미 없는 값
 }
 
-// --- [코드 추가] 라운드 선택 관련 ---
+// --- [코드 수정] 라운드 선택 (뽑기/도박) 관련 ---
 
 /**
- * @brief (서버 전용) 라운드 선택 횟수를 설정합니다.
+ * @brief (서버 전용) 라운드 선택 횟수(뽑기/도박)를 추가합니다.
  */
 void AMyPlayerState::AddChoiceCount(int32 Count)
 {
@@ -118,10 +125,11 @@ void AMyPlayerState::Server_UseRoundChoice_Implementation(bool bChoseItemGacha)
 		if (Character && Character->GetInventoryComponent())
 		{
 			// 캐릭터의 인벤토리 컴포넌트에게 무작위 아이템을 추가하라고 명령합니다.
+			// [주의] AddRandomItem은 이제 '흔함' 등급만 뽑습니다. 기획 의도 확인 필요.
 			Character->GetInventoryComponent()->AddRandomItem();
 		}
 
-		RID_LOG(FColor::Cyan, TEXT("Player chose: Item Gacha"));
+		RID_LOG(FColor::Cyan, TEXT("Player chose: Item Gacha (Common)"));
 	}
 	else
 	{
@@ -145,6 +153,67 @@ void AMyPlayerState::Server_UseRoundChoice_Implementation(bool bChoseItemGacha)
 		// --- [ ★★★ 로직 수정 끝 ★★★ ] ---
 	}
 }
+
+
+// --- [ ★★★ 코드 추가 (흔함 아이템 선택) ★★★ ] ---
+
+/**
+ * @brief (서버 전용) '흔함 아이템 선택권' 횟수를 추가합니다.
+ */
+void AMyPlayerState::AddCommonItemChoice(int32 Count)
+{
+	if (HasAuthority())
+	{
+		CommonItemChoiceCount += Count;
+		OnRep_CommonItemChoiceCount(); // 서버에서도 델리게이트 호출
+	}
+}
+
+/**
+ * @brief (새 UI에서 호출) '흔함 아이템 선택권'을 사용하고 아이템을 획득합니다.
+ */
+void AMyPlayerState::Server_UseCommonItemChoice_Implementation(FName ChosenItemID)
+{
+	// (서버에서 실행됨)
+	if (CommonItemChoiceCount <= 0)
+	{
+		return; // 선택 횟수가 없으면 무시
+	}
+
+	// 데이터 유효성 검사 (선택한 아이템이 실제 '흔함' 등급인지 등)
+	ARamdomItemDefenseCharacter* Character = GetPawn<ARamdomItemDefenseCharacter>();
+	if (!Character || !Character->GetInventoryComponent()) return;
+
+	bool bSuccess = false;
+	FItemData ItemData = Character->GetInventoryComponent()->GetItemData(ChosenItemID, bSuccess);
+
+	// [검증] 아이템 ID가 유효하고, '흔함' 등급이어야만 선택권 사용 가능
+	if (bSuccess && ItemData.Grade == EItemGrade::Common)
+	{
+		CommonItemChoiceCount--;
+		OnRep_CommonItemChoiceCount(); // 서버에서 즉시 델리게이트 호출
+
+		// 캐릭터의 인벤토리 컴포넌트에게 '선택한' 아이템을 추가하라고 명령합니다.
+		Character->GetInventoryComponent()->AddItem(ChosenItemID);
+
+		RID_LOG(FColor::Green, TEXT("Player used Common Item Choice: Added %s"), *ChosenItemID.ToString());
+	}
+	else
+	{
+		RID_LOG(FColor::Red, TEXT("Server_UseCommonItemChoice: Invalid ItemID %s or not Common grade."), *ChosenItemID.ToString());
+	}
+}
+
+/**
+ * @brief 클라이언트에서 CommonItemChoiceCount가 복제되었을 때 호출됩니다.
+ */
+void AMyPlayerState::OnRep_CommonItemChoiceCount()
+{
+	// '흔함 아이템 선택권' 횟수 변경 델리게이트를 방송합니다.
+	OnCommonItemChoiceCountChangedDelegate.Broadcast(CommonItemChoiceCount);
+}
+// --- [ ★★★ 코드 추가 끝 ★★★ ] ---
+
 
 /** 클라이언트에서 StatLevels 복제 시 호출 */
 // 각 OnRep 함수는 해당 스탯 타입과 새 레벨로 델리게이트를 호출합니다.
@@ -303,4 +372,45 @@ bool AMyPlayerState::TryUpgradeStat(EItemStatType StatToUpgrade)
 		// -----------------------------------------
 		return false;
 	}
+}
+
+/**
+ * @brief (서버 전용) 궁극기 스택을 추가합니다.
+ */
+void AMyPlayerState::AddUltimateCharge(int32 Amount)
+{
+	if (HasAuthority() && UltimateCharge < MAX_ULTIMATE_CHARGE)
+	{
+		// 최대치를 넘지 않도록 FMath::Min 사용
+		UltimateCharge = FMath::Min(UltimateCharge + Amount, MAX_ULTIMATE_CHARGE);
+
+		// 서버에서도 델리게이트 즉시 호출 (서버 UI 반영용)
+		OnRep_UltimateCharge();
+	}
+}
+
+/**
+ * @brief (서버 전용) 궁극기 스택을 0으로 리셋합니다.
+ */
+void AMyPlayerState::ResetUltimateCharge()
+{
+	if (HasAuthority())
+	{
+		UltimateCharge = 0;
+		OnRep_UltimateCharge();
+	}
+}
+
+/**
+ * @brief 클라이언트에서 UltimateCharge가 복제되었을 때 호출됩니다.
+ */
+void AMyPlayerState::OnRep_UltimateCharge()
+{
+	// UI(WBP_MainHUD)에 스택이 변경되었음을 알립니다.
+	OnUltimateChargeChangedDelegate.Broadcast(UltimateCharge);
+}
+
+int32 AMyPlayerState::GetMaxUltimateCharge() const
+{
+	return MAX_ULTIMATE_CHARGE;
 }

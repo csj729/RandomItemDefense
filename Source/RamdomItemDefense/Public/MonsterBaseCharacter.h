@@ -56,6 +56,12 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Stats")
 	bool IsDying() const { return bIsDying; }
 
+	// --- [ ★★★ 코드 추가 ★★★ ] ---
+	/** 이 몬스터가 보스 몬스터인지 여부를 반환합니다. */
+	UFUNCTION(BlueprintPure, Category = "Stats")
+	bool IsBoss() const { return bIsBoss; }
+	// --- [ ★★★ 코드 추가 끝 ★★★ ] ---
+
 	void SetWaveMaterial(UMaterialInterface* WaveMaterial);
 	const TArray<TObjectPtr<UMaterialInterface>>& GetWaveMaterials() const { return WaveMaterials; }
 	virtual void PlayHitEffect(const FGameplayTagContainer& EffectTags);
@@ -74,19 +80,23 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "GAS")
 	TObjectPtr<class UMonsterAttributeSet> AttributeSet;
 
+	// --- [ ★★★ 코드 추가 ★★★ ] ---
+	/** (블루프린트 디폴트에서 설정) 이 몬스터가 보스 몬스터로 취급되는지 여부 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Stats")
+	bool bIsBoss;
+	// --- [ ★★★ 코드 추가 끝 ★★★ ] ---
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Stats")
 	int32 GoldOnDeath;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation")
 	TObjectPtr<UAnimMontage> DeathMontage;
 
-	// --- [ ★★★ 코드 수정 ★★★ ] ---
 	/** Health 속성 변경 콜백 (BeginPlay -> PossessedBy로 이동 예정) */
 	virtual void HandleHealthChanged(const FOnAttributeChangeData& Data);
 
 	/** MoveSpeed 속성 변경 콜백 */
 	virtual void HandleMoveSpeedChanged(const FOnAttributeChangeData& Data);
-	// --- [ 코드 수정 끝 ] ---
 
 	UPROPERTY(EditDefaultsOnly, Category = "Stats")
 	float BaseMoveSpeed;

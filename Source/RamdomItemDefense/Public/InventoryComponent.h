@@ -1,4 +1,4 @@
-// csj729/randomitemdefense/RandomItemDefense-78a128504f0127dc02646504d4a1e1c677a0e811/Source/RamdomItemDefense/Public/InventoryComponent.h
+// Source/RamdomItemDefense/Public/InventoryComponent.h (수정)
 
 #pragma once
 
@@ -12,7 +12,6 @@
 class UAbilitySystemComponent;
 class UDataTable;
 
-// --- [코드 추가] ---
 /** 아이템의 스탯 GE 핸들을 ItemID와 함께 추적하기 위한 구조체 */
 USTRUCT()
 struct FActiveItemStatEffect
@@ -42,7 +41,6 @@ struct FActiveItemAbility
 	UPROPERTY()
 	FGameplayAbilitySpecHandle Handle;
 };
-// --- [코드 추가 끝] ---
 
 
 UCLASS(ClassGroup = (Custom), meta = (BlueprintSpawnableComponent))
@@ -88,6 +86,15 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Inventory")
 	FItemData GetItemData(FName ItemID, bool& bSuccess) const;
 
+	// --- [ ★★★ 코드 수정 ★★★ ] ---
+	/**
+	 * @brief 데이터 테이블에서 '흔함' 등급 아이템 ID를 '모두' 찾아 배열로 반환합니다.
+	 * @return 모든 흔함 아이템 ID 배열
+	 */
+	UFUNCTION(BlueprintPure, Category = "Inventory")
+	TArray<FName> GetAllCommonItemIDs() const;
+	// --- [ ★★★ 코드 수정 끝 ★★★ ] ---
+
 	UFUNCTION(BlueprintPure, Category = "Inventory")
 	UDataTable* GetItemDataTable() const { return ItemDataTable; }
 
@@ -117,7 +124,6 @@ private:
 	UPROPERTY(VisibleInstanceOnly, Category = "Inventory")
 	TArray<FName> InventoryItems;
 
-	// --- [코드 수정] TMap -> TArray<struct> ---
 	/** (신) TArray: 아이템의 '각 인스턴스'별로 스탯 GE 핸들을 추적합니다. */
 	UPROPERTY()
 	TArray<FActiveItemStatEffect> ActiveStatEffects;
@@ -125,5 +131,4 @@ private:
 	/** (신) TArray: 아이템의 '각 인스턴스'별로 부여된 GA 핸들을 추적합니다. */
 	UPROPERTY()
 	TArray<FActiveItemAbility> ActiveGrantedAbilities;
-	// --- [코드 수정 끝] ---
 };

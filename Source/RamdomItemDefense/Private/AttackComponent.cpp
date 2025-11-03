@@ -11,6 +11,7 @@
 #include "Blueprint/AIBlueprintHelperLibrary.h"
 #include "AbilitySystemBlueprintLibrary.h"
 #include "Engine/Engine.h"
+#include "MyPlayerState.h"
 #include "RamdomItemDefense.h" // RID_LOG 매크로용
 
 UAttackComponent::UAttackComponent()
@@ -229,6 +230,16 @@ void UAttackComponent::PerformAttack()
 				FGameplayTag EventTag = FGameplayTag::RequestGameplayTag(FName("Event.Attack.Perform"));
 				UAbilitySystemBlueprintLibrary::SendGameplayEventToActor(OwnerCharacter, EventTag, Payload);
 
+				if (OwnerCharacter)
+				{
+					// 이 공격이 성공했으므로 PlayerState에 스택 1 추가
+					AMyPlayerState* PS = OwnerCharacter->GetPlayerState<AMyPlayerState>();
+					if (PS)
+					{
+						// (서버 전용 함수 호출)
+						PS->AddUltimateCharge(1);
+					}
+				}
 				// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
 				//RID_LOG(FColor::Yellow, TEXT("Attacking -> %s"), *TargetToAttack->GetName());
 				// -----------------------------------------

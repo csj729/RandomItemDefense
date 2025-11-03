@@ -1,4 +1,4 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+// Source/RamdomItemDefense/Private/RamdomItemDefensePlayerController.cpp (수정)
 
 #include "RamdomItemDefensePlayerController.h"
 #include "GameFramework/Pawn.h"
@@ -20,6 +20,9 @@
 #include "RoundChoiceWidget.h"
 #include "MyPlayerState.h"
 #include "Engine/LocalPlayer.h"
+#include "CommonItemChoiceWidget.h" // [코드 추가] 새 위젯 헤더 포함
+#include "AbilitySystemBlueprintLibrary.h" // [ ★★★ 코드 추가 ★★★ ]
+#include "GameplayTagContainer.h"
 
 
 DEFINE_LOG_CATEGORY(LogTemplateCharacter);
@@ -56,6 +59,11 @@ void ARamdomItemDefensePlayerController::BeginPlay()
 			if (RoundChoiceWidgetClass) RoundChoiceInstance = CreateWidget<URoundChoiceWidget>(this, RoundChoiceWidgetClass);
 			if (GameOverWidgetClass) GameOverInstance = CreateWidget<UUserWidget>(this, GameOverWidgetClass);
 
+			// --- [ ★★★ 코드 추가 ★★★ ] ---
+			// 새 위젯 생성
+			if (CommonItemChoiceWidgetClass) CommonItemChoiceInstance = CreateWidget<UCommonItemChoiceWidget>(this, CommonItemChoiceWidgetClass);
+			// --- [ ★★★ 코드 추가 끝 ★★★ ] ---
+
 
 			// --- [핵심 수정] ---
 			// MainHUD를 뷰포트에 추가하기 전에
@@ -74,13 +82,6 @@ void ARamdomItemDefensePlayerController::BeginPlay()
 			if (MainHUDInstance) MainHUDInstance->AddToViewport();
 		}
 		// -----------------------------
-
-		//// --- [수정 없음] ---
-		//// 이 입력 모드 설정 코드는 올바르며, 그대로 두시면 됩니다.
-		//FInputModeGameAndUI InputModeData;
-		//InputModeData.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
-		//SetInputMode(InputModeData);
-		//// -------------------
 	}
 }
 
@@ -94,22 +95,30 @@ void ARamdomItemDefensePlayerController::OnPossess(APawn* InPawn)
 		MyPlayerStateRef = GetPlayerState<AMyPlayerState>();
 		if (MyPlayerStateRef)
 		{
-			// PlayerState의 선택 횟수 변경 델리게이트에 컨트롤러 함수 바인딩
+			// (일반) 라운드 선택 델리게이트 바인딩
 			MyPlayerStateRef->OnChoiceCountChangedDelegate.AddDynamic(this, &ARamdomItemDefensePlayerController::OnPlayerChoiceCountChanged);
-
-			// 초기 상태 반영 (게임 시작 시 ChoiceCount가 0 이상일 경우 대비)
 			OnPlayerChoiceCountChanged(MyPlayerStateRef->GetChoiceCount());
+
+			// --- [ ★★★ 코드 추가 ★★★ ] ---
+			// (신규) 흔함 아이템 선택 델리게이트 바인딩
+			MyPlayerStateRef->OnCommonItemChoiceCountChangedDelegate.AddDynamic(this, &ARamdomItemDefensePlayerController::OnPlayerCommonChoiceCountChanged);
+			OnPlayerCommonChoiceCountChanged(MyPlayerStateRef->GetCommonItemChoiceCount()); // 초기 상태 반영
+			// --- [ ★★★ 코드 추가 끝 ★★★ ] ---
 		}
 		else
 		{
 			// 아직 PlayerState가 준비되지 않았다면 잠시 후 재시도
-			// (보통 OnPossess 시점에는 유효하지만 안전하게 처리)
 			GetWorld()->GetTimerManager().SetTimerForNextTick([this]() {
 				MyPlayerStateRef = GetPlayerState<AMyPlayerState>();
 				if (MyPlayerStateRef)
 				{
 					MyPlayerStateRef->OnChoiceCountChangedDelegate.AddDynamic(this, &ARamdomItemDefensePlayerController::OnPlayerChoiceCountChanged);
 					OnPlayerChoiceCountChanged(MyPlayerStateRef->GetChoiceCount());
+
+					// --- [ ★★★ 코드 추가 ★★★ ] ---
+					MyPlayerStateRef->OnCommonItemChoiceCountChangedDelegate.AddDynamic(this, &ARamdomItemDefensePlayerController::OnPlayerCommonChoiceCountChanged);
+					OnPlayerCommonChoiceCountChanged(MyPlayerStateRef->GetCommonItemChoiceCount());
+					// --- [ ★★★ 코드 추가 끝 ★★★ ] ---
 				}
 				});
 		}
@@ -148,6 +157,7 @@ void ARamdomItemDefensePlayerController::SetupInputComponent()
 		EnhancedInputComponent->BindAction(SetDestinationTouchAction, ETriggerEvent::Triggered, this, &ARamdomItemDefensePlayerController::OnTouchTriggered);
 		EnhancedInputComponent->BindAction(SetDestinationTouchAction, ETriggerEvent::Completed, this, &ARamdomItemDefensePlayerController::OnTouchReleased);
 		EnhancedInputComponent->BindAction(SetDestinationTouchAction, ETriggerEvent::Canceled, this, &ARamdomItemDefensePlayerController::OnTouchReleased);
+		EnhancedInputComponent->BindAction(UltimateSkillAction, ETriggerEvent::Started, this, &ARamdomItemDefensePlayerController::OnUltimateSkillPressed);
 	}
 }
 
@@ -260,6 +270,7 @@ void ARamdomItemDefensePlayerController::ToggleInventoryWidget()
 	}
 }
 
+/** (일반) 라운드 선택권 횟수 변경 시 */
 void ARamdomItemDefensePlayerController::OnPlayerChoiceCountChanged(int32 NewCount)
 {
 	if (!IsLocalPlayerController() || !RoundChoiceInstance) return;
@@ -282,6 +293,32 @@ void ARamdomItemDefensePlayerController::OnPlayerChoiceCountChanged(int32 NewCou
 	}
 }
 
+// --- [ ★★★ 코드 추가 ★★★ ] ---
+/** (신규) '흔함 아이템 선택권' 횟수 변경 시 */
+void ARamdomItemDefensePlayerController::OnPlayerCommonChoiceCountChanged(int32 NewCount)
+{
+	if (!IsLocalPlayerController() || !CommonItemChoiceInstance) return;
+
+	if (NewCount > 0)
+	{
+		// 선택 횟수가 0보다 크면 위젯을 화면에 추가
+		if (!CommonItemChoiceInstance->IsInViewport())
+		{
+			CommonItemChoiceInstance->AddToViewport();
+		}
+	}
+	else
+	{
+		// 선택 횟수가 0 이하면 위젯을 화면에서 제거
+		if (CommonItemChoiceInstance->IsInViewport())
+		{
+			CommonItemChoiceInstance->RemoveFromParent();
+		}
+	}
+}
+// --- [ ★★★ 코드 추가 끝 ★★★ ] ---
+
+
 /** 게임오버 UI 표시 */
 void ARamdomItemDefensePlayerController::ShowGameOverUI()
 {
@@ -292,21 +329,15 @@ void ARamdomItemDefensePlayerController::ShowGameOverUI()
 	if (StatUpgradeInstance && StatUpgradeInstance->IsInViewport()) StatUpgradeInstance->RemoveFromParent();
 	if (InventoryInstance && InventoryInstance->IsInViewport()) InventoryInstance->RemoveFromParent();
 	if (RoundChoiceInstance && RoundChoiceInstance->IsInViewport()) RoundChoiceInstance->RemoveFromParent();
-	// (다른 팝업 UI가 있다면 여기서 함께 숨김 처리)
+	// --- [ ★★★ 코드 추가 ★★★ ] ---
+	if (CommonItemChoiceInstance && CommonItemChoiceInstance->IsInViewport()) CommonItemChoiceInstance->RemoveFromParent(); // 게임오버 시 선택권 UI도 숨김
+	// --- [ ★★★ 코드 추가 끝 ★★★ ] ---
 
 	// 2. 게임오버 UI 표시
 	if (GameOverInstance && !GameOverInstance->IsInViewport())
 	{
 		GameOverInstance->AddToViewport();
 	}
-
-
-	//// 3. 입력 모드를 UI 전용으로 변경 (게임 조작 방지)
-	//FInputModeUIOnly InputModeData;
-	////InputModeData.SetWidgetToFocus(GameOverInstance->TakeWidget()); // 포커스 설정 (선택 사항)
-	//InputModeData.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
-	//SetInputMode(InputModeData);
-	//bShowMouseCursor = true; // 마우스 커서 표시
 }
 
 /** 게임오버 UI 숨기기 */
@@ -319,16 +350,26 @@ void ARamdomItemDefensePlayerController::HideGameOverUI()
 		GameOverInstance->RemoveFromParent();
 	}
 
-	//// 입력 모드 원래대로 복구 (예: 게임 + UI)
-	//FInputModeGameAndUI InputModeData;
-	//// InputModeData.SetWidgetToFocus(...); // 필요시 포커스 설정
-	//InputModeData.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
-	//SetInputMode(InputModeData);
-	//// bShowMouseCursor = false; // 게임에 따라 조절
-
 	// 메인 HUD 다시 표시
 	if (MainHUDInstance && !MainHUDInstance->IsInViewport())
 	{
 		MainHUDInstance->AddToViewport();
 	}
 }
+
+/** 'G' 키 (UltimateSkillAction)가 눌렸을 때 호출됩니다. */
+void ARamdomItemDefensePlayerController::OnUltimateSkillPressed()
+{
+	ARamdomItemDefenseCharacter* MyCharacter = GetPawn<ARamdomItemDefenseCharacter>();
+	if (MyCharacter)
+	{
+		UAbilitySystemComponent* ASC = MyCharacter->GetAbilitySystemComponent();
+		if (ASC)
+		{
+			// "Event.Attack.Execute.Ultimate" 태그를 가진 어빌리티를 실행 시도합니다.
+			// (이 태그는 DefaultGameplayTags.ini에 추가해야 합니다)
+			FGameplayTag UltimateTag = FGameplayTag::RequestGameplayTag(FName("Event.Attack.Execute.Ultimate"));
+			ASC->TryActivateAbilitiesByTag(FGameplayTagContainer(UltimateTag), true);
+		}
+	}
+}	

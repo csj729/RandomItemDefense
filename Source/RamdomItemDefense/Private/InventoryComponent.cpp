@@ -1,4 +1,4 @@
-// csj729/randomitemdefense/RandomItemDefense-78a128504f0127dc02646504d4a1e1c677a0e811/Source/RamdomItemDefense/Private/InventoryComponent.cpp
+// Source/RamdomItemDefense/Private/InventoryComponent.cpp (수정)
 
 #include "InventoryComponent.h"
 #include "AbilitySystemComponent.h"
@@ -302,6 +302,39 @@ void UInventoryComponent::AddRandomItem()
 	}
 	// ------------------
 }
+
+// --- [ ★★★ 코드 추가 ★★★ ] ---
+/**
+ * @brief 데이터 테이블에서 '흔함' 등급 아이템 ID를 '모두' 찾아 배열로 반환합니다.
+ */
+TArray<FName> UInventoryComponent::GetAllCommonItemIDs() const
+{
+	TArray<FName> CommonItemIDs;
+	if (!ItemDataTable)
+	{
+		return CommonItemIDs;
+	}
+
+	// 1. 모든 아이템 ID를 순회합니다.
+	TArray<FName> AllItemIDs = ItemDataTable->GetRowNames();
+	for (const FName& ItemID : AllItemIDs)
+	{
+		bool bSuccess = false;
+		// 해당 아이템 ID의 데이터를 가져옵니다.
+		FItemData ItemData = GetItemData(ItemID, bSuccess);
+		// 데이터를 성공적으로 가져왔고, 등급이 'Common'인지 확인합니다.
+		if (bSuccess && ItemData.Grade == EItemGrade::Common)
+		{
+			// 조건을 만족하면 CommonItemIDs 배열에 추가합니다.
+			CommonItemIDs.Add(ItemID);
+		}
+	}
+
+	// 2. '흔함' 등급 아이템 전체 목록을 반환합니다.
+	return CommonItemIDs;
+}
+// --- [ ★★★ 코드 추가 끝 ★★★ ] ---
+
 
 /**
  * @brief (서버 전용 / UI 호출용) 결과 아이템 ID를 기반으로 아이템 조합을 시도합니다.

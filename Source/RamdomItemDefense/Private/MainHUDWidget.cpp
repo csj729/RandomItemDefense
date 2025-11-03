@@ -45,9 +45,12 @@ void UMainHUDWidget::BindPlayerStateEvents()
 		// PlayerState의 C++ 델리게이트에 이 위젯의 UFUNCTION을 바인딩합니다.
 		MyPlayerState->OnGoldChangedDelegate.AddDynamic(this, &UMainHUDWidget::OnGoldChanged);
 		MyPlayerState->OnSpawnerAssignedDelegate.AddDynamic(this, &UMainHUDWidget::HandleSpawnerAssigned);
+		MyPlayerState->OnUltimateChargeChangedDelegate.AddDynamic(this, &UMainHUDWidget::HandleUltimateChargeChanged);
 
 		// 바인딩 직후, 현재 값으로 UI를 즉시 업데이트하도록 이벤트를 호출합니다.
 		OnGoldChanged(MyPlayerState->GetGold());
+
+		HandleUltimateChargeChanged(MyPlayerState->GetUltimateCharge());
 
 		if (MyPlayerState->MySpawner)
 		{
@@ -99,4 +102,10 @@ void UMainHUDWidget::HandleMonsterCountChanged(int32 NewCount)
 
 	// 블루프린트(UMG) 이벤트 호출
 	OnMonsterCountChanged(NewCount, MaxCount);
+}
+
+void UMainHUDWidget::HandleUltimateChargeChanged(int32 NewValue)
+{
+	// WBP_MainHUD의 블루프린트 이벤트를 호출합니다.
+	OnUltimateChargeChanged(NewValue, MAX_ULTIMATE_CHARGE);
 }

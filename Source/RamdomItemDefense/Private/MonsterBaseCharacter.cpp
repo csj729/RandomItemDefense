@@ -28,6 +28,7 @@ AMonsterBaseCharacter::AMonsterBaseCharacter()
 
 	GoldOnDeath = 10;
 	bIsDying = false;
+	bIsBoss = false;
 
 	AutoPossessAI = EAutoPossessAI::PlacedInWorldOrSpawned;
 	CurrentWaveMaterial = nullptr;
