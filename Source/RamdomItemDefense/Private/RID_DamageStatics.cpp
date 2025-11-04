@@ -57,7 +57,7 @@ float URID_DamageStatics::GetCritMultiplier(UAbilitySystemComponent* SourceASC)
 	return TotalCritMultiplier;
 }
 
-/** (범위 스킬용) 치명타 굴림 */
+/** 치명타 굴림 */
 bool URID_DamageStatics::CheckForCrit(UAbilitySystemComponent* SourceASC, bool bIsSkillAttack)
 {
 	const UMyAttributeSet* AttributeSet = GetAttributeSetFromASC(SourceASC);
@@ -66,6 +66,7 @@ bool URID_DamageStatics::CheckForCrit(UAbilitySystemComponent* SourceASC, bool b
 		return false;
 	}
 
+	// 스킬 치명타 확률은 일반 치명타 확률의 20%
 	const float BaseCritChance = AttributeSet->GetCritChance();
 	const float ActualCritChance = bIsSkillAttack ? (BaseCritChance / 5.0f) : BaseCritChance;
 

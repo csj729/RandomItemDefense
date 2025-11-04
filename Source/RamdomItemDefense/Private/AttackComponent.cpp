@@ -153,6 +153,13 @@ void UAttackComponent::PerformAttack()
 {
 	if (!OwnerCharacter || !OwnerCharacter->HasAuthority()) return;
 
+	if (AbilitySystemComponent && AbilitySystemComponent->HasMatchingGameplayTag(FGameplayTag::RequestGameplayTag(FName("State.Player.IsUsingUltimate"))))
+	{
+		// 궁극기 사용 중이므로, 기본 공격(PerformAttack)을 실행하지 않고 건너뜁니다.
+		UE_LOG(LogTemp, Warning, TEXT("Using Ultimate"));
+		return;
+	}
+
 	AActor* TargetToAttack = ManualTarget ? ManualTarget : AutoTarget;
 
 	if (TargetToAttack)

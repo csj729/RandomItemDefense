@@ -9,7 +9,8 @@
 
 UGA_BasicAttack::UGA_BasicAttack()
 {
-	// 블루프린트에서 Activation Required Tags에 Event.Attack.Execute.Basic 추가 필요
+	// 블루프린트에서 Activation Required Tags에 
+	// .Execute.Basic 추가 필요
 	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
 	DamageCoefficient = 1.0f; // 기본 계수는 1.0 (공격력 그대로)
 	// 기본 데이터 태그 설정 (BP에서 변경 가능)

@@ -131,9 +131,5 @@ void UCommonItemChoiceWidget::MakeChoice(FName ChosenItemID)
 		// 1. 서버에 이 아이템을 선택했다고 알림 (선택권 1개 소모)
 		MyPlayerState->Server_UseCommonItemChoice(ChosenItemID);
 
-		// --- [ ★★★ 수정 ★★★ ] ---
-		// 2. [클라이언트 즉시 반응]
-		// OnHideChoices(); // <--- 이 라인을 삭제하거나 주석 처리합니다.
-		// --- [ ★★★ 수정 끝 ★★★ ] ---
 	}
 }

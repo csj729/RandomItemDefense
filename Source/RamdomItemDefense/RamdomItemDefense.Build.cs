@@ -17,8 +17,10 @@ public class RamdomItemDefense : ModuleRules
             "AIModule",
             "Niagara",
             "EnhancedInput",
-            "UMG"
+            "UMG",
+            "GameplayAbilities",
+            "GameplayTags",
+            "GameplayTasks"
         });
-        PrivateDependencyModuleNames.AddRange(new string[] { "GameplayAbilities", "GameplayTags", "GameplayTasks", "AIModule" });
     }
 }
