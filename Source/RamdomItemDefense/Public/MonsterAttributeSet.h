@@ -1,4 +1,4 @@
-// MonsterAttributeSet.h
+// Source/RamdomItemDefense/Public/MonsterAttributeSet.h
 
 #pragma once
 
@@ -43,6 +43,16 @@ public:
     UPROPERTY(BlueprintReadOnly, Category = "Attributes", ReplicatedUsing = OnRep_MoveSpeed)
     FGameplayAttributeData MoveSpeed;
     ATTRIBUTE_ACCESSORS(UMonsterAttributeSet, MoveSpeed);
+
+    // --- [ ★★★ 코드 추가 ★★★ ] ---
+    /**
+     * @brief 현재 방어력을 기반으로 실제 적용될 데미지를 계산합니다.
+     * @param IncomingDamage 방어력 감소 전의 원본 데미지 (양수)
+     * @return 방어력 공식이 적용된 최종 데미지 (양수)
+     */
+    UFUNCTION(BlueprintPure, Category = "Attributes|Calculation")
+    float CalculateReducedDamage(float IncomingDamage) const;
+    // --- [ ★★★ 코드 추가 끝 ★★★ ] ---
 
 protected:
     UFUNCTION()

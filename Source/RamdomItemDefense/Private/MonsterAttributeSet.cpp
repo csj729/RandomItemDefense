@@ -4,12 +4,15 @@
 #include "Net/UnrealNetwork.h"
 #include "GameplayEffectExtension.h"
 #include "Engine/Engine.h"
-#include "MonsterBaseCharacter.h" // [필수] IsBoss() 함수 사용
+#include "MonsterBaseCharacter.h" 
 #include "RamdomItemDefenseCharacter.h"
 #include "MyPlayerState.h"
 #include "RamdomItemDefense.h"
-#include "MyGameState.h"       // GetCurrentWave() 사용
-#include "Engine/World.h"      // GetWorld() 사용
+#include "MyGameState.h"       
+#include "Engine/World.h"      
+// --- [ ★★★ 코드 추가 ★★★ ] ---
+#include "Kismet/KismetMathLibrary.h" // FMath::Pow() 함수 사용
+// --- [ ★★★ 코드 추가 끝 ★★★ ] ---
 
 void UMonsterAttributeSet::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
@@ -21,14 +24,42 @@ void UMonsterAttributeSet::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>&
 	DOREPLIFETIME_CONDITION_NOTIFY(UMonsterAttributeSet, MoveSpeed, COND_None, REPNOTIFY_Always);
 }
 
+
+// --- [ ★★★ 새 함수 구현 ★★★ ] ---
+float UMonsterAttributeSet::CalculateReducedDamage(float IncomingDamage) const
+{
+	// 1. 현재 방어력 가져오기 (최소 0)
+	const float CurrentArmor = FMath::Max(0.f, GetArmor());
+
+	// 2. 방어력이 0 이하면, 원본 데미지(양수)를 그대로 반환
+	if (CurrentArmor <= 0.f)
+	{
+		return IncomingDamage;
+	}
+
+	// 3. 방어력 공식을 통한 데미지 감소율(%) 계산
+	// 데미지 감소율 = 0.05 * (방어력 ^ 0.4515)
+	float DamageReductionPercent = 0.05f * FMath::Pow(CurrentArmor, 0.4515f);
+
+	// (안전장치) 데미지 감소율이 90%를 넘지 않도록 제한
+	DamageReductionPercent = FMath::Min(DamageReductionPercent, 0.9f);
+
+	// 4. 최종 데미지(양수) 계산 및 반환
+	const float ReducedDamage = IncomingDamage * (1.0f - DamageReductionPercent);
+
+	return ReducedDamage;
+}
+// --- [ ★★★ 구현 끝 ★★★ ] ---
+
+
 void UMonsterAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallbackData& Data)
 {
 	Super::PostGameplayEffectExecute(Data);
 
 	if (Data.EvaluatedData.Attribute == GetHealthAttribute())
 	{
-		const float NewHealth = GetHealth();
-		const float Magnitude = Data.EvaluatedData.Magnitude; // 데미지/힐량
+		const float Magnitude = Data.EvaluatedData.Magnitude;
+		const float NewHealth = GetHealth(); // (참고: 이 값은 이미 Magnitude가 적용된 값)
 
 		AMonsterBaseCharacter* Monster = Cast<AMonsterBaseCharacter>(GetOwningAbilitySystemComponent()->GetAvatarActor());
 
@@ -36,15 +67,11 @@ void UMonsterAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCal
 		{
 			if (NewHealth <= 0.f)
 			{
-				// (기존 사망 로직)
+				// [1] --- 몬스터 사망 로직 ---
+				// (기존 사망 로직과 동일)
 				AActor* InstigatorActor = Data.EffectSpec.GetContext().GetInstigator();
 				AActor* EffectCauserActor = Data.EffectSpec.GetContext().GetEffectCauser();
-
-				ARamdomItemDefenseCharacter* KillerCharacter = Cast<ARamdomItemDefenseCharacter>(InstigatorActor);
-				if (KillerCharacter == nullptr)
-				{
-					KillerCharacter = Cast<ARamdomItemDefenseCharacter>(EffectCauserActor);
-				}
+				ARamdomItemDefenseCharacter* KillerCharacter = Cast<ARamdomItemDefenseCharacter>(InstigatorActor ? InstigatorActor : EffectCauserActor);
 
 				Monster->Die(KillerCharacter);
 
@@ -53,80 +80,56 @@ void UMonsterAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCal
 					AMyPlayerState* PS = KillerCharacter->GetPlayerState<AMyPlayerState>();
 					if (PS)
 					{
-						// --- [ ★★★ 보스 처치 보상 로직 수정 ★★★ ] ---
-
-						// 1. GameState에서 현재 웨이브 가져오기
 						AMyGameState* MyGameState = GetWorld() ? GetWorld()->GetGameState<AMyGameState>() : nullptr;
-						int32 CurrentWave = 1; // GameState가 없거나 웨이브가 0이면 1로 간주
-						if (MyGameState && MyGameState->GetCurrentWave() > 0)
-						{
-							CurrentWave = MyGameState->GetCurrentWave();
-						}
+						int32 CurrentWave = (MyGameState && MyGameState->GetCurrentWave() > 0) ? MyGameState->GetCurrentWave() : 1;
 
-						// 2. [수정] 이 몬스터가 '보스' 몬스터인지 확인합니다.
 						if (Monster->IsBoss())
 						{
-							// --- 보스 처치 보상 ---
-							// 3a. 보스 단계 계산 (1, 2, 3...)
 							const int32 BossStage = CurrentWave / 10;
-
-							// 4a. '흔함 아이템 선택권' 보상 지급 (보스 단계 * 3)
 							const int32 ItemChoiceReward = BossStage * 3;
 							PS->AddCommonItemChoice(ItemChoiceReward);
-
-							// 5a. 골드 보상 지급 (3000 + (보스 단계 - 1) * 4000)
 							const int32 BaseGold = 3000;
 							const int32 BonusGold = (BossStage - 1) * 4000;
-							const int32 GoldAmount = BaseGold + BonusGold;
-							PS->AddGold(GoldAmount);
-
-							RID_LOG(FColor::Yellow, TEXT("Awarded BOSS reward to %s (Wave: %d, BossStage: %d)"), *PS->GetPlayerName(), CurrentWave, BossStage);
-							RID_LOG(FColor::Yellow, TEXT("  -> Gold: %d (Base: %d, Bonus: %d)"), GoldAmount, BaseGold, BonusGold);
-							RID_LOG(FColor::Yellow, TEXT("  -> Common Item Choices: %d"), ItemChoiceReward);
+							PS->AddGold(BaseGold + BonusGold);
 						}
 						else
 						{
-							// --- 일반 몬스터 처치 보상 (보스 웨이브의 쫄 포함) ---
-							// 3b. 웨이브 기반으로 골드 계산 (10 + (Wave - 1) * 5)
 							const int32 BaseGold = 10;
 							const int32 BonusGold = (CurrentWave - 1) * 5;
-							const int32 GoldAmount = FMath::Max(BaseGold, BaseGold + BonusGold); // Wave 1일 때 10골드 보장
-							PS->AddGold(GoldAmount);
-
-							RID_LOG(FColor::Yellow, TEXT("Awarded %d gold to %s for killing %s (Wave: %d)"),
-								GoldAmount,
-								*PS->GetPlayerName(),
-								*Monster->GetName(),
-								CurrentWave
-							);
+							PS->AddGold(FMath::Max(BaseGold, BaseGold + BonusGold));
 						}
-						// --- [ ★★★ 로직 수정 끝 ★★★ ] ---
 					}
 				}
-
-				// --- [ 피격 이펙트 재생 (사망 시) ] ---
-				RID_LOG(FColor::Yellow, TEXT("MonsterAttributeSet: Playing HIT effect on DEATH. Checking Asset Tags..."));
-
 				FGameplayTagContainer EffectTags;
 				Data.EffectSpec.GetAllAssetTags(EffectTags);
-
 				Monster->PlayHitEffect(EffectTags);
-				// --- [ 코드 끝 ] ---
 			}
 			else if (Magnitude < 0.f)
 			{
-				// [로그 5: 피격 처리 진입]
-				//RID_LOG(FColor::Yellow, TEXT("MonsterAttributeSet: Monster was HIT (Magnitude < 0 and NewHealth > 0). Checking Asset Tags..."));
+				// [2] --- ★★★ 몬스터 피격 (데미지) 로직 (수정됨) ★★★ ---
 
+				// 2-1. 원본 데미지(음수)와 피해 입기 전 체력 계산
+				const float OriginalDamage = Magnitude; // 예: -100
+				const float HealthBeforeDamage = NewHealth - OriginalDamage; // 예: 400 - (-100) = 500
+
+				// 2-2. 새 함수를 호출하여 실제 적용될 데미지(양수) 계산
+				// 원본 데미지를 양수로 변환하여 전달 ( -OriginalDamage )
+				const float ActualDamageToApply = CalculateReducedDamage(-OriginalDamage); // 예: CalculateReducedDamage(100) -> 60 반환
+
+				// 2-3. 새 체력 값 설정
+				// (피해 입기 전 체력) - (방어력이 적용된 실제 데미지)
+				SetHealth(HealthBeforeDamage - ActualDamageToApply); // 예: 500 - 60 = 440
+				UE_LOG(LogTemp, Warning, TEXT("Damage = %f"), ActualDamageToApply);
+				// 2-4. 피격 이펙트 재생
 				FGameplayTagContainer EffectTags;
 				Data.EffectSpec.GetAllAssetTags(EffectTags);
-
-
 				Monster->PlayHitEffect(EffectTags);
+
+				// --- [ ★★★ 수정 끝 ★★★ ] ---
 			}
 			else
 			{
-				// [로그 6: 아무 조건도 맞지 않음]
+				// [3] 힐 또는 기타 효과 (기존과 동일)
 				RID_LOG(FColor::Orange, TEXT("MonsterAttributeSet: Health changed, but NOT hit (Magnitude: %.1f) and NOT dead (NewHealth: %.1f)."), Magnitude, NewHealth);
 			}
 		}
@@ -134,17 +137,9 @@ void UMonsterAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCal
 	// --- [ Health/MaxHealth 동기화 로직 ] ---
 	else if (Data.EvaluatedData.Attribute == GetMaxHealthAttribute())
 	{
-		// [로그 7: MaxHealth 변경 감지]
-		//RID_LOG(FColor::Green, TEXT("MonsterAttributeSet: MaxHealth Attribute CHANGED."));
-
-		// 새 MaxHealth 값을 가져옵니다.
+		// (기존과 동일)
 		const float NewMaxHealth = GetMaxHealth();
-
-		// 현재 Health 값을 새 MaxHealth 값으로 즉시 설정합니다.
 		SetHealth(NewMaxHealth);
-
-		// [로그 8: Health 동기화 완료]
-		//RID_LOG(FColor::Green, TEXT("MonsterAttributeSet: Health SYNCED to NewMaxHealth: %.1f"), NewMaxHealth);
 	}
 	// --- [ 로직 끝 ] ---
 }

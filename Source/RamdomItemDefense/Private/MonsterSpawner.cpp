@@ -115,16 +115,31 @@ void AMonsterSpawner::SpawnMonster()
 
 							if (SpecHandle.IsValid())
 							{
+								float BaseHP = MONSTER_BASE_HP;
 								// 4. 웨이브 보너스 HP 계산 (Wave 1 = 0, Wave 2 = 50, ...)
 								// (요구사항: 스테이지마다 50씩 상승)
 								// (CurrentWave 1 기준 0)
-								float BonusHP = FMath::Max(0.f, (float)(CurrentWave - 1) * 50.f);
+								float FinalHP = BaseHP + FMath::Max(0.f, (float)(CurrentWave - 1) * 50.f);
 
 								// 5. SetByCaller로 보너스 HP 값 주입
 								// (주의: 태그 이름이 "Data.Wave.BonusHP"로 정확해야 함)
-								SpecHandle.Data.Get()->SetSetByCallerMagnitude(FGameplayTag::RequestGameplayTag(FName("Data.Wave.BonusHP")), BonusHP);
+								SpecHandle.Data.Get()->SetSetByCallerMagnitude(FGameplayTag::RequestGameplayTag(FName("Data.Wave.BonusHP")), FinalHP);
+								// --- [ ★★★ 방어력 계산 로직 추가 ★★★ ] ---
+								int FinalArmor = 0;
 
-								// 6. 스펙 적용
+								const int32 BossStage = CurrentWave / 10; // (Wave 1-9 -> 0), (Wave 11-19 -> 1)
+								const float BaseArmor = BossStage * 20.0f;
+
+								const int32 WaveNumInBlock = (CurrentWave % 10);
+								FinalArmor = BaseArmor + WaveNumInBlock;
+
+								// 6. SetByCaller로 보너스 Armor 값 주입
+								SpecHandle.Data.Get()->SetSetByCallerMagnitude(FGameplayTag::RequestGameplayTag(FName("Data.Wave.BonusArmor")), FinalArmor);
+								//RID_LOG(FColor::White, TEXT("SpawnMonster: Wave %d -> HP: %.1f, Armor: %.1f"), CurrentWave, BonusHP, FinalArmor);
+								// --- [ ★★★ 방어력 계산 로직 끝 ★★★ ] ---
+
+
+								// 7. 스펙 적용
 								MonsterASC->ApplyGameplayEffectSpecToSelf(*SpecHandle.Data.Get());
 
 								//RID_LOG(FColor::Green, TEXT("Applied GE_MonsterStatInit to %s. Wave: %d, BonusHP: %.1f"), *SpawnedMonster->GetName(), CurrentWave, BonusHP);

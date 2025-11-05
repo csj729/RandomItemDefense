@@ -18,7 +18,8 @@
 #include "DamageTextWidget.h"        
 #include "Blueprint/UserWidget.h"
 #include "Components/SkeletalMeshComponent.h"
-#include "Animation/AnimMontage.h" // BlendOutTime을 읽기 위해
+#include "Animation/AnimMontage.h"
+#include "GameFramework/CharacterMovementComponent.h"
 
 
 AMonsterBaseCharacter::AMonsterBaseCharacter()
@@ -132,16 +133,25 @@ void AMonsterBaseCharacter::Die(AActor* Killer)
 
 	if (MySpawner) { MySpawner->OnMonsterKilled(); }
 
+	// --- [ ★★★ 수정 2: AI와 이동 즉시 중지 ★★★ ] ---
 	// AI 컨트롤러의 빙의를 해제 (요청하신 사항)
 	if (MonsterAIController.IsValid())
 	{
 		MonsterAIController->UnPossess();
 	}
 
+	// (추가) 캐릭터 이동을 즉시 멈추고 비활성화합니다.
+	if (GetCharacterMovement())
+	{
+		GetCharacterMovement()->StopMovementImmediately();
+		GetCharacterMovement()->DisableMovement();
+	}
+	// --- [ ★★★ 수정 2 끝 ★★★ ] ---
+
 	// 캡슐 콜리전 비활성화 (트레이스, 물리 모두)
 	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
-	// --- [ ★★★ 수정된 타이머 로직 ★★★ ] ---
+	// --- [ ★★★ 수정된 타이머 로직 ★★★ ] --- (기존 파일 내용)
 
 	// 랙돌 전환까지의 기본 지연 시간 (몽타주가 없을 경우)
 	float RagdollDelay = 0.1f;
@@ -172,24 +182,12 @@ void AMonsterBaseCharacter::Die(AActor* Killer)
 // (★★★) 몽타주 종료 후 랙돌로 전환하는 함수 (수정됨)
 void AMonsterBaseCharacter::GoRagdoll()
 {
-	if (GetCharacterMovement())
-	{
-		// (추가) 캐릭터 이동을 즉시 멈추고 비활성화합니다.
-		GetCharacterMovement()->StopMovementImmediately();
-		GetCharacterMovement()->DisableMovement();
-	}
-
 	if (GetMesh())	
 	{
 		GetMesh()->SetCollisionProfileName(TEXT("Ragdoll"));
 		GetMesh()->SetCollisionEnabled(ECollisionEnabled::PhysicsOnly);
 		GetMesh()->SetSimulatePhysics(true);
-
-		UE_LOG(LogTemp, Warning, TEXT("Ragdoll On"));
 	}
-
-	// (참고) 캡슐 콜리전은 Die() 함수에서 이미 NoCollision으로 설정되었습니다.
-
 	// 5. 랙돌이 2초(요청대로) 뒤에 사라지도록 최종 LifeSpan 설정
 	SetLifeSpan(2.0f);
 }
