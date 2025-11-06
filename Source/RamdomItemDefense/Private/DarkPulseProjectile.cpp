@@ -6,23 +6,12 @@
 #include "Particles/ParticleSystemComponent.h"
 #include "Particles/ParticleSystem.h"
 #include "Kismet/GameplayStatics.h"
-// --- [코드 수정] ---
-// 이 투사체는 더 이상 GAS/Attribute/Monster 로직을 알 필요가 없습니다.
-// #include "AbilitySystemComponent.h"
-// #include "AbilitySystemBlueprintLibrary.h"
-// #include "MyAttributeSet.h"
-// #include "MonsterBaseCharacter.h"
-// #include "DrawDebugHelpers.h"
-// #include "RamdomItemDefense.h"
-// --- [코드 수정 끝] ---
 
 ADarkPulseProjectile::ADarkPulseProjectile()
 {
 	PrimaryActorTick.bCanEverTick = true; // Tick 함수 활성화 (도착 감지용)
 
 	InitialLifeSpan = 5.0f; // 5초 뒤 자동 파괴
-	// bHasExploded = false; // (더 이상 폭발 로직 없음)
-	// ExplosionRadius = 300.0f; // (GA가 관리)
 	ArrivalTolerance = 50.0f; // 도착 허용 오차
 
 	SphereComponent = CreateDefaultSubobject<USphereComponent>(TEXT("SphereComponent"));

@@ -5,18 +5,12 @@
 #include "RamdomItemDefense.h"
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
-// #include "GameplayEffect.h" // (제거) GAS 불필요
 #include "DarkPulseProjectile.generated.h"
 
 class USphereComponent;
 class UProjectileMovementComponent;
 class UParticleSystemComponent;
 class UParticleSystem;
-// (제거) 불필요한 전방 선언
-// class USoundBase;
-// class UAbilitySystemComponent;
-// class UGameplayEffect;
-// class AMonsterBaseCharacter;
 
 
 UCLASS()
