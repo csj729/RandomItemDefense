@@ -4,7 +4,9 @@
 #include "GA_BaseSkill.h"
 #include "GA_Archer_SingleShot.generated.h"
 
-class ADarkPulseProjectile; // 시각 효과용 투사체 클래스 (재활용)
+// --- [코드 수정] ---
+class AProjectileBase; // (이름 변경)
+// --- [코드 수정 끝] ---
 class AActor;
 
 UCLASS()
@@ -18,9 +20,11 @@ public:
 protected:
 	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
 
-	/** (BP 설정) 스폰할 시각 효과용 투사체 (예: BP_Archer_Arrow) */
+	// --- [코드 수정] ---
+	/** (BP 설정) 스폰할 시각 효과용 투사체 (예: BP_Projectile_ArcherArrow) */
 	UPROPERTY(EditDefaultsOnly, Category = "Config|Projectile")
-	TSubclassOf<ADarkPulseProjectile> ProjectileClass;
+	TSubclassOf<AProjectileBase> ProjectileClass; // (이름 변경)
+	// --- [코드 수정 끝] ---
 
 	/** (BP 설정) 투사체 속도 (타이머 계산용) (예: 2500) */
 	UPROPERTY(EditDefaultsOnly, Category = "Config|Projectile")

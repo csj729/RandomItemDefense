@@ -2,7 +2,7 @@
 
 #include "GA_MagicFighter_DarkPulse.h"
 #include "RamdomItemDefenseCharacter.h"
-#include "DarkPulseProjectile.h"
+#include "ProjectileBase.h" 
 #include "AbilitySystemComponent.h"
 #include "MyAttributeSet.h"
 #include "Kismet/KismetMathLibrary.h"
@@ -15,25 +15,28 @@
 #include "MonsterBaseCharacter.h"
 #include "DrawDebugHelpers.h"
 #include "GameFramework/ProjectileMovementComponent.h"
-// --- [코드 추가] ---
-#include "RID_DamageStatics.h" // 데미지 계산 헬퍼 포함
-// --- [코드 추가 끝] ---
+#include "RID_DamageStatics.h" 
 
 
 UGA_MagicFighter_DarkPulse::UGA_MagicFighter_DarkPulse()
 {
 	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
-	BaseActivationChance = 0.2f; // (1.0f로 설정하면 100% 발동)
+	BaseActivationChance = 0.2f;
 
 	VisualProjectileSpeed = 1500.0f;
 	ExplosionRadius = 300.0f;
+
+	// --- [ ★★★ 코드 추가 ★★★ ] ---
+	// 부모 클래스의 변수에 기본값 설정
+	DamageBase = 50.f;
+	DamageCoefficient = 0.3f; // (30%)
+	// --- [ ★★★ 코드 추가 끝 ★★★ ] ---
 }
 
 void UGA_MagicFighter_DarkPulse::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
 {
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
 
-	// 1. 서버인지, 필요한 데이터(EffectClass, Target)가 있는지 확인
 	if (!HasAuthority(&ActivationInfo))
 	{
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
@@ -42,19 +45,16 @@ void UGA_MagicFighter_DarkPulse::ActivateAbility(const FGameplayAbilitySpecHandl
 
 	if (!DamageEffectClass || !ProjectileClass)
 	{
-		//UE_LOG(LogRamdomItemDefense, Warning, TEXT("GA_DarkPulse: DamageEffectClass or ProjectileClass is not set in Blueprint."));
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
 
 	if (!TriggerEventData || !TriggerEventData->Target)
 	{
-		//UE_LOG(LogRamdomItemDefense, Warning, TEXT("GA_DarkPulse: TriggerEventData or Target is NULL."));
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
 
-	// 2. 확률 체크
 	ARamdomItemDefenseCharacter* OwnerCharacter = Cast<ARamdomItemDefenseCharacter>(ActorInfo->AvatarActor.Get());
 
 	if (!OwnerCharacter)
@@ -65,9 +65,9 @@ void UGA_MagicFighter_DarkPulse::ActivateAbility(const FGameplayAbilitySpecHandl
 
 	// 3. 시작/끝 위치, 이동 시간 계산
 	const AActor* ConstTargetActor = TriggerEventData->Target;
-	AActor* TargetActor = const_cast<AActor*>(ConstTargetActor); // 스폰 시 HomingTarget으로 사용
+	AActor* TargetActor = const_cast<AActor*>(ConstTargetActor);
 	FVector StartLocation = OwnerCharacter->GetActorLocation();
-	TargetImpactLocation = TargetActor->GetActorLocation(); // 멤버 변수에 저장
+	TargetImpactLocation = TargetActor->GetActorLocation();
 
 	float Distance = FVector::Dist(StartLocation, TargetImpactLocation);
 	float TravelTime = 0.0f;
@@ -76,17 +76,16 @@ void UGA_MagicFighter_DarkPulse::ActivateAbility(const FGameplayAbilitySpecHandl
 		TravelTime = Distance / VisualProjectileSpeed;
 	}
 
-	// 4. "날아가는" 이펙트 스폰 (액터 스폰 방식으로 변경)
+	// 4. "날아가는" 이펙트 스폰 
 	if (ProjectileClass)
 	{
 		FRotator SpawnRotation = UKismetMathLibrary::FindLookAtRotation(StartLocation, TargetImpactLocation);
 		FActorSpawnParameters SpawnParams;
 		SpawnParams.Owner = OwnerCharacter;
 		SpawnParams.Instigator = OwnerCharacter;
-		SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn; // 충돌 없이 항상 스폰
+		SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
-		// ADarkPulseProjectile을 스폰합니다. (이 투사체는 이제 '시각 효과'만 담당합니다)
-		ADarkPulseProjectile* VisualProjectile = GetWorld()->SpawnActorDeferred<ADarkPulseProjectile>(
+		AProjectileBase* VisualProjectile = GetWorld()->SpawnActorDeferred<AProjectileBase>(
 			ProjectileClass,
 			FTransform(SpawnRotation, StartLocation),
 			OwnerCharacter,
@@ -102,7 +101,6 @@ void UGA_MagicFighter_DarkPulse::ActivateAbility(const FGameplayAbilitySpecHandl
 			}
 
 			UGameplayStatics::FinishSpawningActor(VisualProjectile, FTransform(SpawnRotation, StartLocation));
-			//RID_LOG(FColor::Cyan, TEXT("GA_DarkPulse: Spawned VISUAL projectile."));
 		}
 	}
 
@@ -114,8 +112,6 @@ void UGA_MagicFighter_DarkPulse::ActivateAbility(const FGameplayAbilitySpecHandl
 		TravelTime, // 계산된 이동 시간
 		false
 	);
-
-	//RID_LOG(FColor::Green, TEXT("GA_DarkPulse: Timer SET. Waiting for Explode..."));
 }
 
 void UGA_MagicFighter_DarkPulse::Explode()
@@ -140,11 +136,12 @@ void UGA_MagicFighter_DarkPulse::Explode()
 	if (ExplosionEffect) UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), ExplosionEffect, TargetImpactLocation);
 	if (ExplosionSound) UGameplayStatics::PlaySoundAtLocation(this, ExplosionSound, TargetImpactLocation);
 
-	// 4. 데미지 계산
+	// --- [ ★★★ 코드 수정 ★★★ ] ---
+	// 4. 데미지 계산 (부모 변수 사용)
 	const float OwnerAttackDamage = AttributeSet->GetAttackDamage();
-	const float BaseDamage = 50.f + (OwnerAttackDamage * 0.3f);
-
-	// --- [ ★★★ 범위 스킬 치명타 로직 수정 ★★★ ] ---
+	// 하드코딩된 값 대신 부모의 변수(DamageBase, DamageCoefficient) 사용
+	const float BaseDamage = DamageBase + (OwnerAttackDamage * DamageCoefficient);
+	// --- [ ★★★ 코드 수정 끝 ★★★ ] ---
 
 	// 4-1. 치명타 굴림을 '단 한 번' 수행합니다. (bIsSkillAttack: true)
 	const bool bDidCrit = URID_DamageStatics::CheckForCrit(CasterASC, true);
@@ -155,8 +152,6 @@ void UGA_MagicFighter_DarkPulse::Explode()
 	{
 		FinalDamage = BaseDamage * URID_DamageStatics::GetCritMultiplier(CasterASC);
 	}
-	// --- [ ★★★ 로직 수정 끝 ★★★ ] ---
-
 
 	// 5. 디버그 구체 그리기
 	DrawDebugSphere(GetWorld(), TargetImpactLocation, ExplosionRadius, 12, FColor::Red, false, 2.0f, 0, 1.0f);

@@ -8,11 +8,11 @@
 #include "GA_BaseSkill.h"
 #include "GA_MagicFighter_DarkPulse.generated.h"
 
-// --- [코드 추가] ---
+// --- [코드 수정] ---
 class UParticleSystem;
 class USoundBase;
-class ADarkPulseProjectile; // 시각 효과용 투사체 클래스를 다시 전방 선언
-// --- [코드 추가 끝] ---
+class AProjectileBase; // 통합된 투사체 클래스 전방 선언
+// --- [코드 수정 끝] ---
 
 class UGameplayEffect;
 
@@ -29,10 +29,9 @@ protected:
 	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
 
 	// --- [코드 수정] ---
-	// ProjectileClass를 다시 추가합니다 (시각 효과용)
-	/** (블루프린트에서 설정) 스폰할 시각 효과용 투사체 클래스 (BP_DarkPulseProjectile) */
+	/** (블루프린트에서 설정) 스폰할 시각 효과용 투사체 클래스 (BP_Projectile_DarkPulse) */
 	UPROPERTY(EditDefaultsOnly, Category = "Config")
-	TSubclassOf<ADarkPulseProjectile> ProjectileClass;
+	TSubclassOf<AProjectileBase> ProjectileClass; // (이름 변경)
 
 	/** (블루프린트에서 설정) 시각적으로 날아가는 투사체 속도 (예: 1500) */
 	UPROPERTY(EditDefaultsOnly, Category = "Config")

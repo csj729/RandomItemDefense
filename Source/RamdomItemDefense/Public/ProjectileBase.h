@@ -1,11 +1,11 @@
-// Source/RamdomItemDefense/Public/DarkPulseProjectile.h
+// Source/RamdomItemDefense/Public/ProjectileBase.h (»õ ÆÄÀÏ)
 
 #pragma once
 
 #include "RamdomItemDefense.h"
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
-#include "DarkPulseProjectile.generated.h"
+#include "ProjectileBase.generated.h"
 
 class USphereComponent;
 class UProjectileMovementComponent;
@@ -14,12 +14,12 @@ class UParticleSystem;
 
 
 UCLASS()
-class RAMDOMITEMDEFENSE_API ADarkPulseProjectile : public AActor
+class RAMDOMITEMDEFENSE_API AProjectileBase : public AActor
 {
 	GENERATED_BODY()
 
 public:
-	ADarkPulseProjectile();
+	AProjectileBase();
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UProjectileMovementComponent> ProjectileMovement;

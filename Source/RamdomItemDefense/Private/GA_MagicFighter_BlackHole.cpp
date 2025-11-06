@@ -48,6 +48,18 @@ void UGA_MagicFighter_BlackHole::ActivateAbility(const FGameplayAbilitySpecHandl
 		return;
 	}
 
+	if (UltimateStateEffectClass)
+	{
+		FGameplayEffectContextHandle ContextHandle = SourceASC->MakeEffectContext();
+		FGameplayEffectSpecHandle SpecHandle = SourceASC->MakeOutgoingSpec(UltimateStateEffectClass, 1.0f, ContextHandle);
+		if (SpecHandle.IsValid())
+		{
+			// 부모의 UltimateStateEffectHandle 변수에 핸들을 저장합니다.
+			// (부모의 EndAbility가 이 핸들을 사용해 태그를 제거합니다)
+			UltimateStateEffectHandle = SourceASC->ApplyGameplayEffectSpecToSelf(*SpecHandle.Data.Get());
+		}
+	}
+
 	bMontageFinished = false;
 	bPullFinished = false;
 

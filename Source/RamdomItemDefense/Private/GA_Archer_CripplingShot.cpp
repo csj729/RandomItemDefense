@@ -4,18 +4,23 @@
 #include "RamdomItemDefenseCharacter.h"
 #include "AbilitySystemBlueprintLibrary.h"
 #include "RID_DamageStatics.h"
-// --- [코드 추가] ---
-#include "DarkPulseProjectile.h"
+#include "ProjectileBase.h" 
 #include "GameFramework/ProjectileMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetMathLibrary.h"
-// --- [코드 추가 끝] ---
+
 
 UGA_Archer_CripplingShot::UGA_Archer_CripplingShot()
 {
 	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
 	BaseActivationChance = 0.05f;
-	VisualProjectileSpeed = 2000.0f; // 기본값 설정
+	VisualProjectileSpeed = 2000.0f;
+
+	// --- [ ★★★ 코드 추가 ★★★ ] ---
+	// 부모 클래스의 변수에 기본값 설정
+	DamageBase = 300.0f;
+	DamageCoefficient = 1.5f; // (150%)
+	// --- [ ★★★ 코드 추가 끝 ★★★ ] ---
 }
 
 void UGA_Archer_CripplingShot::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
@@ -49,7 +54,7 @@ void UGA_Archer_CripplingShot::ActivateAbility(const FGameplayAbilitySpecHandle 
 	SpawnParams.Instigator = OwnerCharacter;
 	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
-	ADarkPulseProjectile* VisualProjectile = GetWorld()->SpawnActorDeferred<ADarkPulseProjectile>(
+	AProjectileBase* VisualProjectile = GetWorld()->SpawnActorDeferred<AProjectileBase>(
 		ProjectileClass,
 		FTransform(SpawnRotation, StartLocation),
 		OwnerCharacter,
@@ -101,9 +106,12 @@ void UGA_Archer_CripplingShot::OnImpact()
 		return;
 	}
 
-	// 1. 데미지 계산 (큰 데미지)
+	// --- [ ★★★ 코드 수정 ★★★ ] ---
+	// 1. 데미지 계산 (부모 변수 사용)
 	const float OwnerAttackDamage = AttributeSet->GetAttackDamage();
-	const float BaseDamage = 300.0f + (OwnerAttackDamage * 1.5f); // (예: 단일 대상 계수 1.5)
+	// 하드코딩된 값 대신 부모의 변수(DamageBase, DamageCoefficient) 사용
+	const float BaseDamage = DamageBase + (OwnerAttackDamage * DamageCoefficient);
+	// --- [ ★★★ 코드 수정 끝 ★★★ ] ---
 	const float FinalDamage = URID_DamageStatics::ApplyCritDamage(BaseDamage, SourceASC, TargetActor.Get(), true);
 
 	FGameplayEffectContextHandle ContextHandle = SourceASC->MakeEffectContext();

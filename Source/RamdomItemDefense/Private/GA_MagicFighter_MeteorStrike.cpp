@@ -10,14 +10,18 @@
 #include "Particles/ParticleSystem.h"
 #include "GameplayEffectTypes.h" 
 #include "RamdomItemDefense.h" 
-// --- [코드 추가] ---
-#include "RID_DamageStatics.h" // 데미지 계산 헬퍼 포함
-// --- [코드 추가 끝] ---
+#include "RID_DamageStatics.h" 
 
 UGA_MagicFighter_MeteorStrike::UGA_MagicFighter_MeteorStrike()
 {
 	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
 	BaseActivationChance = 0.1f;
+
+	// --- [ ★★★ 코드 추가 ★★★ ] ---
+	// 부모 클래스의 변수에 기본값 설정
+	DamageBase = 100.0f;
+	DamageCoefficient = 0.2f; // (20%)
+	// --- [ ★★★ 코드 추가 끝 ★★★ ] ---
 }
 
 void UGA_MagicFighter_MeteorStrike::ActivateAbility(
@@ -86,10 +90,11 @@ void UGA_MagicFighter_MeteorStrike::Explode()
 	// 2. 시전자의 현재 AttackDamage 값을 가져옵니다.
 	float CasterAttackDamage = CasterASC->GetNumericAttribute(UMyAttributeSet::GetAttackDamageAttribute());
 
-	// 3. 기본 데미지 계산 (양수)
-	float BaseDamage = 100.0f + (CasterAttackDamage * 0.2f);
-
-	// --- [ ★★★ 범위 스킬 치명타 로직 수정 ★★★ ] ---
+	// --- [ ★★★ 코드 수정 ★★★ ] ---
+	// 3. 기본 데미지 계산 (부모 변수 사용)
+	// 하드코딩된 값 대신 부모의 변수(DamageBase, DamageCoefficient) 사용
+	float BaseDamage = DamageBase + (CasterAttackDamage * DamageCoefficient);
+	// --- [ ★★★ 코드 수정 끝 ★★★ ] ---
 
 	// 3-1. 치명타 굴림을 '단 한 번' 수행합니다. (bIsSkillAttack: true)
 	const bool bDidCrit = URID_DamageStatics::CheckForCrit(CasterASC, true);
@@ -100,8 +105,6 @@ void UGA_MagicFighter_MeteorStrike::Explode()
 	{
 		FinalDamage = BaseDamage * URID_DamageStatics::GetCritMultiplier(CasterASC);
 	}
-	// --- [ ★★★ 로직 수정 끝 ★★★ ] ---
-
 
 	// 4. '폭발' 이펙트 스폰 (시각 효과)
 	if (ExplosionEffect) UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), ExplosionEffect, ImpactLocation, FRotator::ZeroRotator, true);

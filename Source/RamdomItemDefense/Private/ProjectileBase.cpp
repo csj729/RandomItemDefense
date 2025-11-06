@@ -1,13 +1,13 @@
-// Source/RamdomItemDefense/Private/DarkPulseProjectile.cpp
+// Source/RamdomItemDefense/Private/ProjectileBase.cpp (새 파일)
 
-#include "DarkPulseProjectile.h"
+#include "ProjectileBase.h"
 #include "Components/SphereComponent.h"
 #include "GameFramework/ProjectileMovementComponent.h"
 #include "Particles/ParticleSystemComponent.h"
 #include "Particles/ParticleSystem.h"
 #include "Kismet/GameplayStatics.h"
 
-ADarkPulseProjectile::ADarkPulseProjectile()
+AProjectileBase::AProjectileBase()
 {
 	PrimaryActorTick.bCanEverTick = true; // Tick 함수 활성화 (도착 감지용)
 
@@ -24,21 +24,19 @@ ADarkPulseProjectile::ADarkPulseProjectile()
 
 	ProjectileMovement = CreateDefaultSubobject<UProjectileMovementComponent>(TEXT("ProjectileMovement"));
 	ProjectileMovement->UpdatedComponent = RootComponent;
-	ProjectileMovement->InitialSpeed = 1500.0f; // (이 값은 GA의 VisualProjectileSpeed와 일치시키는 것이 좋음)
-	ProjectileMovement->MaxSpeed = 1500.0f;
+	ProjectileMovement->InitialSpeed = 3000.f; // (이 값은 GA의 VisualProjectileSpeed와 일치시키는 것이 좋음)
+	ProjectileMovement->MaxSpeed = 3000.f;
 	ProjectileMovement->bRotationFollowsVelocity = true;
 	ProjectileMovement->bShouldBounce = false; // 튕기지 않음
 	ProjectileMovement->ProjectileGravityScale = 0.0f; // 중력 없음
 
 	ProjectileMovement->bIsHomingProjectile = true; // 유도탄
-	ProjectileMovement->HomingAccelerationMagnitude = 5000.0f;
+	ProjectileMovement->HomingAccelerationMagnitude = 10000.0f;
 }
-void ADarkPulseProjectile::BeginPlay()
+void AProjectileBase::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// --- [코드 수정] ---
-	// HomingTarget 설정 로직은 이제 GA가 담당하므로 여기서는 필요 없습니다.
 	// (만약 GA가 HomingTargetComponent를 설정해 주지 않았다면 여기서 Destroy)
 	if (ProjectileMovement && !ProjectileMovement->HomingTargetComponent.IsValid())
 	{
@@ -50,14 +48,12 @@ void ADarkPulseProjectile::BeginPlay()
 			}
 			});
 	}
-	// --- [코드 수정 끝] ---
 }
 
-void ADarkPulseProjectile::Tick(float DeltaTime)
+void AProjectileBase::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	// --- [코드 수정] ---
 	// 데미지 로직/폭발 로직 모두 제거
 	// 오직 타겟에 '도착'했는지 여부만 확인하여 스스로 파괴
 
@@ -66,7 +62,7 @@ void ADarkPulseProjectile::Tick(float DeltaTime)
 		return; // 타겟이 없으면 아무것도 안 함
 	}
 
-	// 이동을 시작했고, (이전 코드와 동일)
+	// 이동을 시작했고,
 	if (ProjectileMovement->Velocity.SizeSquared() > KINDA_SMALL_NUMBER)
 	{
 		// 거리가 도착 허용 오차(ArrivalTolerance)보다 가까워지면
@@ -80,5 +76,4 @@ void ADarkPulseProjectile::Tick(float DeltaTime)
 			ProjectileMovement->StopMovementImmediately();
 		}
 	}
-	// --- [코드 수정 끝] ---
 }

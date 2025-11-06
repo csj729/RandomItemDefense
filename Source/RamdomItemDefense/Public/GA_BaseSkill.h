@@ -1,4 +1,4 @@
-// Public/GA_BaseSkill.h (새 파일)
+// Public/GA_BaseSkill.h (수정)
 #pragma once
 
 #include "CoreMinimal.h"
@@ -40,4 +40,20 @@ public:
 	 */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Skill Config|GAS")
 	FGameplayTag DamageByCallerTag;
+
+	// --- [ ★★★ 코드 추가 ★★★ ] ---
+	/**
+	 * @brief (BP Class Default에서 설정) 이 스킬의 기본 데미지
+	 * (예: 100)
+	 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Skill Config|Damage")
+	float DamageBase;
+
+	/**
+	 * @brief (BP Class Default에서 설정) 이 스킬의 공격력 계수
+	 * (예: 1.5 = 공격력의 150%)
+	 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Skill Config|Damage")
+	float DamageCoefficient;
+	// --- [ ★★★ 코드 추가 끝 ★★★ ] ---
 };

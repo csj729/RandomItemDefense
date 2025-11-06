@@ -7,15 +7,18 @@
 #include "GameplayEffectTypes.h"
 #include "AbilitySystemBlueprintLibrary.h"
 #include "RamdomItemDefense.h"
-// --- [코드 추가] ---
-#include "RID_DamageStatics.h" // 데미지 계산 헬퍼 포함
-// --- [코드 추가 끝] ---
+#include "RID_DamageStatics.h" 
 
 UGA_MagicFighter_ArcaneBind::UGA_MagicFighter_ArcaneBind()
 {
-	// 블루프린트에서 Activation Required Tags에 Event.Attack.Execute.Skill3 추가 필요
 	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
 	BaseActivationChance = 0.05f;
+
+	// --- [ ★★★ 코드 추가 ★★★ ] ---
+	// 부모 클래스의 변수에 기본값 설정
+	DamageBase = 200.0f;
+	DamageCoefficient = 0.5f; // (50%)
+	// --- [ ★★★ 코드 추가 끝 ★★★ ] ---
 }
 
 void UGA_MagicFighter_ArcaneBind::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
@@ -60,18 +63,19 @@ void UGA_MagicFighter_ArcaneBind::ActivateAbility(const FGameplayAbilitySpecHand
 		return;
 	}
 
-	// 4. 최종 데미지 계산
-	// --- [코드 수정] ---
+	// --- [ ★★★ 코드 수정 ★★★ ] ---
+	// 4. 최종 데미지 계산 (부모 변수 사용)
 	const float OwnerAttackDamage = AttributeSet->GetAttackDamage();
 
 	// 4-1. 기본 데미지 계산 (양수)
-	const float BaseDamage = 200.0f + (OwnerAttackDamage * 0.5f);
+	// 하드코딩된 값 대신 부모의 변수(DamageBase, DamageCoefficient) 사용
+	const float BaseDamage = DamageBase + (OwnerAttackDamage * DamageCoefficient);
 
 	// 4-2. 치명타 적용 (bIsSkillAttack: true)
 	const float FinalDamage = URID_DamageStatics::ApplyCritDamage(BaseDamage, SourceASC, TargetActor, true);
 
-	RID_LOG(FColor::Cyan, TEXT("GA_ArcaneBind: Applying Damage: %.1f (Base: 200, AD: %.1f * 0.5) -> CritApplied: %.1f"), BaseDamage, OwnerAttackDamage, FinalDamage);
-	// --- [코드 수정 끝] ---
+	RID_LOG(FColor::Cyan, TEXT("GA_ArcaneBind: Applying Damage: %.1f (Base: %.1f, AD: %.1f * %.1f) -> CritApplied: %.1f"), BaseDamage, DamageBase, OwnerAttackDamage, DamageCoefficient, FinalDamage);
+	// --- [ ★★★ 코드 수정 끝 ★★★ ] ---
 
 	// 5. 데미지 GE Spec 생성 및 SetByCaller로 최종 데미지 값 주입
 	FGameplayEffectSpecHandle DamageSpecHandle = SourceASC->MakeOutgoingSpec(DamageEffectClass, 1.0f, SourceASC->MakeEffectContext());

@@ -66,20 +66,6 @@ void UGA_UltimateSkill::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
-
-	// 1. (C++ 역할 1) "궁극기 사용 중" 상태 GE 적용
-	if (UltimateStateEffectClass)
-	{
-		UAbilitySystemComponent* SourceASC = ActorInfo->AbilitySystemComponent.Get();
-		FGameplayEffectContextHandle ContextHandle = SourceASC->MakeEffectContext();
-
-		FGameplayEffectSpecHandle SpecHandle = SourceASC->MakeOutgoingSpec(UltimateStateEffectClass, 1.0f, ContextHandle);
-		if (SpecHandle.IsValid())
-		{
-			UltimateStateEffectHandle = SourceASC->ApplyGameplayEffectSpecToSelf(*SpecHandle.Data.Get());
-		}
-	}
-
 	// 2. (C++ 역할 2) 스택 리셋
 	PS->ResetUltimateCharge();
 
@@ -96,15 +82,6 @@ void UGA_UltimateSkill::OnMontageEnded()
 /** 어빌리티가 종료될 때 (성공, 취소, 중단 모두 포함) */
 void UGA_UltimateSkill::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
 {
-	// 1. 상태 GE 제거
-	if (UltimateStateEffectHandle.IsValid())
-	{
-		if (ActorInfo && ActorInfo->AbilitySystemComponent.IsValid())
-		{
-			ActorInfo->AbilitySystemComponent->RemoveActiveGameplayEffect(UltimateStateEffectHandle);
-		}
-	}
-
 	// 2. (필수) 부모의 EndAbility를 호출하여 어빌리티를 완전히 종료합니다.
 	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }

@@ -30,6 +30,13 @@ protected:
 
 	/** 어빌리티 종료 시 (C++ 부모의 EndAbility 호출 전 실행됨) */
 	virtual void EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled) override;
+	
+	/** 적용된 상태 GE 핸들 (나중에 제거하기 위해 저장) */
+	FActiveGameplayEffectHandle UltimateStateEffectHandle;
+
+	/** (에디터에서 설정) 캐릭터에게 'State.Player.IsUsingUltimate' 태그를 부여할 GE (GE_State_IsUsingUltimate) */
+	UPROPERTY(EditDefaultsOnly, Category = "GAS")
+	TSubclassOf<UGameplayEffect> UltimateStateEffectClass;
 
 	/** 몽타주가 '성공적으로' 종료되었을 때 호출될 콜백 함수 */
 	UFUNCTION()
