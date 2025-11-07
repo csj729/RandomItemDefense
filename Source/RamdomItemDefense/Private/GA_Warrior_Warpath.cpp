@@ -12,7 +12,9 @@
 #include "Kismet/GameplayStatics.h"
 #include "AbilitySystemBlueprintLibrary.h"
 #include "Kismet/KismetSystemLibrary.h"
-#include "Particles/ParticleSystemComponent.h" // 추가: UParticleSystemComponent 헤더
+#include "Particles/ParticleSystemComponent.h"
+#include "NiagaraComponent.h"
+#include "NiagaraFunctionLibrary.h"
 #include "Abilities/Tasks/AbilityTask_WaitGameplayEffectRemoved.h" // 추가: GE 제거 태스크 헤더
 
 UGA_Warrior_Warpath::UGA_Warrior_Warpath()
@@ -74,14 +76,15 @@ void UGA_Warrior_Warpath::ActivateAbility(const FGameplayAbilitySpecHandle Handl
 				// 4-2. 지속 이펙트 스폰
 				if (BuffEffect)
 				{
-					BuffEffectComponent = UGameplayStatics::SpawnEmitterAttached(
+					BuffEffectComponent = UNiagaraFunctionLibrary::SpawnSystemAttached(
 						BuffEffect,
 						OwnerCharacter->GetMesh(),
 						BuffEffectAttachSocketName,
 						FVector::ZeroVector,
 						FRotator::ZeroRotator,
 						EAttachLocation::SnapToTarget,
-						true
+						true, // bAutoDestroy
+						true  // bAutoActivate
 					);
 				}
 

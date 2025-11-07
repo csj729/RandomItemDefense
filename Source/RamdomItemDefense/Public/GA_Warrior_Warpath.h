@@ -9,6 +9,8 @@
 class UGameplayEffect;
 class UParticleSystem;
 class UParticleSystemComponent;
+class UNiagaraSystem;
+class UNiagaraComponent;
 
 /**
  * 전사 궁극기: 전쟁의 길
@@ -60,7 +62,7 @@ protected:
 
 	/** (BP 설정) 버프가 지속되는 동안 캐릭터에 Attach할 '지속' 이펙트 */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Config|FX")
-	TObjectPtr<UParticleSystem> BuffEffect;
+	TObjectPtr<UNiagaraSystem> BuffEffect;
 
 	/** (BP 설정) 지속 이펙트를 Attach할 소켓 이름 (예: "Root") */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Config|FX")
@@ -87,5 +89,5 @@ private:
 
 	/** 스폰된 지속 버프 이펙트 컴포넌트 (제거용) */
 	UPROPERTY()
-	UParticleSystemComponent* BuffEffectComponent;
+	TObjectPtr<UNiagaraComponent> BuffEffectComponent;
 };
