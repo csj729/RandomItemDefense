@@ -53,11 +53,10 @@ void UGA_Warrior_GroundSlam::ActivateAbility(const FGameplayAbilitySpecHandle Ha
 
 	// 4. 폭발 중심 위치 (타겟의 현재 위치)
 	FVector ImpactLocation = TriggerEventData->Target.Get()->GetActorLocation();
-	FVector ImpactScale = FVector(ExplosionRadius / 400.f);
 
 	if (ImpactEffect)
 	{
-		UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), ImpactEffect, ImpactLocation, FRotator::ZeroRotator, ImpactScale, true);
+		UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), ImpactEffect, ImpactLocation, FRotator::ZeroRotator, FVector(1.0f), true);
 	}
 
 	// 5. 데미지 계산 (1회)

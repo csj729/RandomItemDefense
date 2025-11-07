@@ -1,47 +1,46 @@
-// Private/GA_Warrior_Shockwave.cpp
+// Private/GA_Soldier_Grenade.cpp
 
-#include "GA_Warrior_Shockwave.h"
+#include "GA_Soldier_Grenade.h"
 #include "RamdomItemDefense.h"
 #include "AbilitySystemComponent.h"
 #include "MyAttributeSet.h"
-#include "RamdomItemDefenseCharacter.h"
 #include "AbilitySystemBlueprintLibrary.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "MonsterBaseCharacter.h"
 #include "RID_DamageStatics.h"
-#include "Kismet/GameplayStatics.h"
+// --- [ ★★★ 수정 ★★★ ] ---
+#include "Kismet/GameplayStatics.h" // NiagaraFunctionLibrary -> GameplayStatics
+#include "Particles/ParticleSystem.h" // 헤더 추가
+// --- [ ★★★ 수정 끝 ★★★ ] ---
 
-UGA_Warrior_Shockwave::UGA_Warrior_Shockwave()
+UGA_Soldier_Grenade::UGA_Soldier_Grenade()
 {
 	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
-	BaseActivationChance = 0.05f; // (임의) 기본 발동 확률 5%
-	ExplosionRadius = 400.0f;
+	BaseActivationChance = 0.15f;
+	ExplosionRadius = 300.0f;
+	ImpactEffectScale = FVector(1.0f);
 
-	// 부모 변수 기본값 설정
-	DamageBase = 150.0f;
-	DamageCoefficient = 1.0f; // 공격력의 100%
+	DamageBase = 50.0f;
+	DamageCoefficient = 0.5f;
 }
 
-void UGA_Warrior_Shockwave::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
+void UGA_Soldier_Grenade::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
 {
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
 
-	// 1. 서버 확인, 타겟 유효성 검사
 	if (!HasAuthority(&ActivationInfo) || !TriggerEventData || !TriggerEventData->Target)
 	{
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
 
-	// 2. GE 클래스 유효성 검사
-	if (!DamageEffectClass || !StunEffectClass)
+	if (!DamageEffectClass || !SlowEffectClass)
 	{
-		UE_LOG(LogRamdomItemDefense, Error, TEXT("GA_Warrior_Shockwave: DamageEffectClass or StunEffectClass is not set in BP!"));
+		UE_LOG(LogRamdomItemDefense, Error, TEXT("GA_Soldier_Grenade: DamageEffectClass or SlowEffectClass is not set in BP!"));
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
 
-	// 3. 시전자 ASC 및 속성셋 가져오기
 	UAbilitySystemComponent* CasterASC = ActorInfo->AbilitySystemComponent.Get();
 	const UMyAttributeSet* AttributeSet = Cast<const UMyAttributeSet>(CasterASC->GetAttributeSet(UMyAttributeSet::StaticClass()));
 
@@ -51,14 +50,18 @@ void UGA_Warrior_Shockwave::ActivateAbility(const FGameplayAbilitySpecHandle Han
 		return;
 	}
 
-	// 4. 폭발 중심 위치 (타겟의 현재 위치)
 	FVector ImpactLocation = TriggerEventData->Target.Get()->GetActorLocation();
+
+	// --- [ ★★★ 수정 ★★★ ] ---
+	// 이펙트 스폰 (캐스케이드)
 	if (ImpactEffect)
 	{
-		UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), ImpactEffect, ImpactLocation, FRotator::ZeroRotator, FVector(1.0f), true);
+		// UNiagaraFunctionLibrary::SpawnSystemAtLocation -> UGameplayStatics::SpawnEmitterAtLocation
+		UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), ImpactEffect, ImpactLocation, FRotator::ZeroRotator, ImpactEffectScale, true);
 	}
+	// --- [ ★★★ 수정 끝 ★★★ ] ---
 
-	// 5. 데미지 계산 (1회)
+	// (이하 데미지 및 GE 적용 로직은 동일)
 	const float CasterAttackDamage = AttributeSet->GetAttackDamage();
 	const float BaseDamage = DamageBase + (CasterAttackDamage * DamageCoefficient);
 	const bool bDidCrit = URID_DamageStatics::CheckForCrit(CasterASC, true);
@@ -68,7 +71,6 @@ void UGA_Warrior_Shockwave::ActivateAbility(const FGameplayAbilitySpecHandle Han
 		FinalDamage = BaseDamage * URID_DamageStatics::GetCritMultiplier(CasterASC);
 	}
 
-	// 6. 데미지 Spec 생성 (1회)
 	FGameplayEffectContextHandle ContextHandle = MakeEffectContext(Handle, ActorInfo);
 	FGameplayEffectSpecHandle DamageSpecHandle;
 	if (DamageEffectClass && DamageByCallerTag.IsValid())
@@ -80,16 +82,14 @@ void UGA_Warrior_Shockwave::ActivateAbility(const FGameplayAbilitySpecHandle Han
 		}
 	}
 
-	// 7. 범위 내 몬스터 탐색
 	TArray<AActor*> OverlappedActors;
 	TArray<TEnumAsByte<EObjectTypeQuery>> ObjectTypes;
 	ObjectTypes.Add(UEngineTypes::ConvertToObjectType(ECollisionChannel::ECC_Pawn));
 	UKismetSystemLibrary::SphereOverlapActors(GetWorld(), ImpactLocation, ExplosionRadius, ObjectTypes, AMonsterBaseCharacter::StaticClass(), {}, OverlappedActors);
 
-	RID_LOG(FColor::Cyan, TEXT("GA_Warrior_Shockwave Exploded! Damage: %.1f (Crit: %s), Hit %d monsters."), FinalDamage, bDidCrit ? TEXT("YES") : TEXT("NO"), OverlappedActors.Num());
+	RID_LOG(FColor::Cyan, TEXT("GA_Soldier_Grenade Exploded! Damage: %.1f (Crit: %s), Hit %d monsters."), FinalDamage, bDidCrit ? TEXT("YES") : TEXT("NO"), OverlappedActors.Num());
 
-	// 8. 찾은 몬스터들에게 GE 적용
-	UGameplayEffect* StunEffect = StunEffectClass->GetDefaultObject<UGameplayEffect>();
+	UGameplayEffect* SlowEffect = SlowEffectClass->GetDefaultObject<UGameplayEffect>();
 
 	for (AActor* TargetActor : OverlappedActors)
 	{
@@ -99,27 +99,12 @@ void UGA_Warrior_Shockwave::ActivateAbility(const FGameplayAbilitySpecHandle Han
 			UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Monster);
 			if (TargetASC)
 			{
-				// [적용 1] 데미지
-				if (DamageSpecHandle.IsValid())
-				{
-					TargetASC->ApplyGameplayEffectSpecToSelf(*DamageSpecHandle.Data.Get());
-				}
-
-				// [적용 2] 치명타 텍스트
-				if (bDidCrit)
-				{
-					URID_DamageStatics::OnCritDamageOccurred.Broadcast(Monster, FinalDamage);
-				}
-
-				// [적용 3] 스턴
-				if (StunEffect)
-				{
-					TargetASC->ApplyGameplayEffectToSelf(StunEffect, 1.0f, ContextHandle);
-				}
+				if (DamageSpecHandle.IsValid()) TargetASC->ApplyGameplayEffectSpecToSelf(*DamageSpecHandle.Data.Get());
+				if (bDidCrit) URID_DamageStatics::OnCritDamageOccurred.Broadcast(Monster, FinalDamage);
+				if (SlowEffect) TargetASC->ApplyGameplayEffectToSelf(SlowEffect, 1.0f, ContextHandle);
 			}
 		}
 	}
 
-	// 9. 어빌리티 종료
 	EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
 }
