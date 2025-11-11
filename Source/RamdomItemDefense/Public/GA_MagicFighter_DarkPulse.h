@@ -8,13 +8,10 @@
 #include "GA_BaseSkill.h"
 #include "GA_MagicFighter_DarkPulse.generated.h"
 
-// --- [코드 수정] ---
 class UParticleSystem;
 class USoundBase;
-class AProjectileBase; // 통합된 투사체 클래스 전방 선언
-// --- [코드 수정 끝] ---
-
-class UGameplayEffect;
+class AProjectileBase;
+class UGameplayEffect; // [ ★★★ 헤더 추가 ★★★ ]
 
 UCLASS()
 class RAMDOMITEMDEFENSE_API UGA_MagicFighter_DarkPulse : public UGA_BaseSkill
@@ -25,13 +22,11 @@ public:
 	UGA_MagicFighter_DarkPulse();
 
 protected:
-	/** 어빌리티가 실제로 활성화될 때 (Gameplay Event 포함) */
 	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
 
-	// --- [코드 수정] ---
 	/** (블루프린트에서 설정) 스폰할 시각 효과용 투사체 클래스 (BP_Projectile_DarkPulse) */
 	UPROPERTY(EditDefaultsOnly, Category = "Config")
-	TSubclassOf<AProjectileBase> ProjectileClass; // (이름 변경)
+	TSubclassOf<AProjectileBase> ProjectileClass;
 
 	/** (블루프린트에서 설정) 시각적으로 날아가는 투사체 속도 (예: 1500) */
 	UPROPERTY(EditDefaultsOnly, Category = "Config")
@@ -48,7 +43,12 @@ protected:
 	/** (블루프린트에서 설정) 폭발 사운드 */
 	UPROPERTY(EditDefaultsOnly, Category = "Config|FX")
 	TObjectPtr<USoundBase> ExplosionSound;
-	// --- [코드 수정 끝] ---
+
+	// --- [ ★★★ 코드 추가 ★★★ ] ---
+	/** (BP 설정) 이펙트를 스폰할 소켓 이름 (예: "MuzzleSocket") */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Config")
+	FName ProjectileSpawnSocketName;
+	// --- [ ★★★ 코드 추가 끝 ★★★ ] ---
 
 	UPROPERTY(EditDefaultsOnly, Category = "Config|GAS")
 	TSubclassOf<UGameplayEffect> SlowEffectClass;
@@ -60,6 +60,10 @@ private:
 	/** 폭발이 일어날 위치 (타겟의 초기 위치) */
 	UPROPERTY()
 	FVector TargetImpactLocation;
+
+	/** (타이머가 참조할 타겟) */
+	UPROPERTY()
+	TWeakObjectPtr<AActor> TargetActor;
 
 	/**
 	 * @brief 타이머 만료 시 실제 폭발 및 데미지를 적용하는 함수

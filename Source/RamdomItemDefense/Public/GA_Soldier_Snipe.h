@@ -9,10 +9,6 @@
 class UGameplayEffect;
 class AProjectileBase;
 
-/**
- * 솔져 스킬 3: 저격
- * 단일 대상에게 큰 데미지를 주고 3초 스턴을 적용합니다.
- */
 UCLASS()
 class RAMDOMITEMDEFENSE_API UGA_Soldier_Snipe : public UGA_BaseSkill
 {
@@ -35,6 +31,12 @@ protected:
 	/** (BP 설정) 투사체 속도 (타이머 계산용) (예: 10000) */
 	UPROPERTY(EditDefaultsOnly, Category = "Config|Projectile")
 	float VisualProjectileSpeed;
+
+	// --- [ ★★★ 코드 추가 ★★★ ] ---
+	/** (BP 설정) 이펙트를 스폰할 소켓 이름 (예: "MuzzleSocket") */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Config|Projectile")
+	FName ProjectileSpawnSocketName;
+	// --- [ ★★★ 코드 추가 끝 ★★★ ] ---
 
 private:
 	FTimerHandle ImpactTimerHandle;

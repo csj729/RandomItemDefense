@@ -5,10 +5,6 @@
 #include "MyAttributeSet.h" 
 #include "RamdomItemDefense.h"
 #include "GameFramework/Actor.h" 
-// 캐릭터의 GetAttributeSet()에 접근하기 위해 2개의 헤더 추가
-#include "AbilitySystemInterface.h"
-#include "RamdomItemDefenseCharacter.h" 
-
 
 // Static 델리게이트 변수 정의
 FOnCritDamageOccurredDelegate URID_DamageStatics::OnCritDamageOccurred;
@@ -18,18 +14,15 @@ const UMyAttributeSet* URID_DamageStatics::GetAttributeSetFromASC(UAbilitySystem
 {
 	if (!SourceASC) return nullptr;
 
-	// 방법 1: ASC의 소유자(캐릭터)를 통해 직접 AttributeSet 가져오기
-	if (ARamdomItemDefenseCharacter* OwnerCharacter = Cast<ARamdomItemDefenseCharacter>(SourceASC->GetOwnerActor()))
+	// 방법 1: ASC의 GetAttributeSet 함수를 직접 사용 (가장 효율적)
+	const UMyAttributeSet* AttributeSet = Cast<const UMyAttributeSet>(SourceASC->GetAttributeSet(UMyAttributeSet::StaticClass()));
+	if (AttributeSet)
 	{
-		if (OwnerCharacter->GetAttributeSet())
-		{
-			// UE_LOG(LogRamdomItemDefense, Log, TEXT("GetAttributeSetFromASC: Found via GetOwnerActor() method."));
-			return OwnerCharacter->GetAttributeSet();
-		}
+		// UE_LOG(LogRamdomItemDefense, Log, TEXT("GetAttributeSetFromASC: Found via GetAttributeSet() method."));
+		return AttributeSet;
 	}
-	// --- [ ★★★ 수정 ★★★ ] ---
+
 	UE_LOG(LogRamdomItemDefense, Error, TEXT("GetAttributeSetFromASC: FAILED to find UMyAttributeSet using ANY method."));
-	// --- [ ★★★ 수정 끝 ★★★ ] ---
 	return nullptr;
 }
 

@@ -9,13 +9,13 @@
 #include "GameplayEffectTypes.h"
 #include "Kismet/GameplayStatics.h"
 #include "RamdomItemDefense.h" 
-
 #include "Kismet/KismetSystemLibrary.h"
 #include "AbilitySystemBlueprintLibrary.h"
 #include "MonsterBaseCharacter.h"
 #include "DrawDebugHelpers.h"
 #include "GameFramework/ProjectileMovementComponent.h"
 #include "RID_DamageStatics.h" 
+#include "SoldierDrone.h" // [ ★★★ 코드 추가 ★★★ ]
 
 
 UGA_MagicFighter_DarkPulse::UGA_MagicFighter_DarkPulse()
@@ -25,83 +25,86 @@ UGA_MagicFighter_DarkPulse::UGA_MagicFighter_DarkPulse()
 
 	VisualProjectileSpeed = 1500.0f;
 	ExplosionRadius = 300.0f;
+	ProjectileSpawnSocketName = FName("MuzzleSocket"); // [ ★★★ 코드 추가 ★★★ ]
 
-	// --- [ ★★★ 코드 추가 ★★★ ] ---
-	// 부모 클래스의 변수에 기본값 설정
 	DamageBase = 50.f;
-	DamageCoefficient = 0.3f; // (30%)
-	// --- [ ★★★ 코드 추가 끝 ★★★ ] ---
+	DamageCoefficient = 0.3f;
 }
 
 void UGA_MagicFighter_DarkPulse::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
 {
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
 
-	if (!HasAuthority(&ActivationInfo))
+	AActor* AvatarActor = ActorInfo->AvatarActor.Get();
+	UAbilitySystemComponent* SourceASC = ActorInfo->AbilitySystemComponent.Get();
+
+	// 1. 유효성 검사
+	if (!AvatarActor || !SourceASC || !HasAuthority(&ActivationInfo) || !DamageEffectClass || !ProjectileClass || !TriggerEventData || !TriggerEventData->Target)
 	{
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
 
-	if (!DamageEffectClass || !ProjectileClass)
+	TargetActor = const_cast<AActor*>(TriggerEventData->Target.Get());
+	if (!TargetActor.IsValid())
 	{
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
 
-	if (!TriggerEventData || !TriggerEventData->Target)
+	// 2. 스폰 위치/회전 계산
+	TargetImpactLocation = TargetActor->GetActorLocation(); // 폭발 위치 저장
+	FVector SpawnLocation = AvatarActor->GetActorLocation(); // 기본 위치
+
+	USceneComponent* AttachComponent = nullptr;
+	if (ARamdomItemDefenseCharacter* CharacterActor = Cast<ARamdomItemDefenseCharacter>(AvatarActor))
 	{
-		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
-		return;
+		AttachComponent = CharacterActor->GetMesh();
+	}
+	else if (ASoldierDrone* DroneActor = Cast<ASoldierDrone>(AvatarActor))
+	{
+		AttachComponent = DroneActor->GetMesh();
 	}
 
-	ARamdomItemDefenseCharacter* OwnerCharacter = Cast<ARamdomItemDefenseCharacter>(ActorInfo->AvatarActor.Get());
-
-	if (!OwnerCharacter)
+	if (AttachComponent && ProjectileSpawnSocketName != NAME_None && AttachComponent->DoesSocketExist(ProjectileSpawnSocketName))
 	{
-		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
-		return;
+		SpawnLocation = AttachComponent->GetSocketLocation(ProjectileSpawnSocketName);
 	}
 
-	// 3. 시작/끝 위치, 이동 시간 계산
-	const AActor* ConstTargetActor = TriggerEventData->Target;
-	AActor* TargetActor = const_cast<AActor*>(ConstTargetActor);
-	FVector StartLocation = OwnerCharacter->GetActorLocation();
-	TargetImpactLocation = TargetActor->GetActorLocation();
+	// (핵심) 타겟의 현재 위치가 아닌, '미래 폭발 지점'을 향해 발사
+	FRotator SpawnRotation = UKismetMathLibrary::FindLookAtRotation(SpawnLocation, TargetImpactLocation);
 
-	float Distance = FVector::Dist(StartLocation, TargetImpactLocation);
-	float TravelTime = 0.0f;
-	if (VisualProjectileSpeed > 0.0f)
-	{
-		TravelTime = Distance / VisualProjectileSpeed;
-	}
+	// 3. 이동 시간 계산
+	float Distance = FVector::Dist(SpawnLocation, TargetImpactLocation);
+	float TravelTime = (VisualProjectileSpeed > 0.0f) ? FMath::Max(0.01f, Distance / VisualProjectileSpeed) : 0.01f;
 
 	// 4. "날아가는" 이펙트 스폰 
-	if (ProjectileClass)
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.Owner = AvatarActor;
+	SpawnParams.Instigator = Cast<APawn>(AvatarActor);
+	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+	AProjectileBase* VisualProjectile = GetWorld()->SpawnActorDeferred<AProjectileBase>(
+		ProjectileClass,
+		FTransform(SpawnRotation, SpawnLocation),
+		SpawnParams.Owner,
+		SpawnParams.Instigator,
+		SpawnParams.SpawnCollisionHandlingOverride
+	);
+
+	if (VisualProjectile)
 	{
-		FRotator SpawnRotation = UKismetMathLibrary::FindLookAtRotation(StartLocation, TargetImpactLocation);
-		FActorSpawnParameters SpawnParams;
-		SpawnParams.Owner = OwnerCharacter;
-		SpawnParams.Instigator = OwnerCharacter;
-		SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-
-		AProjectileBase* VisualProjectile = GetWorld()->SpawnActorDeferred<AProjectileBase>(
-			ProjectileClass,
-			FTransform(SpawnRotation, StartLocation),
-			OwnerCharacter,
-			OwnerCharacter,
-			SpawnParams.SpawnCollisionHandlingOverride
-		);
-
-		if (VisualProjectile)
+		if (VisualProjectile->ProjectileMovement)
 		{
-			if (VisualProjectile->ProjectileMovement)
-			{
-				VisualProjectile->ProjectileMovement->HomingTargetComponent = TargetActor->GetRootComponent();
-			}
-
-			UGameplayStatics::FinishSpawningActor(VisualProjectile, FTransform(SpawnRotation, StartLocation));
+			// (수정) DarkPulse는 타겟이 아닌 '지점'으로 가야 하므로 유도를 끄거나,
+			// HomingTarget을 타겟 액터로 설정합니다. (유도 사용으로 유지)
+			VisualProjectile->ProjectileMovement->HomingTargetComponent = TargetActor->GetRootComponent();
 		}
+
+		// [ ★★★ 빙빙 도는 문제 해결 ★★★ ]
+		VisualProjectile->SetLifeSpan(TravelTime);
+
+		UGameplayStatics::FinishSpawningActor(VisualProjectile, FTransform(SpawnRotation, SpawnLocation));
 	}
 
 	// 5. 이동 시간(TravelTime) 후에 Explode 함수를 호출하도록 타이머 설정
@@ -121,10 +124,9 @@ void UGA_MagicFighter_DarkPulse::Explode()
 	const FGameplayAbilityActorInfo* ActorInfo = GetCurrentActorInfo();
 	FGameplayAbilityActivationInfo ActivationInfo = GetCurrentActivationInfo();
 
-	// 2. 시전자(Caster) ASC 및 AttributeSet 가져오기
+	// 2. 시전자(Caster) ASC 및 AttributeSet 가져오기 (드론/캐릭터 공용)
 	UAbilitySystemComponent* CasterASC = ActorInfo->AbilitySystemComponent.Get();
-	ARamdomItemDefenseCharacter* OwnerCharacter = Cast<ARamdomItemDefenseCharacter>(ActorInfo->AvatarActor.Get());
-	const UMyAttributeSet* AttributeSet = OwnerCharacter ? OwnerCharacter->GetAttributeSet() : nullptr;
+	const UMyAttributeSet* AttributeSet = CasterASC ? Cast<const UMyAttributeSet>(CasterASC->GetAttributeSet(UMyAttributeSet::StaticClass())) : nullptr;
 
 	if (!CasterASC || !AttributeSet)
 	{
@@ -136,17 +138,10 @@ void UGA_MagicFighter_DarkPulse::Explode()
 	if (ExplosionEffect) UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), ExplosionEffect, TargetImpactLocation);
 	if (ExplosionSound) UGameplayStatics::PlaySoundAtLocation(this, ExplosionSound, TargetImpactLocation);
 
-	// --- [ ★★★ 코드 수정 ★★★ ] ---
-	// 4. 데미지 계산 (부모 변수 사용)
+	// 4. 데미지 계산
 	const float OwnerAttackDamage = AttributeSet->GetAttackDamage();
-	// 하드코딩된 값 대신 부모의 변수(DamageBase, DamageCoefficient) 사용
 	const float BaseDamage = DamageBase + (OwnerAttackDamage * DamageCoefficient);
-	// --- [ ★★★ 코드 수정 끝 ★★★ ] ---
-
-	// 4-1. 치명타 굴림을 '단 한 번' 수행합니다. (bIsSkillAttack: true)
 	const bool bDidCrit = URID_DamageStatics::CheckForCrit(CasterASC, true);
-
-	// 4-2. 치명타 여부에 따라 '최종 데미지'를 '단 한 번' 계산합니다.
 	float FinalDamage = BaseDamage;
 	if (bDidCrit)
 	{
@@ -162,18 +157,16 @@ void UGA_MagicFighter_DarkPulse::Explode()
 	ObjectTypes.Add(UEngineTypes::ConvertToObjectType(ECollisionChannel::ECC_Pawn));
 	UKismetSystemLibrary::SphereOverlapActors(GetWorld(), TargetImpactLocation, ExplosionRadius, ObjectTypes, AMonsterBaseCharacter::StaticClass(), {}, OverlappedActors);
 
-	RID_LOG(FColor::Cyan, TEXT("GA_DarkPulse Exploded! Damage: %.1f (Crit: %s), Hit %d monsters."), FinalDamage, bDidCrit ? TEXT("YES") : TEXT("NO"), OverlappedActors.Num());
+	UE_LOG(LogRamdomItemDefense, Log, TEXT("GA_DarkPulse Exploded! Damage: %.1f (Crit: %s), Hit %d monsters."), FinalDamage, bDidCrit ? TEXT("YES") : TEXT("NO"), OverlappedActors.Num());
 
 	// 7. 찾은 몬스터들에게 데미지 적용
 	if (DamageByCallerTag.IsValid())
 	{
 		FGameplayEffectContextHandle ContextHandle = MakeEffectContext(Handle, ActorInfo);
-
-		// 7-1. 데미지 GE Spec을 '단 한 번' 생성합니다.
 		FGameplayEffectSpecHandle SpecHandle = CasterASC->MakeOutgoingSpec(DamageEffectClass, 1.0f, ContextHandle);
+
 		if (SpecHandle.IsValid())
 		{
-			// 7-2. Spec에 '최종 데미지'를 '단 한 번' 설정합니다.
 			SpecHandle.Data.Get()->SetSetByCallerMagnitude(DamageByCallerTag, -FinalDamage);
 
 			for (AActor* HitActor : OverlappedActors)
@@ -184,16 +177,16 @@ void UGA_MagicFighter_DarkPulse::Explode()
 				UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(HitMonster);
 				if (TargetASC)
 				{
-					// 7-3. [데미지 적용] 미리 만들어둔 '동일한 Spec'을 모든 타겟에게 적용합니다.
+					// [데미지 적용]
 					CasterASC->ApplyGameplayEffectSpecToTarget(*SpecHandle.Data.Get(), TargetASC);
 
-					// 7-4. [치명타 텍스트] 치명타가 발생했다면, 이 몬스터에게 델리게이트를 방송합니다.
+					// [치명타 텍스트] 
 					if (bDidCrit)
 					{
 						URID_DamageStatics::OnCritDamageOccurred.Broadcast(HitMonster, FinalDamage);
 					}
 
-					// 7-5. [슬로우 효과 적용]
+					// [슬로우 효과 적용]
 					if (SlowEffectClass)
 					{
 						TargetASC->ApplyGameplayEffectToSelf(SlowEffectClass->GetDefaultObject<UGameplayEffect>(), 1.0f, ContextHandle);
@@ -204,7 +197,7 @@ void UGA_MagicFighter_DarkPulse::Explode()
 	}
 	else
 	{
-		RID_LOG(FColor::Red, TEXT("GA_DarkPulse: FAILED (DamageByCallerTag IS INVALID. Check Blueprint!)"));
+		UE_LOG(LogRamdomItemDefense, Error, TEXT("GA_DarkPulse: FAILED (DamageByCallerTag IS INVALID. Check Blueprint!)"));
 	}
 
 	// 8. 어빌리티 종료

@@ -8,27 +8,28 @@
 #include "GameFramework/ProjectileMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetMathLibrary.h"
-
+#include "SoldierDrone.h" // [ ★★★ 코드 추가 ★★★ ]
 
 UGA_Archer_SingleShot::UGA_Archer_SingleShot()
 {
 	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
 	BaseActivationChance = 0.15f;
 	VisualProjectileSpeed = 2500.0f;
+	ProjectileSpawnSocketName = FName("MuzzleSocket"); // [ ★★★ 코드 추가 ★★★ ]
 
-	// --- [ ★★★ 코드 추가 ★★★ ] ---
-	// 부모 클래스의 변수에 기본값 설정
 	DamageBase = 100.0f;
-	DamageCoefficient = 0.8f; // (80%)
-	// --- [ ★★★ 코드 추가 끝 ★★★ ] ---
+	DamageCoefficient = 0.8f;
 }
 
 void UGA_Archer_SingleShot::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
 {
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
 
-	ARamdomItemDefenseCharacter* OwnerCharacter = Cast<ARamdomItemDefenseCharacter>(ActorInfo->AvatarActor.Get());
-	if (!OwnerCharacter || !OwnerCharacter->HasAuthority() || !DamageEffectClass || !ProjectileClass || !TriggerEventData || !TriggerEventData->Target)
+	AActor* AvatarActor = ActorInfo->AvatarActor.Get();
+	UAbilitySystemComponent* SourceASC = ActorInfo->AbilitySystemComponent.Get();
+
+	// 1. 유효성 검사
+	if (!AvatarActor || !SourceASC || !AvatarActor->HasAuthority() || !DamageEffectClass || !ProjectileClass || !TriggerEventData || !TriggerEventData->Target)
 	{
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
@@ -41,24 +42,42 @@ void UGA_Archer_SingleShot::ActivateAbility(const FGameplayAbilitySpecHandle Han
 		return;
 	}
 
-	// 1. 시작/끝 위치, 이동 시간 계산
-	FVector StartLocation = OwnerCharacter->GetActorLocation();
-	FVector EndLocation = TargetActor->GetActorLocation();
-	float Distance = FVector::Dist(StartLocation, EndLocation);
-	float TravelTime = (VisualProjectileSpeed > 0.0f) ? (Distance / VisualProjectileSpeed) : 0.0f;
+	// --- [ ★★★ 스폰 위치/회전 계산 로직 수정 (Snipe와 동일) ★★★ ] ---
+	FVector TargetLocation = TargetActor->GetActorLocation();
+	FVector SpawnLocation = AvatarActor->GetActorLocation();
 
-	// 2. 시각 효과용 투사체 스폰
-	FRotator SpawnRotation = UKismetMathLibrary::FindLookAtRotation(StartLocation, EndLocation);
+	USceneComponent* AttachComponent = nullptr;
+	if (ARamdomItemDefenseCharacter* CharacterActor = Cast<ARamdomItemDefenseCharacter>(AvatarActor))
+	{
+		AttachComponent = CharacterActor->GetMesh();
+	}
+	else if (ASoldierDrone* DroneActor = Cast<ASoldierDrone>(AvatarActor))
+	{
+		AttachComponent = DroneActor->GetMesh();
+	}
+
+	if (AttachComponent && ProjectileSpawnSocketName != NAME_None && AttachComponent->DoesSocketExist(ProjectileSpawnSocketName))
+	{
+		SpawnLocation = AttachComponent->GetSocketLocation(ProjectileSpawnSocketName);
+	}
+
+	FRotator SpawnRotation = UKismetMathLibrary::FindLookAtRotation(SpawnLocation, TargetLocation);
+	// --- [ ★★★ 수정 끝 ★★★ ] ---
+
+
+	float Distance = FVector::Dist(SpawnLocation, TargetLocation);
+	float TravelTime = (VisualProjectileSpeed > 0.0f) ? FMath::Max(0.01f, Distance / VisualProjectileSpeed) : 0.01f;
+
 	FActorSpawnParameters SpawnParams;
-	SpawnParams.Owner = OwnerCharacter;
-	SpawnParams.Instigator = OwnerCharacter;
+	SpawnParams.Owner = AvatarActor;
+	SpawnParams.Instigator = Cast<APawn>(AvatarActor);
 	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
 	AProjectileBase* VisualProjectile = GetWorld()->SpawnActorDeferred<AProjectileBase>(
 		ProjectileClass,
-		FTransform(SpawnRotation, StartLocation),
-		OwnerCharacter,
-		OwnerCharacter,
+		FTransform(SpawnRotation, SpawnLocation),
+		SpawnParams.Owner,
+		SpawnParams.Instigator,
 		SpawnParams.SpawnCollisionHandlingOverride
 	);
 
@@ -66,13 +85,15 @@ void UGA_Archer_SingleShot::ActivateAbility(const FGameplayAbilitySpecHandle Han
 	{
 		if (VisualProjectile->ProjectileMovement)
 		{
-			// 유도 기능 활성화
 			VisualProjectile->ProjectileMovement->HomingTargetComponent = TargetActor->GetRootComponent();
 		}
-		UGameplayStatics::FinishSpawningActor(VisualProjectile, FTransform(SpawnRotation, StartLocation));
+
+		// [ ★★★ 빙빙 도는 문제 해결 ★★★ ]
+		VisualProjectile->SetLifeSpan(TravelTime);
+
+		UGameplayStatics::FinishSpawningActor(VisualProjectile, FTransform(SpawnRotation, SpawnLocation));
 	}
 
-	// 3. 이동 시간(TravelTime) 후에 OnImpact 함수를 호출하도록 타이머 설정
 	GetWorld()->GetTimerManager().SetTimer(
 		ImpactTimerHandle,
 		this,
@@ -89,17 +110,18 @@ void UGA_Archer_SingleShot::OnImpact()
 	const FGameplayAbilityActorInfo* ActorInfo = GetCurrentActorInfo();
 	FGameplayAbilityActivationInfo ActivationInfo = GetCurrentActivationInfo();
 
-	ARamdomItemDefenseCharacter* OwnerCharacter = Cast<ARamdomItemDefenseCharacter>(ActorInfo->AvatarActor.Get());
 	UAbilitySystemComponent* SourceASC = ActorInfo->AbilitySystemComponent.Get();
 
-	if (!OwnerCharacter || !SourceASC || !TargetActor.IsValid())
+	if (!SourceASC || !TargetActor.IsValid())
 	{
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
 
 	UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(TargetActor.Get());
-	const UMyAttributeSet* AttributeSet = OwnerCharacter->GetAttributeSet();
+
+	// [ ★★★ 수정 ★★★ ] (드론/캐릭터 공용)
+	const UMyAttributeSet* AttributeSet = Cast<const UMyAttributeSet>(SourceASC->GetAttributeSet(UMyAttributeSet::StaticClass()));
 
 	if (!TargetASC || !AttributeSet)
 	{
@@ -107,12 +129,8 @@ void UGA_Archer_SingleShot::OnImpact()
 		return;
 	}
 
-	// --- [ ★★★ 코드 수정 ★★★ ] ---
-	// (데미지 계산: 부모 변수 사용)
 	const float OwnerAttackDamage = AttributeSet->GetAttackDamage();
-	// 하드코딩된 값 대신 부모의 변수(DamageBase, DamageCoefficient) 사용
 	const float BaseDamage = DamageBase + (OwnerAttackDamage * DamageCoefficient);
-	// --- [ ★★★ 코드 수정 끝 ★★★ ] ---
 	const float FinalDamage = URID_DamageStatics::ApplyCritDamage(BaseDamage, SourceASC, TargetActor.Get(), true);
 
 	FGameplayEffectSpecHandle DamageSpecHandle = SourceASC->MakeOutgoingSpec(DamageEffectClass, 1.0f, SourceASC->MakeEffectContext());

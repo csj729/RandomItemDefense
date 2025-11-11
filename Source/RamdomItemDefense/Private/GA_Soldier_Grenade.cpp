@@ -71,6 +71,12 @@ void UGA_Soldier_Grenade::ActivateAbility(const FGameplayAbilitySpecHandle Handl
 		FinalDamage = BaseDamage * URID_DamageStatics::GetCritMultiplier(CasterASC);
 	}
 
+	UE_LOG(LogRamdomItemDefense, Warning, TEXT("### DRONE GRENADE (SKILL1) ###: Attacker=[%s] -> Target=[%s], Damage=%.1f"),
+		*GetNameSafe(ActorInfo->AvatarActor.Get()),
+		*GetNameSafe(TriggerEventData->Target),
+		FinalDamage
+	);
+
 	FGameplayEffectContextHandle ContextHandle = MakeEffectContext(Handle, ActorInfo);
 	FGameplayEffectSpecHandle DamageSpecHandle;
 	if (DamageEffectClass && DamageByCallerTag.IsValid())

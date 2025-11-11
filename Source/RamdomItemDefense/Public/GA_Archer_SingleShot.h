@@ -4,9 +4,7 @@
 #include "GA_BaseSkill.h"
 #include "GA_Archer_SingleShot.generated.h"
 
-// --- [코드 수정] ---
-class AProjectileBase; // (이름 변경)
-// --- [코드 수정 끝] ---
+class AProjectileBase;
 class AActor;
 
 UCLASS()
@@ -20,15 +18,19 @@ public:
 protected:
 	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
 
-	// --- [코드 수정] ---
 	/** (BP 설정) 스폰할 시각 효과용 투사체 (예: BP_Projectile_ArcherArrow) */
 	UPROPERTY(EditDefaultsOnly, Category = "Config|Projectile")
-	TSubclassOf<AProjectileBase> ProjectileClass; // (이름 변경)
-	// --- [코드 수정 끝] ---
+	TSubclassOf<AProjectileBase> ProjectileClass;
 
 	/** (BP 설정) 투사체 속도 (타이머 계산용) (예: 2500) */
 	UPROPERTY(EditDefaultsOnly, Category = "Config|Projectile")
 	float VisualProjectileSpeed;
+
+	// --- [ ★★★ 코드 추가 ★★★ ] ---
+	/** (BP 설정) 이펙트를 스폰할 소켓 이름 (예: "MuzzleSocket") */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Config|Projectile")
+	FName ProjectileSpawnSocketName;
+	// --- [ ★★★ 코드 추가 끝 ★★★ ] ---
 
 private:
 	FTimerHandle ImpactTimerHandle;

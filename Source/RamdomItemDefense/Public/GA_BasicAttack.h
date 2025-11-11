@@ -7,6 +7,7 @@
 #include "GA_BasicAttack.generated.h"
 
 class UGameplayEffect;
+class UParticleSystem; // [ ★★★ 코드 추가 ★★★ ]
 
 UCLASS()
 class RAMDOMITEMDEFENSE_API UGA_BasicAttack : public UGameplayAbility
@@ -31,4 +32,14 @@ protected:
 	/** (블루프린트에서 설정) SetByCaller로 데미지 값을 전달할 때 사용할 태그 */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Config")
 	FGameplayTag DamageDataTag;
+
+	// --- [ ★★★ 코드 추가 ★★★ ] ---
+	/** (BP 설정) 공격 시 총구에서 스폰할 파티클 이펙트 (캐스케이드) */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Config|FX")
+	TObjectPtr<UParticleSystem> MuzzleFlashEffect;
+
+	/** (BP 설정) 이펙트를 스폰할 소켓 이름 (예: "MuzzleSocket") */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Config|FX")
+	FName MuzzleSocketName;
+	// --- [ ★★★ 코드 추가 끝 ★★★ ] ---
 };

@@ -25,6 +25,13 @@ public:
 	/** GA_Soldier_DronePassive가 스폰 직후 호출할 함수 */
 	void SetOwnerCharacter(ARamdomItemDefenseCharacter* InOwner);
 
+	// [ ★★★ 코드 추가 ★★★ ]
+	/**
+	 * @brief 이 드론의 스태틱 메쉬 컴포넌트를 반환합니다. (GA에서 이펙트 부착용)
+	 */
+	FORCEINLINE UStaticMeshComponent* GetMesh() const { return Mesh; }
+	// [ ★★★ 코드 추가 끝 ★★★ ]
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaTime) override; // Tick에서 이동을 처리합니다.

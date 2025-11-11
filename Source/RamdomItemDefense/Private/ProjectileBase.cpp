@@ -1,4 +1,4 @@
-// Source/RamdomItemDefense/Private/ProjectileBase.cpp (새 파일)
+// Source/RamdomItemDefense/Private/ProjectileBase.cpp (수정)
 
 #include "ProjectileBase.h"
 #include "Components/SphereComponent.h"
@@ -9,42 +9,46 @@
 
 AProjectileBase::AProjectileBase()
 {
-	PrimaryActorTick.bCanEverTick = true; // Tick 함수 활성화 (도착 감지용)
+	// [ ★★★ 수정 ★★★ ]
+	// Tick 함수를 사용하지 않습니다.
+	PrimaryActorTick.bCanEverTick = false;
 
-	InitialLifeSpan = 5.0f; // 5초 뒤 자동 파괴
-	ArrivalTolerance = 50.0f; // 도착 허용 오차
+	// [ ★★★ 제거 ★★★ ]
+	// (GA가 수명을 설정할 것이므로 기본 수명 5초를 제거합니다)
+	// InitialLifeSpan = 5.0f; 
+	// (Tick을 안하므로 도착 반경도 제거합니다)
+	// ArrivalTolerance = 50.0f; 
 
 	SphereComponent = CreateDefaultSubobject<USphereComponent>(TEXT("SphereComponent"));
 	RootComponent = SphereComponent;
-	SphereComponent->SetCollisionProfileName(TEXT("NoCollision")); // 충돌 없음
-	SphereComponent->SetGenerateOverlapEvents(false); // 오버랩 없음
+	SphereComponent->SetCollisionProfileName(TEXT("NoCollision"));
+	SphereComponent->SetGenerateOverlapEvents(false);
 
 	TrailEffect = CreateDefaultSubobject<UParticleSystemComponent>(TEXT("TrailEffect"));
 	TrailEffect->SetupAttachment(RootComponent);
 
 	ProjectileMovement = CreateDefaultSubobject<UProjectileMovementComponent>(TEXT("ProjectileMovement"));
 	ProjectileMovement->UpdatedComponent = RootComponent;
-	ProjectileMovement->InitialSpeed = 3000.f; // (이 값은 GA의 VisualProjectileSpeed와 일치시키는 것이 좋음)
+	ProjectileMovement->InitialSpeed = 3000.f;
 	ProjectileMovement->MaxSpeed = 3000.f;
 	ProjectileMovement->bRotationFollowsVelocity = true;
-	ProjectileMovement->bShouldBounce = false; // 튕기지 않음
-	ProjectileMovement->ProjectileGravityScale = 0.0f; // 중력 없음
+	ProjectileMovement->bShouldBounce = false;
+	ProjectileMovement->ProjectileGravityScale = 0.0f;
 
-	ProjectileMovement->bIsHomingProjectile = true; // 유도탄
+	ProjectileMovement->bIsHomingProjectile = true;
 	ProjectileMovement->HomingAccelerationMagnitude = 10000.0f;
 }
 void AProjectileBase::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// (만약 GA가 HomingTargetComponent를 설정해 주지 않았다면 여기서 Destroy)
+	// (이 로직은 유효하므로 그대로 둡니다)
 	if (ProjectileMovement && !ProjectileMovement->HomingTargetComponent.IsValid())
 	{
-		// 1초 뒤에 다시 확인 (GA가 스폰 직후 설정할 시간을 줌)
 		GetWorld()->GetTimerManager().SetTimerForNextTick([this]() {
 			if (ProjectileMovement && !ProjectileMovement->HomingTargetComponent.IsValid())
 			{
-				Destroy(); // 여전히 타겟이 없으면 파괴
+				Destroy();
 			}
 			});
 	}
@@ -52,28 +56,5 @@ void AProjectileBase::BeginPlay()
 
 void AProjectileBase::Tick(float DeltaTime)
 {
-	Super::Tick(DeltaTime);
 
-	// 데미지 로직/폭발 로직 모두 제거
-	// 오직 타겟에 '도착'했는지 여부만 확인하여 스스로 파괴
-
-	if (!ProjectileMovement || !ProjectileMovement->HomingTargetComponent.IsValid())
-	{
-		return; // 타겟이 없으면 아무것도 안 함
-	}
-
-	// 이동을 시작했고,
-	if (ProjectileMovement->Velocity.SizeSquared() > KINDA_SMALL_NUMBER)
-	{
-		// 거리가 도착 허용 오차(ArrivalTolerance)보다 가까워지면
-		const float DistanceToTarget = FVector::Dist(GetActorLocation(), ProjectileMovement->HomingTargetComponent->GetComponentLocation());
-		if (DistanceToTarget <= ArrivalTolerance)
-		{
-			// "폭발" 대신 "스스로 파괴"
-			// (폭발 이펙트는 GA가 타이머로 별도 실행)
-			TrailEffect->Deactivate(); // 꼬리 이펙트 끄기
-			SetLifeSpan(0.1f);         // 즉시 파괴
-			ProjectileMovement->StopMovementImmediately();
-		}
-	}
 }
