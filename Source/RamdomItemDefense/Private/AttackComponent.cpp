@@ -1,4 +1,4 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+// Private/AttackComponent.cpp (수정)
 
 #include "AttackComponent.h"
 #include "RamdomItemDefenseCharacter.h"
@@ -12,33 +12,46 @@
 #include "AbilitySystemBlueprintLibrary.h"
 #include "Engine/Engine.h"
 #include "MyPlayerState.h"
-#include "RamdomItemDefense.h" // RID_LOG 매크로용
+#include "RamdomItemDefense.h" 
 
 UAttackComponent::UAttackComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
+	OwnerCharacter = nullptr; // nullptr로 명시적 초기화
 }
 
 void UAttackComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
+	// (수정) 오너가 캐릭터인 경우에만 기존 방식대로 자동 초기화
 	OwnerCharacter = Cast<ARamdomItemDefenseCharacter>(GetOwner());
 	if (OwnerCharacter)
 	{
-		AbilitySystemComponent = OwnerCharacter->GetAbilitySystemComponent();
-		AttributeSet = OwnerCharacter->GetAttributeSet();
+		// 캐릭터의 BeginPlay에서 호출되므로, 캐릭터의 ASC와 AttributeSet을 사용해 즉시 초기화
+		Initialize(OwnerCharacter->GetAbilitySystemComponent(), OwnerCharacter->GetAttributeSet());
+	}
+	// (오너가 드론인 경우, 드론의 BeginPlay에서 수동으로 Initialize()를 호출할 때까지 대기)
+}
 
-		// AbilitySystemComponent가 유효하다면, 공격 속성 변경에 대한 델리게이트를 바인딩합니다.
-		if (AbilitySystemComponent)
-		{
-			// UMyAttributeSet 클래스에 GetAttackSpeedAttribute() static 함수가 구현되어 있어야 합니다. (ATTRIBUTE_ACCESSORS 매크로가 처리)
-			AbilitySystemComponent->GetGameplayAttributeValueChangeDelegate(UMyAttributeSet::GetAttackSpeedAttribute()).AddUObject(this, &UAttackComponent::OnAttackSpeedChanged);
-		}
+/**
+ * @brief (새 함수) ASC와 AttributeSet을 받아 컴포넌트를 초기화하고 타이머를 시작합니다.
+ */
+void UAttackComponent::Initialize(UAbilitySystemComponent* InASC, const UMyAttributeSet* InAttributeSet)
+{
+	// 1. ASC와 AttributeSet 캐시
+	AbilitySystemComponent = InASC;
+	AttributeSet = InAttributeSet;
+
+	// 2. 델리게이트 바인딩 (기존 BeginPlay 로직)
+	if (AbilitySystemComponent)
+	{
+		AbilitySystemComponent->GetGameplayAttributeValueChangeDelegate(UMyAttributeSet::GetAttackSpeedAttribute()).AddUObject(this, &UAttackComponent::OnAttackSpeedChanged);
 	}
 
-	// 서버에서만 타이머를 설정하도록 합니다.
-	if (GetOwner()->HasAuthority() && AttributeSet)
+	// 3. 타이머 설정 (기존 BeginPlay 로직)
+	// (수정) GetOwner() (즉, 드론 또는 캐릭터)의 권한 확인
+	if (GetOwner() && GetOwner()->HasAuthority() && AttributeSet)
 	{
 		const float CurrentAttackSpeed = AttributeSet->GetAttackSpeed();
 		const float TimerInterval = CurrentAttackSpeed > 0 ? 1.0f / CurrentAttackSpeed : 1.0f;
@@ -52,7 +65,7 @@ void UAttackComponent::OnAttackSpeedChanged(const FOnAttributeChangeData& Data)
 {
 	const float NewAttackSpeed = Data.NewValue;
 
-	// 타이머 재설정을 서버에서만 수행합니다.
+	// (수정) GetOwner()의 권한 확인
 	if (GetOwner() && GetOwner()->HasAuthority())
 	{
 		// 기존 타이머를 제거합니다.
@@ -65,34 +78,31 @@ void UAttackComponent::OnAttackSpeedChanged(const FOnAttributeChangeData& Data)
 			GetWorld()->GetTimerManager().SetTimer(PerformAttackTimerHandle, this, &UAttackComponent::PerformAttack, NewInterval, true);
 		}
 
-		// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
 		RID_LOG(FColor::Green, TEXT("AttackSpeed changed to: %.2f. Timer rescheduled."), NewAttackSpeed);
-		// -----------------------------------------
 	}
 }
 
 void UAttackComponent::OrderAttack(AActor* Target)
 {
-	if (!Target || !OwnerCharacter || !OwnerCharacter->HasAuthority())
+	if (!Target || !GetOwner() || !GetOwner()->HasAuthority())
 	{
 		return;
 	}
 
-	AController* MyController = OwnerCharacter->GetController();
-	if (!MyController)
-	{
-		return;
-	}
+	// (수정) 오너가 Pawn일 때만 Controller 로직 수행
+	APawn* OwnerPawn = Cast<APawn>(GetOwner());
+	AController* MyController = OwnerPawn ? OwnerPawn->GetController() : nullptr;
 
-	// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
 	RID_LOG(FColor::Cyan, TEXT("OrderAttack received for Target(%s). Setting as ManualTarget."), *Target->GetName());
-	// -----------------------------------------
 
 	ManualTarget = Target;
 	AutoTarget = nullptr;
 	PendingManualTarget = nullptr;
 
-	MyController->StopMovement();
+	if (MyController)
+	{
+		MyController->StopMovement();
+	}
 }
 
 void UAttackComponent::ClearAllTargets()
@@ -104,13 +114,14 @@ void UAttackComponent::ClearAllTargets()
 
 void UAttackComponent::FindTarget()
 {
-	if (ManualTarget || PendingManualTarget || !OwnerCharacter)
+	if (ManualTarget || PendingManualTarget)
 	{
 		AutoTarget = nullptr;
 		return;
 	}
 
-	if (!AttributeSet) return;
+	AActor* MyOwner = GetOwner();
+	if (!MyOwner || !AttributeSet) return;
 
 	const float CurrentAttackRange = AttributeSet->GetAttackRange();
 
@@ -120,7 +131,7 @@ void UAttackComponent::FindTarget()
 
 	UKismetSystemLibrary::SphereOverlapActors(
 		GetOwner(),
-		OwnerCharacter->GetActorLocation(),
+		MyOwner->GetActorLocation(), // OwnerCharacter -> MyOwner
 		CurrentAttackRange,
 		ObjectTypes,
 		AMonsterBaseCharacter::StaticClass(),
@@ -136,10 +147,10 @@ void UAttackComponent::FindTarget()
 		AMonsterBaseCharacter* Monster = Cast<AMonsterBaseCharacter>(Actor);
 		if (Monster && Monster->IsDying())
 		{
-			continue; // 죽어가는 몬스터는 타겟 목록에서 제외합니다.
+			continue;
 		}
 
-		float Distance = OwnerCharacter->GetDistanceTo(Actor);
+		float Distance = MyOwner->GetDistanceTo(Actor); // OwnerCharacter -> MyOwner
 		if (Distance < MinDistance)
 		{
 			MinDistance = Distance;
@@ -151,11 +162,12 @@ void UAttackComponent::FindTarget()
 
 void UAttackComponent::PerformAttack()
 {
-	if (!OwnerCharacter || !OwnerCharacter->HasAuthority()) return;
+	AActor* MyOwner = GetOwner();
+	if (!MyOwner || !MyOwner->HasAuthority()) return;
 
+	// (수정) 드론은 궁극기가 없지만, 코드는 호환성을 위해 유지 (ASC가 태그를 가질 수 있으므로)
 	if (AbilitySystemComponent && AbilitySystemComponent->HasMatchingGameplayTag(FGameplayTag::RequestGameplayTag(FName("State.Player.IsUsingUltimate"))))
 	{
-		// 궁극기 사용 중이므로, 기본 공격(PerformAttack)을 실행하지 않고 건너뜁니다.
 		UE_LOG(LogTemp, Warning, TEXT("Using Ultimate"));
 		return;
 	}
@@ -164,40 +176,36 @@ void UAttackComponent::PerformAttack()
 
 	if (TargetToAttack)
 	{
-		// 공격 직전, 타겟이 몬스터이고 죽어가는 상태인지 마지막으로 확인합니다.
+		// 공격 직전, 타겟이 몬스터이고 죽어가는 상태인지 마지막으로 확인
 		AMonsterBaseCharacter* TargetMonster = Cast<AMonsterBaseCharacter>(TargetToAttack);
 		if (TargetMonster && TargetMonster->IsDying())
 		{
-			// 타겟이 죽었다면, 더 이상 공격하지 않도록 타겟을 해제합니다.
-			if (TargetToAttack == ManualTarget)
-			{
-				ManualTarget = nullptr;
-			}
+			if (TargetToAttack == ManualTarget) ManualTarget = nullptr;
 			AutoTarget = nullptr;
-			return; // 공격 로직을 즉시 중단합니다.
+			return;
 		}
 
 		if (!AttributeSet)
 		{
-			// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
 			RID_LOG(FColor::Red, TEXT("ERROR: AttributeSet is NULL!"));
-			// -----------------------------------------
 			return;
 		}
 
 		const float CurrentAttackRange = AttributeSet->GetAttackRange();
-		const float DistanceToTarget = OwnerCharacter->GetDistanceTo(TargetToAttack);
+		const float DistanceToTarget = MyOwner->GetDistanceTo(TargetToAttack); // OwnerCharacter -> MyOwner
 
-		AController* MyController = OwnerCharacter->GetController();
-		if (!MyController) return;
+		// (수정) 오너가 Pawn일 때만 Controller/Movement 로직 수행
+		APawn* OwnerPawn = Cast<APawn>(MyOwner);
+		AController* MyController = OwnerPawn ? OwnerPawn->GetController() : nullptr;
 
 		if (DistanceToTarget > CurrentAttackRange)
 		{
-			if (TargetToAttack == ManualTarget)
+			// (수정) 수동 타겟이고 + 컨트롤러가 있고 + 오너가 캐릭터일 때만 이동
+			if (TargetToAttack == ManualTarget && MyController && OwnerCharacter)
 			{
 				const float AttackRangeBuffer = 50.0f;
 				const float TargetDistance = FMath::Max(0.0f, CurrentAttackRange - AttackRangeBuffer);
-				const FVector MyLocation = OwnerCharacter->GetActorLocation();
+				const FVector MyLocation = MyOwner->GetActorLocation();
 				const FVector TargetLocation = TargetToAttack->GetActorLocation();
 				const FVector Direction = (TargetLocation - MyLocation).GetSafeNormal();
 				const FVector Destination = TargetLocation - (Direction * TargetDistance);
@@ -205,51 +213,53 @@ void UAttackComponent::PerformAttack()
 			}
 			else
 			{
-				AutoTarget = nullptr;
+				AutoTarget = nullptr; // 드론은 사거리 밖이면 타겟 해제
 			}
 			return;
 		}
 		else
 		{
-			MyController->StopMovement();
-
-			if (OwnerCharacter->GetVelocity().Size() > 1.0f)
+			if (MyController) // 컨트롤러가 있다면 (캐릭터의 경우)
 			{
-				return;
+				MyController->StopMovement();
 			}
 
-			FRotator LookAtRotation = UKismetMathLibrary::FindLookAtRotation(OwnerCharacter->GetActorLocation(), TargetToAttack->GetActorLocation());
-			OwnerCharacter->SetActorRotation(FRotator(0.f, LookAtRotation.Yaw, 0.f));
-
-			// 1. 캐릭터에서 '단일' 몽타주가 아닌 '랜덤' 몽타주를 가져옵니다.
-			UAnimMontage* MontageToPlay = OwnerCharacter->GetRandomAttackMontage();
-
-			if (MontageToPlay)
+			// (수정) 오너가 캐릭터(OwnerCharacter)일 때만 Velocity/Montage/회전 로직 수행
+			if (OwnerCharacter)
 			{
-				// 2. 서버에서 몽타주를 재생합니다.
-				OwnerCharacter->PlayAnimMontage(MontageToPlay);
+				if (OwnerCharacter->GetVelocity().Size() > 1.0f)
+				{
+					return; // 아직 이동 중이면 공격 안 함
+				}
+
+				FRotator LookAtRotation = UKismetMathLibrary::FindLookAtRotation(OwnerCharacter->GetActorLocation(), TargetToAttack->GetActorLocation());
+				OwnerCharacter->SetActorRotation(FRotator(0.f, LookAtRotation.Yaw, 0.f));
+
+				UAnimMontage* MontageToPlay = OwnerCharacter->GetRandomAttackMontage();
+				if (MontageToPlay)
+				{
+					OwnerCharacter->PlayAnimMontage(MontageToPlay);
+				}
 			}
+			// (드론은 위 로직을 건너뛰고 바로 이벤트 전송)
+			// (드론의 회전은 드론의 Tick에서 이미 처리 중)
 
 			if (AbilitySystemComponent)
 			{
 				FGameplayEventData Payload;
 				Payload.Target = TargetToAttack;
 				FGameplayTag EventTag = FGameplayTag::RequestGameplayTag(FName("Event.Attack.Perform"));
-				UAbilitySystemBlueprintLibrary::SendGameplayEventToActor(OwnerCharacter, EventTag, Payload);
+				UAbilitySystemBlueprintLibrary::SendGameplayEventToActor(MyOwner, EventTag, Payload); // OwnerCharacter -> MyOwner
 
+				// (수정) 오너가 캐릭터(OwnerCharacter)일 때만 궁극기 스택 추가
 				if (OwnerCharacter)
 				{
-					// 이 공격이 성공했으므로 PlayerState에 스택 1 추가
 					AMyPlayerState* PS = OwnerCharacter->GetPlayerState<AMyPlayerState>();
 					if (PS)
 					{
-						// (서버 전용 함수 호출)
 						PS->AddUltimateCharge(1);
 					}
 				}
-				// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
-				//RID_LOG(FColor::Yellow, TEXT("Attacking -> %s"), *TargetToAttack->GetName());
-				// -----------------------------------------
 			}
 		}
 	}

@@ -25,9 +25,6 @@ protected:
 	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
 	virtual void EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled) override;
 
-	UPROPERTY(EditDefaultsOnly, Category = "GAS")
-	TSubclassOf<UGameplayEffect> UltimateStateEffectClass;
-
 	UPROPERTY(EditDefaultsOnly, Category = "Config|GAS")
 	TSubclassOf<UGameplayEffect> AllOutWarBuffEffectClass;
 
@@ -42,23 +39,14 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Config|FX")
 	FName BuffEffectAttachSocketName;
 
-	// --- [ ★★★ 추가 ★★★ ] ---
 	/** (BP 설정) 지속 이펙트의 스케일 (크기) */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Config|FX")
 	FVector BuffEffectScale;
-	// --- [ ★★★ 추가 끝 ★★★ ] ---
 
 private:
 	UFUNCTION()
-	void OnMontageFinished();
-
-	UFUNCTION()
-	void OnMontageCancelled();
-
-	UFUNCTION()
 	void OnBuffEffectRemoved(const FGameplayEffectRemovalInfo& EffectRemovalInfo);
 
-	FActiveGameplayEffectHandle UltimateStateEffectHandle;
 	FActiveGameplayEffectHandle UltimateBuffEffectHandle;
 
 	UPROPERTY()
