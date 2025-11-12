@@ -249,13 +249,21 @@ void UGA_MagicFighter_BlackHole::CheckEndAbility()
 }
 
 
-/** 어빌리티가 강제 종료(취소)될 때 (타이머 정리용) */
 void UGA_MagicFighter_BlackHole::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
 {
 	// 1. (정리) 혹시라도 타이머가 돌고 있었다면 강제 중지
 	GetWorld()->GetTimerManager().ClearTimer(PullTimerHandle);
 	GetWorld()->GetTimerManager().ClearTimer(PullDurationTimerHandle);
 
-	// 2. (필수!) C++ 부모의 EndAbility를 호출 (태그 제거)
+	// --- [ ★★★ 코드 추가 ★★★ ] ---
+	// 2. (정리) 이 어빌리티가 적용했던 '궁극기 사용 중' 상태 GE를 제거합니다.
+	// (이것을 하지 않으면 AttackComponent가 계속 공격을 차단합니다)
+	if (UltimateStateEffectHandle.IsValid() && ActorInfo && ActorInfo->AbilitySystemComponent.IsValid())
+	{
+		ActorInfo->AbilitySystemComponent->RemoveActiveGameplayEffect(UltimateStateEffectHandle);
+	}
+	// --- [ ★★★ 코드 추가 끝 ★★★ ] ---
+
+	// 3. (필수!) C++ 부모의 EndAbility를 호출 (태그 제거)
 	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }

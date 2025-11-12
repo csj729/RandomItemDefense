@@ -1,80 +1,36 @@
-// Source/RamdomItemDefense/Private/GA_BasicAttack.cpp
+// Source/RamdomItemDefense/Private/GA_BasicAttack.cpp (수정)
 
 #include "GA_BasicAttack.h"
 #include "AbilitySystemComponent.h"
-#include "MyAttributeSet.h" 
-#include "RamdomItemDefenseCharacter.h" 
-#include "GameplayEffectTypes.h" 
-#include "AbilitySystemBlueprintLibrary.h" 
+#include "MyAttributeSet.h" // MyAttributeSet 헤더 포함
+#include "RamdomItemDefenseCharacter.h" // 캐릭터 헤더 포함 (AttributeSet 가져오기 위해)
+#include "GameplayEffectTypes.h" // FGameplayEventData 사용
+#include "AbilitySystemBlueprintLibrary.h" // GetAbilitySystemComponent 사용
 #include "RID_DamageStatics.h"
-#include "RamdomItemDefense.h" 
-#include "SoldierDrone.h" // [ ★★★ 포함 필수 ★★★ ] (드론 캐스팅용)
-#include "Kismet/GameplayStatics.h" // [ ★★★ 포함 필수 ★★★ ] (이펙트 스폰용)
-#include "GameFramework/Character.h" // [ ★★★ 포함 필수 ★★★ ] (캐릭터 캐스팅용)
-
+#include "RamdomItemDefense.h" // 로그 사용
+#include "GameplayTagContainer.h" 
 
 UGA_BasicAttack::UGA_BasicAttack()
 {
+	// 블루프린트에서 Activation Required Tags에 
+	// .Execute.Basic 추가 필요
 	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
-	DamageCoefficient = 1.0f;
-	DamageDataTag = FGameplayTag::RequestGameplayTag(FName("Skill.Damage.Value"));
-	MuzzleSocketName = FName("MuzzleSocket");
+
+	// 부모로부터 상속받은 변수들의 기본값 설정
+	DamageBase = 0.0f; // 기본 공격은 기본 데미지 0
+	DamageCoefficient = 1.0f; // 기본 계수는 1.0 (공격력 그대로)
+
+	// 기본 데이터 태그 설정 (BP에서 변경 가능)
+	DamageDataTag = FGameplayTag::RequestGameplayTag(FName("Skill.Damage.Value")); // 또는 Skill.Damage.BasicAttack
 }
 
+/** * 어빌리티 활성화 시 (자식 클래스의 ActivateAbility보다 먼저) 호출됩니다.
+ * MuzzleFlash 이펙트를 스폰하는 공통 로직을 처리합니다.
+ */
 void UGA_BasicAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
 {
+	// (GA_BaseSkill::ActivateAbility가 MuzzleFlash를 처리)
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
-
-	// [ ★★★ 수정된 로그 ( .IsValid() 및 .Get() 사용) ★★★ ]
-	if (TriggerEventData && TriggerEventData->Target)
-	{
-		UE_LOG(LogRamdomItemDefense, Warning, TEXT("### BASIC ATTACK ###: Attacker=[%s] -> Target=[%s]"),
-			*GetNameSafe(ActorInfo->AvatarActor.Get()),
-			*GetNameSafe(TriggerEventData->Target.Get()) // .Get()으로 실제 Actor 포인터를 가져옵니다.
-		);
-	}
-	else
-	{
-		UE_LOG(LogRamdomItemDefense, Error, TEXT("GA_BasicAttack [%s]: FAILED. TriggerEventData or Target is NULL."), *GetNameSafe(ActorInfo->AvatarActor.Get()));
-	}
-	// [ ★★★ 로그 끝 ★★★ ]
-
-
-	// --- [ ★★★ Muzzle Flash 스폰 로직 (드론/캐릭터 분기) ★★★ ] ---
-	if (MuzzleFlashEffect && MuzzleSocketName != NAME_None)
-	{
-		AActor* AvatarActor = ActorInfo->AvatarActor.Get();
-		USceneComponent* AttachComponent = nullptr;
-
-		// 1. 공격자가 캐릭터인지 확인
-		if (ARamdomItemDefenseCharacter* CharacterActor = Cast<ARamdomItemDefenseCharacter>(AvatarActor))
-		{
-			AttachComponent = CharacterActor->GetMesh();
-		}
-		// 2. 캐릭터가 아니라면, 드론인지 확인
-		else if (ASoldierDrone* DroneActor = Cast<ASoldierDrone>(AvatarActor))
-		{
-			AttachComponent = DroneActor->GetMesh();
-		}
-
-		// 3. 부착할 메쉬를 찾았는지 확인
-		if (AttachComponent)
-		{
-			// 4. 이펙트 스폰
-			UGameplayStatics::SpawnEmitterAttached(
-				MuzzleFlashEffect,
-				AttachComponent,
-				MuzzleSocketName,
-				FVector::ZeroVector,
-				FRotator::ZeroRotator,
-				FVector(1.0f),
-				EAttachLocation::SnapToTarget,
-				true // AutoDestroy
-			);
-		}
-	}
-	// --- [ ★★★ 로직 끝 ★★★ ] ---
-
 
 	// 1. 필요한 데이터 확인 (데미지 이펙트, 타겟)
 	if (!DamageEffectClass)
@@ -82,46 +38,48 @@ void UGA_BasicAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle, c
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
-
-	// --- [ ★★★ .IsValid() 체크로 수정 ★★★ ] ---
 	if (!TriggerEventData || !TriggerEventData->Target)
 	{
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
-	// --- [ 수정 끝 ] ---
 
-	// 2. 소유자 ASC, 타겟 액터 가져오기
+	// --- [ ★★★ 로직 수정 ★★★ ] ---
+	// 2. ASC 및 타겟 액터 가져오기
 	UAbilitySystemComponent* SourceASC = ActorInfo->AbilitySystemComponent.Get();
-
-	// --- [ ★★★ .Get() 호출로 수정 (핵심!) ★★★ ] ---
-	const AActor* ConstTargetActor = TriggerEventData->Target.Get();
+	const AActor* ConstTargetActor = TriggerEventData->Target;
 	AActor* TargetActor = const_cast<AActor*>(ConstTargetActor);
-	// --- [ 수정 끝 ] ---
-
 	UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(TargetActor);
 
 	if (!SourceASC || !TargetActor || !TargetASC)
 	{
-		UE_LOG(LogRamdomItemDefense, Warning, TEXT("GA_BasicAttack: FAILED. SourceASC, TargetActor, or TargetASC is NULL."));
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
 
-	// 3. 소유자의 공격력 가져오기 (드론/캐릭터 공용)
+	// 3. 소유자(캐릭터 또는 드론)의 AttributeSet을 ASC에서 직접 가져오기
 	const UMyAttributeSet* AttributeSet = Cast<const UMyAttributeSet>(SourceASC->GetAttributeSet(UMyAttributeSet::StaticClass()));
-
 	if (!AttributeSet)
 	{
-		UE_LOG(LogRamdomItemDefense, Error, TEXT("GA_BasicAttack [%s]: FAILED. Could not find UMyAttributeSet on ASC."), *GetNameSafe(ActorInfo->AvatarActor.Get()));
+		// (이전에 실패했던 지점)
+		RID_LOG(FColor::Red, TEXT("GA_BasicAttack: FAILED to get UMyAttributeSet from SourceASC."));
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
+	// --- [ ★★★ 로직 수정 끝 ★★★ ] ---
 
-	// (이하 데미지 계산 및 적용 로직은 모두 동일)
 	const float OwnerAttackDamage = AttributeSet->GetAttackDamage();
-	const float BaseDamage = OwnerAttackDamage * DamageCoefficient;
+
+	// 4-1. 기본 데미지 계산 (새 공식 적용)
+	const float BaseDamage = DamageBase + (OwnerAttackDamage * DamageCoefficient);
+
+	// 4-2. 치명타 적용 (bIsSkillAttack: false)
+	// (RID_DamageStatics::ApplyCritDamage는 이미 수정된 GetAttributeSetFromASC를 사용하므로 안전)
 	const float FinalDamage = URID_DamageStatics::ApplyCritDamage(BaseDamage, SourceASC, TargetActor, false);
+
+	RID_LOG(FColor::White, TEXT("GA_BasicAttack: Applying Damage: %.1f (AD: %.1f * Coeff: %.1f) -> CritApplied: %.1f"), BaseDamage, OwnerAttackDamage, DamageCoefficient, FinalDamage);
+
+	// 5. 데미지 GE Spec 생성 및 SetByCaller로 최종 데미지 값 주입
 	FGameplayEffectSpecHandle SpecHandle = SourceASC->MakeOutgoingSpec(DamageEffectClass, 1.0f, SourceASC->MakeEffectContext());
 	if (SpecHandle.IsValid() && DamageDataTag.IsValid())
 	{
@@ -135,5 +93,7 @@ void UGA_BasicAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle, c
 			UE_LOG(LogRamdomItemDefense, Warning, TEXT("GA_BasicAttack: DamageDataTag is Invalid! Check Blueprint settings."));
 		}
 	}
+
+	// 어빌리티 종료
 	EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
 }

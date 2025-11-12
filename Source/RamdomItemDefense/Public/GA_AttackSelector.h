@@ -1,3 +1,5 @@
+// Source/RamdomItemDefense/Public/GA_AttackSelector.h (수정)
+
 #pragma once
 
 #include "RamdomItemDefense.h"
@@ -5,6 +7,8 @@
 #include "Abilities/GameplayAbility.h"
 #include "GameplayTagContainer.h"
 #include "GA_AttackSelector.generated.h"
+
+class UAbilitySystemComponent;
 
 UCLASS()
 class RAMDOMITEMDEFENSE_API UGA_AttackSelector : public UGameplayAbility
@@ -21,10 +25,11 @@ protected:
 	/**
 	 * @brief (블루프린트 구현용) 확률에 따라 실행할 공격 유형 태그를 결정합니다.
 	 * @param TriggerEventData 공격 대상 등의 정보 전달용
+	 * @param OwnerASC (추가됨) 태그 확인을 위한 시전자의 ASC
 	 * @return 선택된 공격 실행 태그 (예: Event.Attack.Execute.Basic)
 	 */
 	UFUNCTION(BlueprintImplementableEvent, Category = "Attack Selection")
-	FGameplayTag SelectAttackType(const FGameplayEventData& TriggerEventData);
+	FGameplayTag SelectAttackType(const FGameplayEventData& TriggerEventData, UAbilitySystemComponent* OwnerASC);
 
 	/**
 	 * @brief (블루프린트 구현용) 결정된 공격 태그로 Gameplay Event를 전송합니다.

@@ -1,4 +1,4 @@
-// Public/GA_Warrior_Warpath.h
+// Public/GA_Warrior_Warpath.h (수정)
 
 #pragma once
 
@@ -36,10 +36,6 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Config|GAS")
 	TSubclassOf<UGameplayEffect> UltimateBuffEffectClass;
 
-	/** (BP 설정) SetByCaller 데미지 계산용 GE (예: GE_Ultimate_Damage_Instant) */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Config|Damage")
-	TSubclassOf<UGameplayEffect> DamageEffectClass;
-
 	/** (BP 설정) 데미지 태그 (예: Skill.Damage.Value) */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Config|Damage")
 	FGameplayTag DamageDataTag;
@@ -47,14 +43,6 @@ protected:
 	/** (BP 설정) 맵 전체로 간주할 광역 데미지 반경 (예: 10000) */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Config|Damage")
 	float DamageRadius;
-
-	/** (BP 설정) 기본 데미지 (예: 1000) */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Config|Damage")
-	float DamageBase;
-
-	/** (BP 설정) 공격력 계수 (예: 3.0 = 공격력의 300%) */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Config|Damage")
-	float DamageCoefficient;
 
 	/** (BP 설정) 시전자(캐릭터)에게 스폰할 이펙트 */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Config|FX")

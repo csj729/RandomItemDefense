@@ -1,4 +1,4 @@
-// SSource/RamdomItemDefense/Public/GA_MagicFighter_BlackHole.h
+// SSource/RamdomItemDefense/Public/GA_MagicFighter_BlackHole.h (수정)
 
 #pragma once
 
@@ -30,7 +30,7 @@ protected:
 
 	/** 어빌리티 종료 시 (C++ 부모의 EndAbility 호출 전 실행됨) */
 	virtual void EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled) override;
-	
+
 	/** 적용된 상태 GE 핸들 (나중에 제거하기 위해 저장) */
 	FActiveGameplayEffectHandle UltimateStateEffectHandle;
 
@@ -53,10 +53,6 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "BlackHole Config")
 	float DamageRadius;
 
-	/** (BP 설정) SetByCaller 데미지 계산용 GE (예: GE_Ultimate_Damage_Instant) */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "BlackHole Config|GAS")
-	TSubclassOf<UGameplayEffect> DamageEffectClass;
-
 	/** (BP 설정) 5초 스턴 GE (예: GE_Stun_5s) */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "BlackHole Config|GAS")
 	TSubclassOf<UGameplayEffect> StunEffectClass;
@@ -64,14 +60,6 @@ protected:
 	/** (BP 설정) 데미지 태그 (예: Skill.Damage.Value) */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "BlackHole Config|GAS")
 	FGameplayTag DamageDataTag;
-
-	/** (BP 설정) 기본 데미지 (예: 500) */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "BlackHole Config|Damage")
-	float DamageBase;
-
-	/** (BP 설정) 공격력 계수 (예: 2.0 = 공격력의 200%) */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "BlackHole Config|Damage")
-	float DamageCoefficient;
 
 	/** (BP 설정) 몬스터를 끌어당기는 시간 (예: 3.0초) */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "BlackHole Config|Pull")

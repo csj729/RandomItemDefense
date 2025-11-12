@@ -1,7 +1,9 @@
+// Source/RamdomItemDefense/Public/GA_UltimateSkill.h (수정)
+
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Abilities/GameplayAbility.h"
+#include "GA_BaseSkill.h"
 #include "GA_UltimateSkill.generated.h"
 
 // 전방 선언
@@ -9,7 +11,8 @@ class UGameplayEffect;
 class UAnimMontage;
 
 UCLASS()
-class RAMDOMITEMDEFENSE_API UGA_UltimateSkill : public UGameplayAbility
+class RAMDOMITEMDEFENSE_API UGA_UltimateSkill : public UGA_BaseSkill // 부모 클래스 변경
+	// --- [ ★★★ 수정 끝 ★★★ ] ---
 {
 	GENERATED_BODY()
 
@@ -18,7 +21,7 @@ public:
 
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Animation") // <-- BlueprintReadOnly 추가!
-	UAnimMontage* UltimateMontage;
+		UAnimMontage* UltimateMontage;
 
 protected:
 	/** (★★★) 어빌리티가 활성화될 수 있는지 (스택이 찼는지) 확인합니다. */

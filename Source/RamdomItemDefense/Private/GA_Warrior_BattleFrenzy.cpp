@@ -62,7 +62,7 @@ void UGA_Warrior_BattleFrenzy::ActivateAbility(const FGameplayAbilitySpecHandle 
 
 	// 4. 버프량 계산 (갱신이든 신규든 항상 최신값으로 계산)
 	const float CasterAttackDamage = AttributeSet->GetAttackDamage();
-	const float AttackSpeedBuffValue = CasterAttackDamage * AttackSpeedCoefficient;
+	const float AttackSpeedBuffValue = 0.5f + CasterAttackDamage * AttackSpeedCoefficient;
 
 	// 5. 버프 GE Spec 생성
 	FGameplayEffectContextHandle ContextHandle = MakeEffectContext(Handle, ActorInfo);

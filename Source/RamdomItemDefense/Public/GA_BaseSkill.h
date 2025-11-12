@@ -1,4 +1,4 @@
-// Public/GA_BaseSkill.h (수정)
+// Source/RamdomItemDefense/Public/GA_BaseSkill.h (수정)
 #pragma once
 
 #include "CoreMinimal.h"
@@ -7,6 +7,7 @@
 #include "GA_BaseSkill.generated.h"
 
 class UGameplayEffect;
+class UParticleSystem; // 캐스케이드 전방 선언
 
 /**
  * @brief 모든 확률 발동형 스킬의 부모 클래스.
@@ -19,6 +20,13 @@ class RAMDOMITEMDEFENSE_API UGA_BaseSkill : public UGameplayAbility
 
 public:
 	UGA_BaseSkill();
+
+	// --- [ ★★★ 코드 추가 ★★★ ] ---
+	/** * 어빌리티 활성화 시 (자식 클래스의 ActivateAbility보다 먼저) 호출됩니다.
+	 * MuzzleFlash 이펙트를 스폰하는 공통 로직을 처리합니다.
+	 */
+	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
+	// --- [ ★★★ 코드 추가 끝 ★★★ ] ---
 
 	/**
 	 * @brief 이 스킬의 기본 발동 확률 (0.0 ~ 1.0)
@@ -41,7 +49,6 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Skill Config|GAS")
 	FGameplayTag DamageByCallerTag;
 
-	// --- [ ★★★ 코드 추가 ★★★ ] ---
 	/**
 	 * @brief (BP Class Default에서 설정) 이 스킬의 기본 데미지
 	 * (예: 100)
@@ -55,5 +62,12 @@ public:
 	 */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Skill Config|Damage")
 	float DamageCoefficient;
-	// --- [ ★★★ 코드 추가 끝 ★★★ ] ---
+
+	/** (BP 설정) 스킬 시전 시 스폰할 총구 화염 이펙트 (캐스케이드) */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Skill Config|FX")
+	TObjectPtr<UParticleSystem> MuzzleFlashEffect;
+
+	/** (BP 설정) 이펙트를 부착할 소켓 이름 (예: "MuzzlePoint") */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Skill Config|FX")
+	FName MuzzleSocketName;
 };
