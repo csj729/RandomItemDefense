@@ -1,3 +1,5 @@
+// Source/RamdomItemDefense/Private/GA_Archer_CripplingShot.cpp
+
 #include "GA_Archer_CripplingShot.h"
 #include "AbilitySystemComponent.h"
 #include "MyAttributeSet.h"
@@ -9,6 +11,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetMathLibrary.h"
 #include "SoldierDrone.h" // [ ★★★ 코드 추가 ★★★ ]
+#include "RamdomItemDefense.h" // <--- UE_LOG(LogRamdomItemDefense, ...)를 위해 추가
 
 
 UGA_Archer_CripplingShot::UGA_Archer_CripplingShot()
@@ -152,7 +155,12 @@ void UGA_Archer_CripplingShot::OnImpact()
 
 	// 4. 방어력 감소 GE 적용
 	if (ArmorShredEffectClass) // nullptr 체크 추가
+	{
+		// --- [ ★★★ 디버그 로그 추가 (UE_LOG) ★★★ ] ---
+		UE_LOG(LogRamdomItemDefense, Warning, TEXT("[GA_Archer_CripplingShot] OnImpact: Applying ArmorShredEffect to %s."), *GetNameSafe(TargetActor.Get()));
+		// --- [ ★★★ 디버그 로그 끝 ★★★ ] ---
 		TargetASC->ApplyGameplayEffectToSelf(ArmorShredEffectClass->GetDefaultObject<UGameplayEffect>(), 1.0f, ContextHandle);
+	}
 
 	EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
 }

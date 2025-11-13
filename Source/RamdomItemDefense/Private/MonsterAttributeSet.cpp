@@ -7,12 +7,10 @@
 #include "MonsterBaseCharacter.h" 
 #include "RamdomItemDefenseCharacter.h"
 #include "MyPlayerState.h"
-#include "RamdomItemDefense.h"
+#include "RamdomItemDefense.h" // <--- UE_LOG(LogRamdomItemDefense, ...)를 위해 필요
 #include "MyGameState.h"       
 #include "Engine/World.h"      
-// --- [ ★★★ 코드 추가 ★★★ ] ---
 #include "Kismet/KismetMathLibrary.h" // FMath::Pow() 함수 사용
-// --- [ ★★★ 코드 추가 끝 ★★★ ] ---
 
 void UMonsterAttributeSet::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
@@ -25,7 +23,6 @@ void UMonsterAttributeSet::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>&
 }
 
 
-// --- [ ★★★ 새 함수 구현 ★★★ ] ---
 float UMonsterAttributeSet::CalculateReducedDamage(float IncomingDamage) const
 {
 	// 1. 현재 방어력 가져오기 (최소 0)
@@ -34,6 +31,14 @@ float UMonsterAttributeSet::CalculateReducedDamage(float IncomingDamage) const
 	// 2. 방어력이 0 이하면, 원본 데미지(양수)를 그대로 반환
 	if (CurrentArmor <= 0.f)
 	{
+		// --- [ ★★★ 새 디버그 로그 1 ★★★ ] ---
+		// 방어력이 0일 때의 로그
+		AActor* AvatarActor = GetOwningAbilitySystemComponent() ? GetOwningAbilitySystemComponent()->GetAvatarActor() : nullptr;
+		UE_LOG(LogRamdomItemDefense, Warning, TEXT("[CalculateReducedDamage] Monster: %s | Armor: 0.0 | Reduction: 0.0%% | Damage: %.1f -> %.1f"),
+			*GetNameSafe(AvatarActor),
+			IncomingDamage,
+			IncomingDamage);
+		// --- [ ★★★ 로그 끝 ★★★ ] ---
 		return IncomingDamage;
 	}
 
@@ -47,9 +52,19 @@ float UMonsterAttributeSet::CalculateReducedDamage(float IncomingDamage) const
 	// 4. 최종 데미지(양수) 계산 및 반환
 	const float ReducedDamage = IncomingDamage * (1.0f - DamageReductionPercent);
 
+	// --- [ ★★★ 새 디버그 로그 2 ★★★ ] ---
+	// 방어력이 0보다 클 때의 상세 계산 로그
+	AActor* AvatarActor = GetOwningAbilitySystemComponent() ? GetOwningAbilitySystemComponent()->GetAvatarActor() : nullptr;
+	UE_LOG(LogRamdomItemDefense, Warning, TEXT("[CalculateReducedDamage] Monster: %s | Armor: %.1f | Reduction: %.1f%% | Damage: %.1f -> %.1f"),
+		*GetNameSafe(AvatarActor),
+		CurrentArmor,
+		DamageReductionPercent * 100.0f, // 퍼센트(%)로 표시
+		IncomingDamage,
+		ReducedDamage);
+	// --- [ ★★★ 로그 끝 ★★★ ] ---
+
 	return ReducedDamage;
 }
-// --- [ ★★★ 구현 끝 ★★★ ] ---
 
 
 void UMonsterAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallbackData& Data)

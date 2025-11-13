@@ -1,30 +1,29 @@
+// Source/RamdomItemDefense/Private/BTTask_FindPatrolPos.cpp (수정)
+
 #include "BTTask_FindPatrolPos.h"
 #include "AIController.h"
 #include "BehaviorTree/BlackboardComponent.h"
 #include "Components/SplineComponent.h"
-#include "RamdomItemDefense.h" // GEngine 대체
+#include "RamdomItemDefense.h" 
 #include "NavigationSystem.h"
 
 UBTTask_FindPatrolPos::UBTTask_FindPatrolPos()
 {
-	NodeName = TEXT("Find Patrol Pos (Spline)"); // 에디터에서 알아보기 쉽게 이름 변경
+	NodeName = TEXT("Find Patrol Pos (Simple)"); // [ ★★★ 수정 ★★★ ]
+
 }
 
 EBTNodeResult::Type UBTTask_FindPatrolPos::ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory)
 {
-	Super::ExecuteTask(OwnerComp, NodeMemory);
+	// [ ★★★ 수정 ★★★ ]
+	Super::ExecuteTask(OwnerComp, NodeMemory); // UBTTaskNode는 Super 호출 필요
 
 	UBlackboardComponent* BlackboardComp = OwnerComp.GetBlackboardComponent();
 	if (BlackboardComp == nullptr)
 	{
-		// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
-		RID_LOG(FColor::Red, TEXT("BTTask: ERROR! Blackboard is null."));
-		// -----------------------------------------
+		UE_LOG(LogRamdomItemDefense, Error, TEXT("[BTTask_FindPatrolPos] ERROR! Blackboard is null."));
 		return EBTNodeResult::Failed;
 	}
-
-	// ================== [코드 수정] ==================
-	// 이제 하드코딩된 이름 대신, 에디터에서 선택한 KeySelector의 이름을 사용해 값을 가져옵니다.
 
 	// 1. 블랙보드에서 경로 액터와 현재 인덱스를 가져옵니다.
 	AActor* PathActor = Cast<AActor>(BlackboardComp->GetValueAsObject(PathActorKey.SelectedKeyName));
@@ -32,10 +31,7 @@ EBTNodeResult::Type UBTTask_FindPatrolPos::ExecuteTask(UBehaviorTreeComponent& O
 
 	if (PathActor == nullptr)
 	{
-		// 이 에러 메시지가 바로 지금 겪고 계신 문제입니다.
-		// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
-		RID_LOG(FColor::Red, TEXT("BTTask: ERROR! Value for key '%s' is null in Blackboard."), *PathActorKey.SelectedKeyName.ToString());
-		// -----------------------------------------
+		UE_LOG(LogRamdomItemDefense, Error, TEXT("[BTTask_FindPatrolPos] ERROR! Value for key '%s' is null in Blackboard."), *PathActorKey.SelectedKeyName.ToString());
 		return EBTNodeResult::Failed;
 	}
 
@@ -43,9 +39,7 @@ EBTNodeResult::Type UBTTask_FindPatrolPos::ExecuteTask(UBehaviorTreeComponent& O
 	USplineComponent* SplineComp = PathActor->FindComponentByClass<USplineComponent>();
 	if (SplineComp == nullptr)
 	{
-		// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
-		RID_LOG(FColor::Red, TEXT("BTTask: ERROR! Path Actor has no Spline Component."));
-		// -----------------------------------------
+		UE_LOG(LogRamdomItemDefense, Error, TEXT("[BTTask_FindPatrolPos] ERROR! Path Actor has no Spline Component."));
 		return EBTNodeResult::Failed;
 	}
 
@@ -55,10 +49,7 @@ EBTNodeResult::Type UBTTask_FindPatrolPos::ExecuteTask(UBehaviorTreeComponent& O
 	// 4. 찾은 위치를 블랙보드의 PatrolPosKey에 저장합니다.
 	BlackboardComp->SetValueAsVector(PatrolPosKey.SelectedKeyName, TargetLocation);
 
-	// 5. 다음 이동을 위해 인덱스를 1 증가시킵니다.
-	int32 NextPointIndex = (CurrentPointIndex + 1) % SplineComp->GetNumberOfSplinePoints();
-	BlackboardComp->SetValueAsInt(PointIndexKey.SelectedKeyName, NextPointIndex);
-	// ===============================================
+	UE_LOG(LogRamdomItemDefense, Log, TEXT("[BTTask_FindPatrolPos] (Pawn: %s) Set TargetLocation to Point %d"), *GetNameSafe(OwnerComp.GetAIOwner()->GetPawn()), CurrentPointIndex);
 
-	return EBTNodeResult::Succeeded;
+	return EBTNodeResult::Succeeded; // 위치 찾기 성공
 }
