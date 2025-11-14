@@ -129,6 +129,8 @@ protected:
 	/** State.Slow 태그가 변경될 때 호출될 콜백 함수 */
 	void OnSlowTagChanged(const FGameplayTag Tag, int32 NewCount);
 
+	/** State.ArmorShred 태그가 변경될 때 호출될 콜백 함수 */
+	void OnArmorShredTagChanged(const FGameplayTag Tag, int32 NewCount);
 	/** 이 몬스터를 제어하는 AI 컨트롤러 캐시 */
 	UPROPERTY()
 	TWeakObjectPtr<AMonsterAIController> MonsterAIController;
@@ -141,6 +143,8 @@ protected:
 	UFUNCTION(BlueprintImplementableEvent, Category = "Animation")
 	void OnSlowStateChanged(bool bIsSlowed);
 
+	UFUNCTION(BlueprintImplementableEvent, Category = "Animation")
+	void OnArmorShredStateChanged(bool bIsShredded);
 	/**
 	 * @brief (블루프린트에서 설정) 몬스터 머리 위에 띄울 데미지 텍스트 위젯
 	 * (WBP_DamageText로 설정, 부모는 UDamageTextWidget이어야 함)

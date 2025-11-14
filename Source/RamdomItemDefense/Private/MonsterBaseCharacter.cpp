@@ -62,14 +62,22 @@ void AMonsterBaseCharacter::PossessedBy(AController* NewController)
 	if (AbilitySystemComponent)
 	{
 		AbilitySystemComponent->InitAbilityActorInfo(this, this);
+
 		AbilitySystemComponent->RegisterGameplayTagEvent(
 			FGameplayTag::RequestGameplayTag(FName("State.Stun")),
 			EGameplayTagEventType::NewOrRemoved
 		).AddUObject(this, &AMonsterBaseCharacter::OnStunTagChanged);
+
 		AbilitySystemComponent->RegisterGameplayTagEvent(
 			FGameplayTag::RequestGameplayTag(FName("State.Slow")),
 			EGameplayTagEventType::NewOrRemoved
 		).AddUObject(this, &AMonsterBaseCharacter::OnSlowTagChanged);
+
+		AbilitySystemComponent->RegisterGameplayTagEvent(
+			FGameplayTag::RequestGameplayTag(FName("State.ArmorShred")),
+			EGameplayTagEventType::NewOrRemoved
+		).AddUObject(this, &AMonsterBaseCharacter::OnArmorShredTagChanged);
+
 		if (AttributeSet)
 		{
 			AbilitySystemComponent->GetGameplayAttributeValueChangeDelegate(AttributeSet->GetHealthAttribute()).AddUObject(this, &AMonsterBaseCharacter::HandleHealthChanged);
@@ -133,6 +141,9 @@ void AMonsterBaseCharacter::Die(AActor* Killer)
 
 	if (MySpawner) { MySpawner->OnMonsterKilled(); }
 
+	OnStunStateChanged(false);
+	OnSlowStateChanged(false);
+	OnArmorShredStateChanged(false);
 	// --- [ ★★★ 수정 2: AI와 이동 즉시 중지 ★★★ ] ---
 	// AI 컨트롤러의 빙의를 해제 (요청하신 사항)
 	if (MonsterAIController.IsValid())
@@ -279,6 +290,18 @@ void AMonsterBaseCharacter::OnSlowTagChanged(const FGameplayTag Tag, int32 NewCo
 	}
 	bool bIsSlowed = NewCount > 0;
 	OnSlowStateChanged(bIsSlowed);
+}
+
+void AMonsterBaseCharacter::OnArmorShredTagChanged(const FGameplayTag Tag, int32 NewCount)
+{
+	if (bIsDying)
+	{	
+		return;
+	}
+	bool bIsShredded = NewCount > 0;
+
+	// 블루프린트 이벤트(OnArmorShredStateChanged)를 호출합니다.
+	OnArmorShredStateChanged(bIsShredded);
 }
 
 void AMonsterBaseCharacter::OnCritDamageOccurred(AActor* TargetActor, float CritDamageAmount)
