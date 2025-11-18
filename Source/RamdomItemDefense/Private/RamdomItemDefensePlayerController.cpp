@@ -38,6 +38,7 @@ ARamdomItemDefensePlayerController::ARamdomItemDefensePlayerController()
 void ARamdomItemDefensePlayerController::BeginPlay()
 {
 	Super::BeginPlay();
+	bIsButtonActionWindowActive = false;
 
 	// 로컬 플레이어 컨트롤러에서만 Input 및 UI 설정
 	if (IsLocalPlayerController())
@@ -158,6 +159,15 @@ void ARamdomItemDefensePlayerController::SetupInputComponent()
 		EnhancedInputComponent->BindAction(SetDestinationTouchAction, ETriggerEvent::Completed, this, &ARamdomItemDefensePlayerController::OnTouchReleased);
 		EnhancedInputComponent->BindAction(SetDestinationTouchAction, ETriggerEvent::Canceled, this, &ARamdomItemDefensePlayerController::OnTouchReleased);
 		EnhancedInputComponent->BindAction(UltimateSkillAction, ETriggerEvent::Started, this, &ARamdomItemDefensePlayerController::OnUltimateSkillPressed);
+	
+		if (ButtonAction_Q_Action) EnhancedInputComponent->BindAction(ButtonAction_Q_Action, ETriggerEvent::Started, this, &ARamdomItemDefensePlayerController::OnButtonAction_Q);
+		if (ButtonAction_W_Action) EnhancedInputComponent->BindAction(ButtonAction_W_Action, ETriggerEvent::Started, this, &ARamdomItemDefensePlayerController::OnButtonAction_W);
+		if (ButtonAction_E_Action) EnhancedInputComponent->BindAction(ButtonAction_E_Action, ETriggerEvent::Started, this, &ARamdomItemDefensePlayerController::OnButtonAction_E);
+		if (ButtonAction_R_Action) EnhancedInputComponent->BindAction(ButtonAction_R_Action, ETriggerEvent::Started, this, &ARamdomItemDefensePlayerController::OnButtonAction_R);
+		if (ButtonAction_A_Action) EnhancedInputComponent->BindAction(ButtonAction_A_Action, ETriggerEvent::Started, this, &ARamdomItemDefensePlayerController::OnButtonAction_A);
+		if (ButtonAction_S_Action) EnhancedInputComponent->BindAction(ButtonAction_S_Action, ETriggerEvent::Started, this, &ARamdomItemDefensePlayerController::OnButtonAction_S);
+		if (ButtonAction_D_Action) EnhancedInputComponent->BindAction(ButtonAction_D_Action, ETriggerEvent::Started, this, &ARamdomItemDefensePlayerController::OnButtonAction_D);
+		if (ButtonAction_F_Action) EnhancedInputComponent->BindAction(ButtonAction_F_Action, ETriggerEvent::Started, this, &ARamdomItemDefensePlayerController::OnButtonAction_F);
 	}
 }
 
@@ -373,3 +383,70 @@ void ARamdomItemDefensePlayerController::OnUltimateSkillPressed()
 		}
 	}
 }	
+
+/** (PlayerState로부터 받은) 클라이언트 RPC 구현 */
+void ARamdomItemDefensePlayerController::Client_OnShowButtonActionUI_Implementation(float TimingWindow, EButtonActionKey KeyToPress)
+{
+	// (클라이언트에서 실행됨)
+	bIsButtonActionWindowActive = true;
+	RequiredButtonActionKey = KeyToPress;
+	ButtonActionWindowEndTime = GetWorld()->GetTimeSeconds() + TimingWindow;
+
+	// MainHUDInstance (UMG)에 UI를 띄우라고 알림
+	// (이 부분은 UMG와 연동하여 구현해야 합니다)
+	if (MainHUDInstance)
+	{
+		// MainHUDWidget.h에 BlueprintImplementableEvent로
+		// void ShowButtonActionPrompt(EButtonActionKey Key, float Duration);
+		// 같은 함수를 선언하고 UMG에서 구현해야 합니다.
+
+		// 예: MainHUDInstance->ShowButtonActionPrompt(KeyToPress, TimingWindow);
+	}
+}
+
+// 8개의 입력 핸들러 구현 (모두 HandleButtonActionInput 호출)
+void ARamdomItemDefensePlayerController::OnButtonAction_Q() { HandleButtonActionInput(EButtonActionKey::Key_Q); }
+void ARamdomItemDefensePlayerController::OnButtonAction_W() { HandleButtonActionInput(EButtonActionKey::Key_W); }
+void ARamdomItemDefensePlayerController::OnButtonAction_E() { HandleButtonActionInput(EButtonActionKey::Key_E); }
+void ARamdomItemDefensePlayerController::OnButtonAction_R() { HandleButtonActionInput(EButtonActionKey::Key_R); }
+void ARamdomItemDefensePlayerController::OnButtonAction_A() { HandleButtonActionInput(EButtonActionKey::Key_A); }
+void ARamdomItemDefensePlayerController::OnButtonAction_S() { HandleButtonActionInput(EButtonActionKey::Key_S); }
+void ARamdomItemDefensePlayerController::OnButtonAction_D() { HandleButtonActionInput(EButtonActionKey::Key_D); }
+void ARamdomItemDefensePlayerController::OnButtonAction_F() { HandleButtonActionInput(EButtonActionKey::Key_F); }
+
+/** 모든 버튼 액션 입력을 처리하는 공통 헬퍼 함수 */
+void ARamdomItemDefensePlayerController::HandleButtonActionInput(EButtonActionKey KeyPressed)
+{
+	// (클라이언트에서 실행됨)
+
+	// 1. 활성화된 창이 아니면 무시
+	if (!bIsButtonActionWindowActive) return;
+
+	// 2. 클라이언트측 시간 초과 예비 체크 (서버 타임아웃이 메인이지만, 빠른 피드백용)
+	if (GetWorld()->GetTimeSeconds() > ButtonActionWindowEndTime)
+	{
+		bIsButtonActionWindowActive = false;
+		return;
+	}
+
+	// 3. 입력이 유효함 -> 창을 즉시 닫음 (중복 입력 방지)
+	bIsButtonActionWindowActive = false;
+
+	// 4. UMG의 부스트 UI 즉시 숨김
+	// (예: if (MainHUDInstance) MainHUDInstance->HideButtonActionPrompt();)
+
+	// 5. 서버에 결과 보고
+	if (MyPlayerStateRef) // OnPossess에서 캐시된 PlayerState
+	{
+		if (KeyPressed == RequiredButtonActionKey)
+		{
+			// [성공]
+			MyPlayerStateRef->Server_ReportButtonActionSuccess();
+		}
+		else
+		{
+			// [실패 - 틀린 키]
+			MyPlayerStateRef->Server_ReportButtonActionFailure();
+		}
+	}
+}

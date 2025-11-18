@@ -5,6 +5,8 @@
 #include "Engine/Engine.h"
 #include "MonsterSpawner.h"
 #include "RamdomItemDefenseCharacter.h"
+#include "RamdomItemDefensePlayerController.h"
+#include "AbilitySystemComponent.h"
 #include "InventoryComponent.h"
 #include "RamdomItemDefense.h" // RID_LOG 매크로용
 #include "MyGameState.h"       // GetCurrentWave() 사용
@@ -23,6 +25,11 @@ AMyPlayerState::AMyPlayerState()
 	CritDamageLevel = 0;
 	ArmorReductionLevel = 0;
 	SkillActivationChanceLevel = 0;
+
+	// --- 버튼 액션 관련 변수 전체 초기화 ---
+	ButtonActionLevel = 0;
+	bHasFailedButtonActionThisStage = false;
+	bIsWaitingForButtonActionInput = false;
 }
 
 void AMyPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -42,6 +49,10 @@ void AMyPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 	DOREPLIFETIME(AMyPlayerState, CritDamageLevel);
 	DOREPLIFETIME(AMyPlayerState, ArmorReductionLevel);
 	DOREPLIFETIME(AMyPlayerState, SkillActivationChanceLevel);
+
+	// [ ★★★ 버튼 액션 변수 복제 등록 ★★★ ]
+	DOREPLIFETIME(AMyPlayerState, ButtonActionLevel);
+	DOREPLIFETIME(AMyPlayerState, bHasFailedButtonActionThisStage);
 }
 
 // --- 골드 관련 (수정됨) ---
@@ -413,4 +424,154 @@ void AMyPlayerState::OnRep_UltimateCharge()
 int32 AMyPlayerState::GetMaxUltimateCharge() const
 {
 	return MAX_ULTIMATE_CHARGE;
+}
+
+/** 버튼 액션 레벨 변경 시 UI 갱신용 RepNotify */
+void AMyPlayerState::OnRep_ButtonActionLevel()
+{
+	OnButtonActionLevelChangedDelegate.Broadcast(ButtonActionLevel);
+}
+
+/** (GameMode가 호출) 새 웨이브가 시작될 때 */
+void AMyPlayerState::OnWaveStarted()
+{
+	if (!HasAuthority()) return;
+
+	// 1. 실패 기록 초기화, 입력 대기 상태 해제
+	bHasFailedButtonActionThisStage = false;
+	bIsWaitingForButtonActionInput = false;
+
+	// 2. 기존 타이머 모두 중지 (안전 장치)
+	GetWorld()->GetTimerManager().ClearTimer(ButtonActionTimerHandle);
+	GetWorld()->GetTimerManager().ClearTimer(ButtonActionInputTimeoutHandle);
+
+	// 3. "15초" 뒤에 첫 번째 부스트 시도를 하도록 타이머 설정
+	GetWorld()->GetTimerManager().SetTimer(
+		ButtonActionTimerHandle,
+		this,
+		&AMyPlayerState::TriggerButtonActionUI,
+		15.0f, // (요구사항) 웨이브 시작 후 15초
+		false
+	);
+
+	RID_LOG(FColor::Cyan, TEXT("PlayerState: Wave Started. Scheduling first ButtonAction in 15s."));
+}
+
+/** (서버 전용) 15초 또는 3~5초 타이머 만료 시 호출 */
+void AMyPlayerState::TriggerButtonActionUI()
+{
+	// (요구사항) 이미 실패했거나, (중복 방지) 이미 입력을 기다리는 중이면 실행 안 함
+	if (!HasAuthority() || bHasFailedButtonActionThisStage || bIsWaitingForButtonActionInput)
+	{
+		return;
+	}
+
+	// 1. 현재 레벨에 맞는 타이밍 창 가져오기
+	float CurrentWindow = ButtonActionTimingWindows.IsValidIndex(ButtonActionLevel) ? ButtonActionTimingWindows[ButtonActionLevel] : 1.0f;
+
+	// 2. 랜덤 키 선택 (0=Q ~ 7=F)
+	const int32 RandomIndex = FMath::RandRange(0, 7);
+	CurrentRequiredButtonActionKey = static_cast<EButtonActionKey>(RandomIndex);
+
+	// 3. 입력 대기 상태로 전환
+	bIsWaitingForButtonActionInput = true;
+
+	// 4. PlayerController를 통해 클라이언트에게 UI 표시 요청
+	ARamdomItemDefensePlayerController* PC = Cast<ARamdomItemDefensePlayerController>(GetPlayerController());
+	if (PC)
+	{
+		PC->Client_OnShowButtonActionUI(CurrentWindow, CurrentRequiredButtonActionKey);
+	}
+
+	// 5. (실패 판정 타이머)
+	GetWorld()->GetTimerManager().SetTimer(
+		ButtonActionInputTimeoutHandle,
+		this,
+		&AMyPlayerState::OnButtonActionTimeout,
+		CurrentWindow + 0.1f, // (네트워크 지연 고려 0.1초)
+		false
+	);
+}
+
+/** (서버 전용) 플레이어가 입력을 놓쳤을 때 (타임아웃 실패) */
+void AMyPlayerState::OnButtonActionTimeout()
+{
+	if (!HasAuthority()) return;
+
+	// (중복 방지) 성공/실패 RPC가 먼저 도착해서 이미 처리됐다면 무시
+	if (!bIsWaitingForButtonActionInput) return;
+
+	bIsWaitingForButtonActionInput = false; // 상태 해제
+
+	RID_LOG(FColor::Red, TEXT("PlayerState: Button Action FAILED (Timeout). Level reset to 0."));
+
+	// (요구사항) 실패 기록 (이번 스테이지 끝날 때까지)
+	bHasFailedButtonActionThisStage = true;
+
+	// (요구사항) 난이도(레벨) 0으로 초기화
+	ButtonActionLevel = 0;
+	OnRep_ButtonActionLevel(); // UI 갱신 (0)
+
+	// (요구사항) 다음 타이머를 예약하지 않음 (이번 스테이지 기회 끝)
+	GetWorld()->GetTimerManager().ClearTimer(ButtonActionTimerHandle);
+}
+
+/** (클라 -> 서버) 플레이어가 "성공(정확한 키)"을 보고 */
+void AMyPlayerState::Server_ReportButtonActionSuccess_Implementation()
+{
+	// (중복 방지) 타임아웃이 먼저 발생했거나, 잘못된 호출이면 무시
+	if (!HasAuthority() || !bIsWaitingForButtonActionInput) return;
+
+	bIsWaitingForButtonActionInput = false; // 상태 해제
+	GetWorld()->GetTimerManager().ClearTimer(ButtonActionInputTimeoutHandle);
+
+	// 1. 부스트 레벨 1단계 올리기 (최대 5)
+	ButtonActionLevel = FMath::Min(ButtonActionLevel + 1, 5);
+	RID_LOG(FColor::Green, TEXT("PlayerState: Button Action SUCCESS. Level up to %d."), ButtonActionLevel);
+
+	// 2. (5단계 보상)
+	if (ButtonActionLevel == 5)
+	{
+		RID_LOG(FColor::Magenta, TEXT("PlayerState: Reached MAX ACTION (Level 5)! Applying reward."));
+
+		ButtonActionLevel = 0; // (요구사항) 즉시 0으로 초기화
+
+		if (ButtonActionRewardBuffClass)
+		{
+			if (ARamdomItemDefenseCharacter* Char = GetPawn<ARamdomItemDefenseCharacter>())
+			{
+				if (UAbilitySystemComponent* ASC = Char->GetAbilitySystemComponent())
+				{
+					ASC->ApplyGameplayEffectToSelf(ButtonActionRewardBuffClass->GetDefaultObject<UGameplayEffect>(), 1.0f, ASC->MakeEffectContext());
+				}
+			}
+		}
+	}
+
+	// 3. 레벨 UI 갱신
+	OnRep_ButtonActionLevel();
+
+	// 4. (요구사항) "3~5초" 랜덤 간격 뒤에 다음 부스트 시도 예약
+	float RandomInterval = FMath::RandRange(3.0f, 5.0f);
+	GetWorld()->GetTimerManager().SetTimer(
+		ButtonActionTimerHandle,
+		this,
+		&AMyPlayerState::TriggerButtonActionUI,
+		RandomInterval,
+		false
+	);
+}
+
+/** (클라 -> 서버) 플레이어가 "실패(틀린 키)"를 보고 */
+void AMyPlayerState::Server_ReportButtonActionFailure_Implementation()
+{
+	// (중복 방지) 타임아웃이 먼저 발생했거나, 잘못된 호출이면 무시
+	if (!HasAuthority() || !bIsWaitingForButtonActionInput) return;
+
+	bIsWaitingForButtonActionInput = false; // 상태 해제
+	GetWorld()->GetTimerManager().ClearTimer(ButtonActionInputTimeoutHandle);
+
+	// 실패(타임아웃) 로직을 그대로 실행 (실패 기록, 레벨 0, 타이머 중지)
+	OnButtonActionTimeout();
+	RID_LOG(FColor::Orange, TEXT("PlayerState: Button Action FAILED (Wrong Key). Level reset to 0."));
 }

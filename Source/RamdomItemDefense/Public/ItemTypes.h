@@ -57,6 +57,19 @@ enum class EItemStatType : uint8
     SkillActivationChance UMETA(DisplayName = "스킬 발동 확률")
 };
 
+UENUM(BlueprintType)
+enum class EButtonActionKey : uint8
+{
+    Key_Q   UMETA(DisplayName = "Q Key"),
+    Key_W   UMETA(DisplayName = "W Key"),
+    Key_E   UMETA(DisplayName = "E Key"),
+    Key_R   UMETA(DisplayName = "R Key"),
+    Key_A   UMETA(DisplayName = "A Key"),
+    Key_S   UMETA(DisplayName = "S Key"),
+    Key_D   UMETA(DisplayName = "D Key"),
+    Key_F   UMETA(DisplayName = "F Key")
+};
+
 /**
  * @brief SetByCaller GE에 주입할 스탯 데이터 (데이터 테이블 편집용)
  */

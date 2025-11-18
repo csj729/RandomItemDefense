@@ -173,4 +173,60 @@ protected:
 	UFUNCTION()
 	void OnRep_CommonItemChoiceCount();
 	// --- [ ★★★ 코드 추가 끝 ★★★ ] ---
+
+// --- [ ★★★ 버튼 액션 (QTE) 시스템 ★★★ ] ---
+protected:
+	/** 현재 버튼 액션 단계 (0~5) */
+	UPROPERTY(ReplicatedUsing = OnRep_ButtonActionLevel)
+	int32 ButtonActionLevel;
+
+	/** 이번 스테이지에서 버튼 액션을 실패했는지 여부 */
+	UPROPERTY(Replicated)
+	bool bHasFailedButtonActionThisStage;
+
+	/** 버튼 액션 타이머 (15초 대기, 3~5초 간격) */
+	FTimerHandle ButtonActionTimerHandle;
+
+	/** 버튼 액션 입력 대기(실패 판정) 타이머 */
+	FTimerHandle ButtonActionInputTimeoutHandle;
+
+	/** 버튼 액션 레벨별 입력 허용 시간 (초) (0~5단계) */
+	TArray<float> ButtonActionTimingWindows = { 1.0f, 0.8f, 0.6f, 0.4f, 0.3f, 0.2f };
+
+	/** 현재 시퀀스에서 요구되는 키 (서버 전용 상태) */
+	EButtonActionKey CurrentRequiredButtonActionKey;
+
+	/** 현재 클라이언트의 입력을 기다리는 중인지 (서버 전용 상태) */
+	bool bIsWaitingForButtonActionInput;
+
+	/** 버튼 액션 레벨 변경 시 UI 갱신용 RepNotify */
+	UFUNCTION()
+	void OnRep_ButtonActionLevel();
+
+public:
+	/** UI 바인딩용: 버튼 액션 레벨 변경 델리게이트 */
+	UPROPERTY(BlueprintAssignable, Category = "Events")
+	FOnIntChangedDelegate OnButtonActionLevelChangedDelegate;
+
+	/** (GameMode가 호출) 새 웨이브가 시작될 때 이 플레이어의 버튼 액션 상태를 리셋합니다. */
+	void OnWaveStarted();
+
+	/** (서버 전용) ButtonActionTimerHandle에 의해 호출 (UI 표시 트리거) */
+	void TriggerButtonActionUI();
+
+	/** (서버 전용) 플레이어가 입력을 놓쳤을 때 (실패 판정) */
+	void OnButtonActionTimeout();
+
+	/** (클라 -> 서버) 플레이어가 "성공(정확한 키)"을 보고 */
+	UFUNCTION(Server, Reliable)
+	void Server_ReportButtonActionSuccess();
+
+	/** (클라 -> 서버) 플레이어가 "실패(틀린 키)"를 보고 */
+	UFUNCTION(Server, Reliable)
+	void Server_ReportButtonActionFailure();
+
+	/** 5단계 보상으로 적용할 GameplayEffect (BP에서 설정) */
+	UPROPERTY(EditDefaultsOnly, Category = "Button Action")
+	TSubclassOf<class UGameplayEffect> ButtonActionRewardBuffClass;
+
 };

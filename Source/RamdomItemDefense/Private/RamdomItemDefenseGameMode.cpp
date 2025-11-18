@@ -184,6 +184,8 @@ void ARamdomItemDefenseGameMode::StartNextWave()
 		{
 			// AddChoiceCount 함수 이름 확인 필요 (이전 코드에서는 AddChoiceCount로 되어 있었음)
 			MyPS->AddChoiceCount(2); // 서버 전용 함수 호출
+			// 이 플레이어의 스킬 부스트 상태를 "새 웨이브"로 리셋
+			MyPS->OnWaveStarted();
 		}
 	}
 

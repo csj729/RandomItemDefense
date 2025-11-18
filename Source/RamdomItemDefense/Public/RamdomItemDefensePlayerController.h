@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "Templates/SubclassOf.h"
 #include "GameFramework/PlayerController.h"
+#include "ItemTypes.h"
 #include "RamdomItemDefensePlayerController.generated.h"
 
 /** Forward declaration to improve compiling times */
@@ -30,6 +31,26 @@ class ARamdomItemDefensePlayerController : public APlayerController
 
 public:
 	ARamdomItemDefensePlayerController();
+
+	/** (수정) 버튼 액션 Input Actions (Q, W, E, R) */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* ButtonAction_Q_Action;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* ButtonAction_W_Action;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* ButtonAction_E_Action;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* ButtonAction_R_Action;
+
+	/** (추가) 버튼 액션 Input Actions (A, S, D, F) */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* ButtonAction_A_Action;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* ButtonAction_S_Action;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* ButtonAction_D_Action;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* ButtonAction_F_Action;
 
 	/** Time Threshold to know if it was a short press */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input)
@@ -69,6 +90,10 @@ public:
 	void ShowGameOverUI();
 	/** 게임오버 UI를 숨깁니다. (재시작 시 호출될 수 있음) */
 	void HideGameOverUI();
+
+	/** (추가) (Called by PlayerState) Tells this client to show the boost UI */
+	UFUNCTION(Client, Reliable)
+	void Client_OnShowButtonActionUI(float TimingWindow, EButtonActionKey KeyToPress);
 
 protected:
 	/** True if the controlled character should navigate to the mouse cursor. */
@@ -156,9 +181,29 @@ protected:
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "UI")
 	TObjectPtr<UUserWidget> GameOverInstance;
 
+	/** (수정) Input handlers for ButtonAction actions. */
+	void OnButtonAction_Q();
+	void OnButtonAction_W();
+	void OnButtonAction_E();
+	void OnButtonAction_R();
+
+	/** (추가) Input handlers for ButtonAction actions. */
+	void OnButtonAction_A();
+	void OnButtonAction_S();
+	void OnButtonAction_D();
+	void OnButtonAction_F();
+
+	/** (추가) 모든 버튼 액션 입력을 처리하는 공통 헬퍼 함수 */
+	void HandleButtonActionInput(EButtonActionKey KeyPressed);
+
 private:
 	FVector CachedDestination;
 
 	bool bIsTouch; // Is it a touch device
 	float FollowTime; // For how long it has been pressed
+
+	/** (추가) 클라이언트측 버튼 액션 상태 변수 */
+	bool bIsButtonActionWindowActive;
+	EButtonActionKey RequiredButtonActionKey;
+	float ButtonActionWindowEndTime; // 타임아웃 클라이언트측 예비 체크
 };
