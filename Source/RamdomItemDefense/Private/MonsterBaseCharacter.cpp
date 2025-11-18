@@ -86,15 +86,15 @@ void AMonsterBaseCharacter::PossessedBy(AController* NewController)
 			{
 				const float CurrentSpeedMultiplier = AttributeSet->GetMoveSpeed();
 				GetCharacterMovement()->MaxWalkSpeed = BaseMoveSpeed * CurrentSpeedMultiplier;
-				RID_LOG(FColor::Green, TEXT("%s PossessedBy. Initial MaxWalkSpeed set to: %.1f (Base: %.1f * Multi: %.2f)"),
+				/*RID_LOG(FColor::Green, TEXT("%s PossessedBy. Initial MaxWalkSpeed set to: %.1f (Base: %.1f * Multi: %.2f)"),
 					*GetName(),
 					GetCharacterMovement()->MaxWalkSpeed,
 					BaseMoveSpeed,
-					CurrentSpeedMultiplier);
+					CurrentSpeedMultiplier);*/
 			}
 			URID_DamageStatics::OnCritDamageOccurred.AddDynamic(this, &AMonsterBaseCharacter::OnCritDamageOccurred);
 		}
-		RID_LOG(FColor::Green, TEXT("%s PossessedBy. All ASC Delegates Bound."), *GetName());
+		//RID_LOG(FColor::Green, TEXT("%s PossessedBy. All ASC Delegates Bound."), *GetName());
 	}
 }
 
@@ -120,11 +120,11 @@ void AMonsterBaseCharacter::HandleMoveSpeedChanged(const FOnAttributeChangeData&
 	{
 		const float NewSpeedMultiplier = Data.NewValue;
 		MoveComp->MaxWalkSpeed = BaseMoveSpeed * NewSpeedMultiplier;
-		RID_LOG(FColor::Blue, TEXT("%s Final MoveSpeed set to: %.1f (Base: %.1f * Multiplier: %.2f)"),
+		/*RID_LOG(FColor::Blue, TEXT("%s Final MoveSpeed set to: %.1f (Base: %.1f * Multiplier: %.2f)"),
 			*GetName(),
 			GetCharacterMovement()->MaxWalkSpeed,
 			BaseMoveSpeed,
-			NewSpeedMultiplier);
+			NewSpeedMultiplier);*/
 	}
 }
 
@@ -144,7 +144,6 @@ void AMonsterBaseCharacter::Die(AActor* Killer)
 	OnStunStateChanged(false);
 	OnSlowStateChanged(false);
 	OnArmorShredStateChanged(false);
-	// --- [ ★★★ 수정 2: AI와 이동 즉시 중지 ★★★ ] ---
 	// AI 컨트롤러의 빙의를 해제 (요청하신 사항)
 	if (MonsterAIController.IsValid())
 	{
@@ -270,12 +269,12 @@ void AMonsterBaseCharacter::OnStunTagChanged(const FGameplayTag Tag, int32 NewCo
 			if (bIsStunned)
 			{
 				Brain->PauseLogic(TEXT("Stunned"));
-				RID_LOG(FColor::Red, TEXT("%s AI PAUSED (Stun)"), *GetName());
+				//RID_LOG(FColor::Red, TEXT("%s AI PAUSED (Stun)"), *GetName());
 			}
 			else
 			{
 				Brain->ResumeLogic(TEXT("StunEnded"));
-				RID_LOG(FColor::Green, TEXT("%s AI RESUMED (Stun End)"), *GetName());
+				//RID_LOG(FColor::Green, TEXT("%s AI RESUMED (Stun End)"), *GetName());
 			}
 		}
 	}

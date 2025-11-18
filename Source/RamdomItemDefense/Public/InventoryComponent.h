@@ -7,10 +7,41 @@
 #include "GameplayEffect.h" 
 #include "Abilities/GameplayAbility.h" 
 #include "ItemTypes.h" 
+#include "RamdomItemDefense.h" 
 #include "InventoryComponent.generated.h"
 
 class UAbilitySystemComponent;
 class UDataTable;
+
+// 3. 인벤토리 전용 커스텀 로그 매크로를 정의합니다.
+#define ENABLE_INVENTORY_DEBUG 0
+
+// 3. 인벤토리 전용 로그 카테고리를 선언합니다.
+DECLARE_LOG_CATEGORY_EXTERN(LogRID_Inventory, Log, All);
+
+// 4. 인벤토리 전용 커스텀 로그 매크로를 정의합니다.
+// (마스터 스위치 && 개별 스위치 모두 1일 때만 코드를 생성)
+#if ENABLE_RID_DEBUG && ENABLE_INVENTORY_DEBUG
+
+#include "Engine/Engine.h" // GEngine 사용을 위해 포함
+
+// [ ★★★ 수정: Verbosity 파라미터 제거 ★★★ ]
+#define LOG_INVENTORY(Color, Format, ...) \
+	{ \
+		if (GEngine) \
+		{ \
+			FString Msg = FString::Printf(Format, ##__VA_ARGS__); \
+			GEngine->AddOnScreenDebugMessage(-1, 5.f, Color, FString::Printf(TEXT("[Inv] %s"), *Msg)); \
+			/* [ ★★★ 수정: Verbosity를 'Log'로 고정 ★★★ ] */ \
+			UE_LOG(LogRID_Inventory, Log, TEXT("%s"), *Msg); \
+		} \
+	}
+#else
+
+// [ ★★★ 수정: Verbosity 파라미터 제거 ★★★ ]
+#define LOG_INVENTORY(Color, Format, ...) (void)0
+
+#endif
 
 /** 아이템의 스탯 GE 핸들을 ItemID와 함께 추적하기 위한 구조체 */
 USTRUCT()

@@ -5,10 +5,33 @@
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerState.h"
 #include "ItemTypes.h"
+#include "RamdomItemDefense.h" 
 #include "MyPlayerState.generated.h"
 
 class AMonsterSpawner;
 class AMyGameState; // AMyGameState 전방 선언
+
+// 2. PlayerState 전용 *개별 스위치*를 정의합니다.
+#define ENABLE_PLAYERSTATE_DEBUG 1
+
+// 3. PlayerState 전용 로그 카테고리를 선언합니다.
+DECLARE_LOG_CATEGORY_EXTERN(LogRID_PlayerState, Log, All);
+
+// 4. 전용 커스텀 로그 매크로를 정의합니다.
+#if ENABLE_RID_DEBUG && ENABLE_PLAYERSTATE_DEBUG
+#include "Engine/Engine.h" // GEngine 사용을 위해 포함
+#define LOG_PLAYERSTATE(Color, Format, ...) \
+	{ \
+		if (GEngine) \
+		{ \
+			FString Msg = FString::Printf(Format, ##__VA_ARGS__); \
+			GEngine->AddOnScreenDebugMessage(-1, 5.f, Color, FString::Printf(TEXT("[PState] %s"), *Msg)); \
+			UE_LOG(LogRID_PlayerState, Log, TEXT("%s"), *Msg); \
+		} \
+	}
+#else
+#define LOG_PLAYERSTATE(Color, Format, ...) (void)0
+#endif
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnStatLevelChangedDelegate, EItemStatType, StatType, int32, NewLevel);
 
@@ -180,9 +203,9 @@ protected:
 	UPROPERTY(ReplicatedUsing = OnRep_ButtonActionLevel)
 	int32 ButtonActionLevel;
 
-	/** 이번 스테이지에서 버튼 액션을 실패했는지 여부 */
+	/** 이번 스테이지에서 버튼 액션 시퀀스가 (성공이든 실패든) 종료되었는지 여부 */
 	UPROPERTY(Replicated)
-	bool bHasFailedButtonActionThisStage;
+	bool bIsButtonActionSequenceFinishedThisStage;
 
 	/** 버튼 액션 타이머 (15초 대기, 3~5초 간격) */
 	FTimerHandle ButtonActionTimerHandle;
@@ -191,7 +214,7 @@ protected:
 	FTimerHandle ButtonActionInputTimeoutHandle;
 
 	/** 버튼 액션 레벨별 입력 허용 시간 (초) (0~5단계) */
-	TArray<float> ButtonActionTimingWindows = { 1.0f, 0.8f, 0.6f, 0.4f, 0.3f, 0.2f };
+	TArray<float> ButtonActionTimingWindows = { 2.0f, 1.6f, 1.2f, 1.0f, 0.7f, 0.2f };
 
 	/** 현재 시퀀스에서 요구되는 키 (서버 전용 상태) */
 	EButtonActionKey CurrentRequiredButtonActionKey;
@@ -225,8 +248,12 @@ public:
 	UFUNCTION(Server, Reliable)
 	void Server_ReportButtonActionFailure();
 
-	/** 5단계 보상으로 적용할 GameplayEffect (BP에서 설정) */
+	UFUNCTION(Client, Reliable)
+	void Client_NotifyButtonActionResult(bool bWasSuccess, int32 RewardIndex = -1);
+
+	// [ ★★★ 수정: 변수 변경 ★★★ ]
+	/** 5단계 보상으로 적용할 랜덤 버프 목록 (3개 등록 필수) */
 	UPROPERTY(EditDefaultsOnly, Category = "Button Action")
-	TSubclassOf<class UGameplayEffect> ButtonActionRewardBuffClass;
+	TArray<TSubclassOf<class UGameplayEffect>> ButtonActionRewardBuffs;
 
 };

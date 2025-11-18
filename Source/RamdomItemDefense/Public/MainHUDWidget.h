@@ -64,4 +64,26 @@ protected:
 	/** PlayerState의 궁극기 스택이 변경될 때 C++에서 수신 */
 	UFUNCTION()
 	void HandleUltimateChargeChanged(int32 NewValue);
+
+public:
+	/**
+	 * (BP 구현용) 컨트롤러가 호출: 버튼 액션 UI(Q/W/E...)를 띄우고 타이머 애니메이션을 시작합니다.
+	 * @param KeyToPress 표시할 키 (QWERASDF)
+	 * @param Duration 입력 허용 시간 (이 시간 동안 애니메이션 재생)
+	 */
+	UFUNCTION(BlueprintImplementableEvent, Category = "Button Action")
+	void ShowButtonActionPrompt(EButtonActionKey KeyToPress, float Duration);
+
+	/**
+	 * (BP 구현용) 컨트롤러가 호출: 플레이어가 키를 누른 즉시 키 UI를 숨깁니다.
+	 */
+	UFUNCTION(BlueprintImplementableEvent, Category = "Button Action")
+	void HideButtonActionPrompt();
+
+	/**
+	 * (BP 구현용) 컨트롤러가 호출: 서버로부터 받은 "성공" 또는 "실패" 메시지를 띄웁니다.
+	 * @param bWasSuccess 성공(true) 또는 실패(false)
+	 */
+	UFUNCTION(BlueprintImplementableEvent, Category = "Button Action")
+	void ShowButtonActionResult(bool bWasSuccess, int32 RewardIndex);
 };

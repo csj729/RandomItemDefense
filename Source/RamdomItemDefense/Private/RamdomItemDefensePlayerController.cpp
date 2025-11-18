@@ -392,15 +392,26 @@ void ARamdomItemDefensePlayerController::Client_OnShowButtonActionUI_Implementat
 	RequiredButtonActionKey = KeyToPress;
 	ButtonActionWindowEndTime = GetWorld()->GetTimeSeconds() + TimingWindow;
 
-	// MainHUDInstance (UMG)에 UI를 띄우라고 알림
-	// (이 부분은 UMG와 연동하여 구현해야 합니다)
 	if (MainHUDInstance)
 	{
-		// MainHUDWidget.h에 BlueprintImplementableEvent로
-		// void ShowButtonActionPrompt(EButtonActionKey Key, float Duration);
-		// 같은 함수를 선언하고 UMG에서 구현해야 합니다.
+		// [ ★★★ 수정 ★★★ ]
+		// WBP_MainHUD의 "ShowButtonActionPrompt" 이벤트 호출
+		MainHUDInstance->ShowButtonActionPrompt(KeyToPress, TimingWindow);
+	}
+}
 
-		// 예: MainHUDInstance->ShowButtonActionPrompt(KeyToPress, TimingWindow);
+/** (추가) 서버로부터 최종 결과를 통지받았을 때 */
+void ARamdomItemDefensePlayerController::OnButtonActionResult(bool bWasSuccess, int32 RewardIndex)
+{
+	bIsButtonActionWindowActive = false;
+
+	if (MainHUDInstance)
+	{
+		MainHUDInstance->HideButtonActionPrompt();
+
+		// [ ★★★ 수정: 인자 추가 전달 ★★★ ]
+		// WBP_MainHUD의 함수도 인자를 받도록 수정해야 함
+		MainHUDInstance->ShowButtonActionResult(bWasSuccess, RewardIndex);
 	}
 }
 
@@ -432,8 +443,11 @@ void ARamdomItemDefensePlayerController::HandleButtonActionInput(EButtonActionKe
 	// 3. 입력이 유효함 -> 창을 즉시 닫음 (중복 입력 방지)
 	bIsButtonActionWindowActive = false;
 
-	// 4. UMG의 부스트 UI 즉시 숨김
-	// (예: if (MainHUDInstance) MainHUDInstance->HideButtonActionPrompt();)
+	// 4. UMG의 키 프롬프트 UI 즉시 숨김
+	if (MainHUDInstance)
+	{
+		MainHUDInstance->HideButtonActionPrompt();
+	}
 
 	// 5. 서버에 결과 보고
 	if (MyPlayerStateRef) // OnPossess에서 캐시된 PlayerState

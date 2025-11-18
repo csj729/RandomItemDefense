@@ -95,6 +95,10 @@ public:
 	UFUNCTION(Client, Reliable)
 	void Client_OnShowButtonActionUI(float TimingWindow, EButtonActionKey KeyToPress);
 
+	// [ ★★★ 추가 ★★★ ]
+	/** (Called by PlayerState) 서버로부터 받은 최종 결과를 HUD에 표시합니다. */
+	void OnButtonActionResult(bool bWasSuccess, int32 RewardIndex);
+
 protected:
 	/** True if the controlled character should navigate to the mouse cursor. */
 	uint32 bMoveToMouseCursor : 1;

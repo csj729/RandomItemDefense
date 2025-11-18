@@ -97,22 +97,35 @@ void UMonsterAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCal
 					{
 						AMyGameState* MyGameState = GetWorld() ? GetWorld()->GetGameState<AMyGameState>() : nullptr;
 						int32 CurrentWave = (MyGameState && MyGameState->GetCurrentWave() > 0) ? MyGameState->GetCurrentWave() : 1;
+						int32 BaseGold = 0;
+						int32 BonusGold = 0;
+						int32 FinalGold = 0;
 
 						if (Monster->IsBoss())
 						{
 							const int32 BossStage = CurrentWave / 10;
 							const int32 ItemChoiceReward = BossStage * 3;
 							PS->AddCommonItemChoice(ItemChoiceReward);
-							const int32 BaseGold = 3000;
-							const int32 BonusGold = (BossStage - 1) * 4000;
-							PS->AddGold(BaseGold + BonusGold);
+							BaseGold = 3000;
+							BonusGold = (BossStage - 1) * 4000;
 						}
 						else
 						{
-							const int32 BaseGold = 10;
-							const int32 BonusGold = (CurrentWave - 1) * 5;
-							PS->AddGold(FMath::Max(BaseGold, BaseGold + BonusGold));
+							BaseGold = 10;
+							BonusGold = (CurrentWave - 1) * 5;
 						}
+
+						FinalGold = BaseGold + BonusGold;
+
+						if (KillerCharacter->GetAbilitySystemComponent() &&
+							KillerCharacter->GetAbilitySystemComponent()->HasMatchingGameplayTag(FGameplayTag::RequestGameplayTag(FName("Buff.Reward.Gold"))))
+						{
+							FinalGold *= 1.5f; // 버프가 있으면 2배!
+							// (선택) 화면에 "골드 2배!" 같은 로그나 이펙트를 띄울 수도 있음
+						}
+
+						PS->AddGold(FMath::Max(BaseGold, FinalGold));
+
 					}
 				}
 				FGameplayTagContainer EffectTags;
@@ -145,7 +158,7 @@ void UMonsterAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCal
 			else
 			{
 				// [3] 힐 또는 기타 효과 (기존과 동일)
-				RID_LOG(FColor::Orange, TEXT("MonsterAttributeSet: Health changed, but NOT hit (Magnitude: %.1f) and NOT dead (NewHealth: %.1f)."), Magnitude, NewHealth);
+				// RID_LOG(FColor::Orange, TEXT("MonsterAttributeSet: Health changed, but NOT hit (Magnitude: %.1f) and NOT dead (NewHealth: %.1f)."), Magnitude, NewHealth);
 			}
 		}
 	}
