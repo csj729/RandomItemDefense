@@ -98,6 +98,7 @@ void AMonsterSpawner::SpawnMonster()
 				{
 					int32 CurrentWave = MyGameState->GetCurrentWave(); // (1부터 시작)
 
+					SpawnedMonster->SetSpawnWaveIndex(CurrentWave);
 					// --- [ ★★★ 웨이브 스케일링 스탯 적용 로직 (수정됨) ★★★ ] ---
 					UAbilitySystemComponent* MonsterASC = SpawnedMonster->GetAbilitySystemComponent();
 					if (MonsterASC)

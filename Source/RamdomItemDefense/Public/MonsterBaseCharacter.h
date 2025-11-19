@@ -70,6 +70,9 @@ public:
 	/** (AIController가 폰에 빙의될 때 호출됨) AI 관련 초기화 수행 */
 	virtual void PossessedBy(AController* NewController) override;
 
+	void SetSpawnWaveIndex(int32 InWaveIndex) { SpawnWaveIndex = InWaveIndex; }
+	int32 GetSpawnWaveIndex() const { return SpawnWaveIndex; }
+
 
 protected:
 	virtual void BeginPlay() override;
@@ -114,6 +117,10 @@ protected:
 
 	UFUNCTION()
 	void OnRep_WaveMaterial();
+
+	/** 이 몬스터가 스폰된 웨이브 번호 */
+	UPROPERTY(VisibleAnywhere, Category = "Stats")
+	int32 SpawnWaveIndex;
 
 protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Effects")

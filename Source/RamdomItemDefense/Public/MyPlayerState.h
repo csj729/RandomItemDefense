@@ -214,7 +214,7 @@ protected:
 	FTimerHandle ButtonActionInputTimeoutHandle;
 
 	/** 버튼 액션 레벨별 입력 허용 시간 (초) (0~5단계) */
-	TArray<float> ButtonActionTimingWindows = { 2.0f, 1.6f, 1.2f, 1.0f, 0.7f, 0.2f };
+	TArray<float> ButtonActionTimingWindows = { 2.0f, 1.6f, 1.2f, 1.0f, 0.7f};
 
 	/** 현재 시퀀스에서 요구되는 키 (서버 전용 상태) */
 	EButtonActionKey CurrentRequiredButtonActionKey;

@@ -40,6 +40,7 @@ AMonsterBaseCharacter::AMonsterBaseCharacter()
 	CurrentWaveMaterial = nullptr;
 
 	BaseMoveSpeed = 300.0f;
+	SpawnWaveIndex = 1;
 }
 
 // ... (GetLifetimeReplicatedProps, GetAbilitySystemComponent, PossessedBy, BeginPlay, HandleHealthChanged, HandleMoveSpeedChanged, SetSpawner 함수는 모두 동일) ...

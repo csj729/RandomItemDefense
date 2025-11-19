@@ -95,8 +95,9 @@ void UMonsterAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCal
 					AMyPlayerState* PS = KillerCharacter->GetPlayerState<AMyPlayerState>();
 					if (PS)
 					{
-						AMyGameState* MyGameState = GetWorld() ? GetWorld()->GetGameState<AMyGameState>() : nullptr;
-						int32 CurrentWave = (MyGameState && MyGameState->GetCurrentWave() > 0) ? MyGameState->GetCurrentWave() : 1;
+						int32 CurrentWave = Monster->GetSpawnWaveIndex();
+						if (CurrentWave <= 0) CurrentWave = 1; // 안전 장치
+
 						int32 BaseGold = 0;
 						int32 BonusGold = 0;
 						int32 FinalGold = 0;
@@ -118,7 +119,7 @@ void UMonsterAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCal
 						FinalGold = BaseGold + BonusGold;
 
 						if (KillerCharacter->GetAbilitySystemComponent() &&
-							KillerCharacter->GetAbilitySystemComponent()->HasMatchingGameplayTag(FGameplayTag::RequestGameplayTag(FName("Buff.Reward.Gold"))))
+							KillerCharacter->GetAbilitySystemComponent()->HasMatchingGameplayTag(FGameplayTag::RequestGameplayTag(FName("ButtonAction.Reward.Gold"))))
 						{
 							FinalGold *= 1.5f; // 버프가 있으면 2배!
 							// (선택) 화면에 "골드 2배!" 같은 로그나 이펙트를 띄울 수도 있음

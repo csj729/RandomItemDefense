@@ -584,19 +584,34 @@ void AMyPlayerState::Server_ReportButtonActionSuccess_Implementation()
 	OnRep_ButtonActionLevel();
 }
 
-/** (클라 -> 서버) 플레이어가 "실패(틀린 키)"를 보고 */
 void AMyPlayerState::Server_ReportButtonActionFailure_Implementation()
 {
 	// (중복 방지) 타임아웃이 먼저 발생했거나, 잘못된 호출이면 무시
 	if (!HasAuthority() || !bIsWaitingForButtonActionInput) return;
 
-	bIsWaitingForButtonActionInput = false; // 상태 해제
+	// 1. 상태 해제 및 타임아웃 타이머 중지
+	bIsWaitingForButtonActionInput = false;
 	GetWorld()->GetTimerManager().ClearTimer(ButtonActionInputTimeoutHandle);
 
+	// 2. 클라이언트에게 실패 알림 (UI 갱신)
 	Client_NotifyButtonActionResult(false);
-	// 실패(타임아웃) 로직을 그대로 실행 (실패 기록, 레벨 0, 타이머 중지)
-	OnButtonActionTimeout();
+
+	// --- [ ★★★ 수정: OnButtonActionTimeout() 호출 대신 직접 로직 수행 ★★★ ] ---
+
+	// 3. 로그 출력
 	LOG_PLAYERSTATE(FColor::Orange, TEXT("Button Action FAILED (Wrong Key). Level reset to 0."));
+
+	// 4. 이번 스테이지 실패 기록
+	bIsButtonActionSequenceFinishedThisStage = true;
+
+	// 5. 난이도(레벨) 0으로 초기화 (핵심!)
+	ButtonActionLevel = 0;
+	OnRep_ButtonActionLevel(); // UI 갱신
+
+	// 6. 다음 타이머 예약 취소 (이번 스테이지 기회 끝)
+	GetWorld()->GetTimerManager().ClearTimer(ButtonActionTimerHandle);
+
+	// -----------------------------------------------------------------------
 }
 
 void AMyPlayerState::Client_NotifyButtonActionResult_Implementation(bool bWasSuccess, int32 RewardIndex)
