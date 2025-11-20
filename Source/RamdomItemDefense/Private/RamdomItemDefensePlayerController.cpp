@@ -81,6 +81,8 @@ void ARamdomItemDefensePlayerController::BeginPlay()
 
 			// 초기에는 메인 HUD만 보이도록
 			if (MainHUDInstance) MainHUDInstance->AddToViewport();
+
+			TryBindPlayerState();
 		}
 		// -----------------------------
 	}
@@ -89,12 +91,6 @@ void ARamdomItemDefensePlayerController::BeginPlay()
 void ARamdomItemDefensePlayerController::OnPossess(APawn* InPawn)
 {
 	Super::OnPossess(InPawn);
-
-	// 로컬 플레이어 컨트롤러인 경우에만 PlayerState 델리게이트 바인딩
-	if (IsLocalPlayerController())
-	{
-		TryBindPlayerState();
-	}
 }
 
 // [추가] 재귀적 바인딩 함수 구현

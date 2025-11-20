@@ -14,7 +14,7 @@ void UInventoryWidget::NativeDestruct()
 {
 	Super::NativeDestruct();
 	// 위젯이 꺼질 때 안전하게 연결 해제
-	if (InventoryComp.IsValid())
+	if (InventoryComp)
 	{
 		InventoryComp->OnInventoryUpdated.RemoveDynamic(this, &UInventoryWidget::HandleInventoryUpdated);
 	}
@@ -22,34 +22,34 @@ void UInventoryWidget::NativeDestruct()
 
 void UInventoryWidget::BindDataSources()
 {
-	// 1. 인벤토리 컴포넌트 찾기
-	if (!InventoryComp.IsValid())
-	{
-		if (ARamdomItemDefenseCharacter* Character = GetOwningPlayerPawn<ARamdomItemDefenseCharacter>())
-		{
-			InventoryComp = Character->GetInventoryComponent();
-			if (InventoryComp.IsValid())
-			{
-				// 델리게이트 중복 방지 체크 후 연결
-				if (!InventoryComp->OnInventoryUpdated.IsAlreadyBound(this, &UInventoryWidget::HandleInventoryUpdated))
-				{
-					InventoryComp->OnInventoryUpdated.AddDynamic(this, &UInventoryWidget::HandleInventoryUpdated);
-				}
+    // 1. 인벤토리 컴포넌트 참조가 없다면 찾기 시도
+    if (!InventoryComp)
+    {
+        if (ARamdomItemDefenseCharacter* Character = GetOwningPlayerPawn<ARamdomItemDefenseCharacter>())
+        {
+            InventoryComp = Character->GetInventoryComponent();
+        }
+    }
 
-				// 연결 성공 로그
-				UE_LOG(LogRamdomItemDefense, Log, TEXT("InventoryWidget: InventoryComponent Bound Successfully!"));
+    // 2. 인벤토리 컴포넌트가 유효하다면 (새로 찾았든, 예전부터 알고 있었든)
+    if (InventoryComp)
+    {
+        // "이미 알고 있다"고 넘어가는 게 아니라, "연결이 안 되어 있으면 다시 연결"합니다.
+        if (!InventoryComp->OnInventoryUpdated.IsAlreadyBound(this, &UInventoryWidget::HandleInventoryUpdated))
+        {
+            InventoryComp->OnInventoryUpdated.AddDynamic(this, &UInventoryWidget::HandleInventoryUpdated);
 
-				// 연결 즉시 초기화면 갱신 (이미 들어있는 아이템 표시)
-				HandleInventoryUpdated();
-			}
-		}
-	}
+            // 연결 직후 UI를 강제로 한 번 갱신해 줍니다. (창을 켤 때 최신 상태 반영)
+            HandleInventoryUpdated();
 
-	// 2. [핵심] 인벤토리 컴포넌트를 아직 못 찾았다면 다음 프레임에 다시 시도 (무한 재시도)
-	if (!InventoryComp.IsValid())
-	{
-		GetWorld()->GetTimerManager().SetTimerForNextTick(this, &UInventoryWidget::BindDataSources);
-	}
+            UE_LOG(LogRamdomItemDefense, Log, TEXT("InventoryWidget: Delegate Re-Bound Successfully!"));
+        }
+    }
+    // 3. 아직도 못 찾았다면 다음 틱에 재시도
+    else
+    {
+        GetWorld()->GetTimerManager().SetTimerForNextTick(this, &UInventoryWidget::BindDataSources);
+    }
 }
 
 void UInventoryWidget::HandleInventoryUpdated()

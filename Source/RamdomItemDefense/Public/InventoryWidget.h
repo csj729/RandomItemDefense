@@ -20,7 +20,7 @@ protected:
 
 	// --- 데이터 소스 ---
 	UPROPERTY(BlueprintReadOnly, Category = "Data")
-	TWeakObjectPtr<UInventoryComponent> InventoryComp;
+	TObjectPtr<UInventoryComponent> InventoryComp;
 
 	// [삭제됨] MyPlayerState (골드는 MainHUD에서 관리)
 
@@ -32,7 +32,6 @@ protected:
 
 public:
 	// --- [블루프린트 구현용 이벤트] ---
-	/** 인벤토리가 변경됨 -> BP야, 아이템 슬롯들 다시 그려라! */
 	UFUNCTION(BlueprintImplementableEvent, Category = "UI Events")
 	void OnInventoryUpdated();
 

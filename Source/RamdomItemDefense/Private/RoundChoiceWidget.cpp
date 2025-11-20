@@ -33,22 +33,27 @@ void URoundChoiceWidget::NativeConstruct()
 // [추가] 재귀적 바인딩 함수
 void URoundChoiceWidget::BindPlayerState()
 {
-	if (MyPlayerState) return;
+	// 1. PlayerState가 없다면 찾기 시도
+	if (MyPlayerState == nullptr)
+	{
+		MyPlayerState = GetOwningPlayerState<AMyPlayerState>();
+	}
 
-	MyPlayerState = GetOwningPlayerState<AMyPlayerState>();
-
+	// 2. PlayerState가 유효하다면 (새로 찾았든, 기존에 있었든) 바인딩 시도
 	if (MyPlayerState)
 	{
+		// 이미 바인딩되어 있는지 확인 후, 안 되어 있다면 바인딩 (재연결 핵심)
 		if (!MyPlayerState->OnChoiceCountChangedDelegate.IsAlreadyBound(this, &URoundChoiceWidget::HandleChoiceCountChanged))
 		{
 			MyPlayerState->OnChoiceCountChangedDelegate.AddDynamic(this, &URoundChoiceWidget::HandleChoiceCountChanged);
 		}
-		// 초기값 갱신
+
+		// 초기값 갱신 (현재 선택 횟수 반영)
 		HandleChoiceCountChanged(MyPlayerState->GetChoiceCount());
 	}
 	else
 	{
-		// [핵심] 무한 재시도
+		// 아직 PlayerState가 없다면 다음 틱에 재시도
 		GetWorld()->GetTimerManager().SetTimerForNextTick(this, &URoundChoiceWidget::BindPlayerState);
 	}
 }

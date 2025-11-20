@@ -34,6 +34,7 @@ void UInventoryComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& 
 void UInventoryComponent::OnRep_InventoryItems()
 {
 	// 클라이언트 UI에게 "데이터 바꼈으니 다시 그려!"라고 알림
+	UE_LOG(LogRamdomItemDefense, Warning, TEXT("OnRep_InventoryItems Called! Item Count: %d"), InventoryItems.Num());
 	OnInventoryUpdated.Broadcast();
 
 	// 로그 확인용
