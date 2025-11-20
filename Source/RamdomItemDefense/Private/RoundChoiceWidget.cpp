@@ -27,31 +27,30 @@ void URoundChoiceWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
 
-	// PlayerState 참조 가져오기
+	BindPlayerState();
+}
+
+// [추가] 재귀적 바인딩 함수
+void URoundChoiceWidget::BindPlayerState()
+{
+	if (MyPlayerState) return;
+
 	MyPlayerState = GetOwningPlayerState<AMyPlayerState>();
 
-	// PlayerState 유효성 검사 및 '델리게이트' 바인딩
 	if (MyPlayerState)
 	{
-		// PlayerState의 선택 횟수 변경 델리게이트에 C++ 함수 바인딩
-		MyPlayerState->OnChoiceCountChangedDelegate.AddDynamic(this, &URoundChoiceWidget::HandleChoiceCountChanged);
-		// 현재 값으로 텍스트 즉시 업데이트
+		if (!MyPlayerState->OnChoiceCountChangedDelegate.IsAlreadyBound(this, &URoundChoiceWidget::HandleChoiceCountChanged))
+		{
+			MyPlayerState->OnChoiceCountChangedDelegate.AddDynamic(this, &URoundChoiceWidget::HandleChoiceCountChanged);
+		}
+		// 초기값 갱신
 		HandleChoiceCountChanged(MyPlayerState->GetChoiceCount());
 	}
 	else
 	{
-		// PlayerState가 아직 준비되지 않았다면 다음 틱에 다시 시도
-		GetWorld()->GetTimerManager().SetTimerForNextTick([this]() {
-			MyPlayerState = GetOwningPlayerState<AMyPlayerState>();
-			if (MyPlayerState)
-			{
-				MyPlayerState->OnChoiceCountChangedDelegate.AddDynamic(this, &URoundChoiceWidget::HandleChoiceCountChanged);
-				HandleChoiceCountChanged(MyPlayerState->GetChoiceCount());
-			}
-			});
+		// [핵심] 무한 재시도
+		GetWorld()->GetTimerManager().SetTimerForNextTick(this, &URoundChoiceWidget::BindPlayerState);
 	}
-
-	// [주의] 버튼 클릭 바인딩(OnClicked.AddDynamic)은 NativeOnInitialized()로 이동했습니다.
 }
 
 /** 위젯이 뷰포트에서 '제거될 때마다' 호출 */

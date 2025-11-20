@@ -29,66 +29,64 @@ void UStatUpgradeWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
 
-	// PlayerState 참조 가져오기 및 델리게이트 바인딩
-	MyPlayerState = GetOwningPlayerState<AMyPlayerState>();
-	if (MyPlayerState)
-	{
-		MyPlayerState->OnGoldChangedDelegate.AddDynamic(this, &UStatUpgradeWidget::HandleGoldChanged);
-		MyPlayerState->OnStatLevelChangedDelegate.AddDynamic(this, &UStatUpgradeWidget::HandleStatLevelChanged);
+	// [수정] 바인딩 함수 호출
+	BindPlayerState();
 
-		// 초기 UI 업데이트
-		HandleGoldChanged(MyPlayerState->GetGold());
-		UpdateAllStatLines(); // 레벨, 비용, 버튼 상태 초기화
-	}
-	else
-	{
-		// PlayerState가 늦게 로드될 경우 다음 틱에 재시도
-		GetWorld()->GetTimerManager().SetTimerForNextTick([this]() {
-			MyPlayerState = GetOwningPlayerState<AMyPlayerState>();
-			if (MyPlayerState)
-			{
-				MyPlayerState->OnGoldChangedDelegate.AddDynamic(this, &UStatUpgradeWidget::HandleGoldChanged);
-				MyPlayerState->OnStatLevelChangedDelegate.AddDynamic(this, &UStatUpgradeWidget::HandleStatLevelChanged);
-				HandleGoldChanged(MyPlayerState->GetGold());
-				UpdateAllStatLines();
-				// ASC 바인딩도 여기서 다시 시도해야 할 수 있음
-				// ... (아래 ASC 바인딩 로직 복사) ...
-			}
-			});
-	}
-
-	// 캐릭터의 ASC 참조 가져오기 및 스탯 변경 델리게이트 바인딩
+	// 캐릭터의 ASC 참조 가져오기 (이 부분도 안전하게 재시도 로직에 넣거나, ASC는 보통 BeginPlay 시점에 이미 있으므로 유지)
 	ARamdomItemDefenseCharacter* OwningCharacter = GetOwningPlayerPawn<ARamdomItemDefenseCharacter>();
 	if (OwningCharacter)
 	{
 		OwningASC = OwningCharacter->GetAbilitySystemComponent();
 		if (OwningASC.IsValid())
 		{
-			// 각 Attribute 변경 시 해당 핸들러 함수를 호출하도록 연결
+			// (기존 ASC 델리게이트 바인딩 로직 그대로 유지)
 			OwningASC->GetGameplayAttributeValueChangeDelegate(UMyAttributeSet::GetAttackDamageAttribute()).AddUObject(this, &UStatUpgradeWidget::HandleAttackDamageChanged);
 			OwningASC->GetGameplayAttributeValueChangeDelegate(UMyAttributeSet::GetAttackSpeedAttribute()).AddUObject(this, &UStatUpgradeWidget::HandleAttackSpeedChanged);
 			OwningASC->GetGameplayAttributeValueChangeDelegate(UMyAttributeSet::GetCritDamageAttribute()).AddUObject(this, &UStatUpgradeWidget::HandleCritDamageChanged);
 			OwningASC->GetGameplayAttributeValueChangeDelegate(UMyAttributeSet::GetArmorReductionAttribute()).AddUObject(this, &UStatUpgradeWidget::HandleArmorReductionChanged);
 			OwningASC->GetGameplayAttributeValueChangeDelegate(UMyAttributeSet::GetSkillActivationChanceAttribute()).AddUObject(this, &UStatUpgradeWidget::HandleSkillChanceChanged);
-			// (골드 강화 불가 스탯 값 표시가 필요하다면 여기서 바인딩 추가)
-			// OwningASC->GetGameplayAttributeValueChangeDelegate(UMyAttributeSet::GetCritChanceAttribute()).AddUObject(this, &UStatUpgradeWidget::HandleCritChanceChanged); // 예시
 
-			// 초기 스탯 값 UI 업데이트
-			// 각 핸들러를 직접 호출하여 초기 값을 설정합니다.
-			FOnAttributeChangeData DummyData; // 임시 데이터 구조체
+			// 초기값 업데이트
+			FOnAttributeChangeData DummyData;
 			DummyData.NewValue = OwningASC->GetNumericAttribute(UMyAttributeSet::GetAttackDamageAttribute()); HandleAttackDamageChanged(DummyData);
 			DummyData.NewValue = OwningASC->GetNumericAttribute(UMyAttributeSet::GetAttackSpeedAttribute()); HandleAttackSpeedChanged(DummyData);
 			DummyData.NewValue = OwningASC->GetNumericAttribute(UMyAttributeSet::GetCritDamageAttribute()); HandleCritDamageChanged(DummyData);
 			DummyData.NewValue = OwningASC->GetNumericAttribute(UMyAttributeSet::GetArmorReductionAttribute()); HandleArmorReductionChanged(DummyData);
 			DummyData.NewValue = OwningASC->GetNumericAttribute(UMyAttributeSet::GetSkillActivationChanceAttribute()); HandleSkillChanceChanged(DummyData);
-			// (다른 스탯 초기값 설정도 필요시 추가)
 		}
 	}
+}
 
+void UStatUpgradeWidget::BindPlayerState()
+{
+	// 이미 바인딩 되었다면 중복 실행 방지 (선택 사항)
+	if (MyPlayerState) return;
 
-	// --- [ ★★★ 코드 이동 ★★★ ] ---
-	// 버튼 클릭 이벤트 바인딩 로직은 모두 NativeOnInitialized()로 이동했습니다.
-	// --- [ 코드 이동 끝 ] ---
+	MyPlayerState = GetOwningPlayerState<AMyPlayerState>();
+
+	if (MyPlayerState)
+	{
+		// 델리게이트 중복 바인딩 방지 체크
+		if (!MyPlayerState->OnGoldChangedDelegate.IsAlreadyBound(this, &UStatUpgradeWidget::HandleGoldChanged))
+		{
+			MyPlayerState->OnGoldChangedDelegate.AddDynamic(this, &UStatUpgradeWidget::HandleGoldChanged);
+		}
+		if (!MyPlayerState->OnStatLevelChangedDelegate.IsAlreadyBound(this, &UStatUpgradeWidget::HandleStatLevelChanged))
+		{
+			MyPlayerState->OnStatLevelChangedDelegate.AddDynamic(this, &UStatUpgradeWidget::HandleStatLevelChanged);
+		}
+
+		// 초기 UI 업데이트
+		HandleGoldChanged(MyPlayerState->GetGold());
+		UpdateAllStatLines();
+
+		UE_LOG(LogRamdomItemDefense, Log, TEXT("StatUpgradeWidget: PlayerState Bound Successfully!"));
+	}
+	else
+	{
+		// [핵심] 실패 시 다음 틱에 자기 자신을 다시 호출 (무한 재시도)
+		GetWorld()->GetTimerManager().SetTimerForNextTick(this, &UStatUpgradeWidget::BindPlayerState);
+	}
 }
 
 // 골드 변경 시 호출

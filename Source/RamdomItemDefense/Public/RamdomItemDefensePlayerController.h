@@ -200,6 +200,8 @@ protected:
 	/** (추가) 모든 버튼 액션 입력을 처리하는 공통 헬퍼 함수 */
 	void HandleButtonActionInput(EButtonActionKey KeyPressed);
 
+	void TryBindPlayerState();
+
 private:
 	FVector CachedDestination;
 

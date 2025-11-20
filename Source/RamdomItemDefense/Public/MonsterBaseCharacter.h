@@ -55,6 +55,9 @@ public:
 
 	virtual void Die(AActor* Killer);
 
+	UFUNCTION(NetMulticast, Unreliable)
+	void Multicast_PlayMontage(UAnimMontage* MontageToPlay);
+
 	UFUNCTION(BlueprintPure, Category = "Stats")
 	bool IsDying() const { return bIsDying; }
 
@@ -172,5 +175,7 @@ private:
 
 	/** 몽타주 종료 후 랙돌로 전환하는 함수 */
 	void GoRagdoll();
-	// --- [ ★★★ 코드 추가 끝 ★★★ ] ---
+
+	UFUNCTION(NetMulticast, Reliable)
+	void Multicast_GoRagdoll();
 };

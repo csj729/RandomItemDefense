@@ -2,16 +2,15 @@
 
 #include "GA_Soldier_Grenade.h"
 #include "RamdomItemDefense.h"
+#include "RamdomItemDefenseCharacter.h"
 #include "AbilitySystemComponent.h"
 #include "MyAttributeSet.h"
 #include "AbilitySystemBlueprintLibrary.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "MonsterBaseCharacter.h"
 #include "RID_DamageStatics.h"
-// --- [ ★★★ 수정 ★★★ ] ---
-#include "Kismet/GameplayStatics.h" // NiagaraFunctionLibrary -> GameplayStatics
-#include "Particles/ParticleSystem.h" // 헤더 추가
-// --- [ ★★★ 수정 끝 ★★★ ] ---
+#include "Kismet/GameplayStatics.h"
+#include "Particles/ParticleSystem.h"
 
 UGA_Soldier_Grenade::UGA_Soldier_Grenade()
 {
@@ -52,14 +51,18 @@ void UGA_Soldier_Grenade::ActivateAbility(const FGameplayAbilitySpecHandle Handl
 
 	FVector ImpactLocation = TriggerEventData->Target.Get()->GetActorLocation();
 
-	// --- [ ★★★ 수정 ★★★ ] ---
-	// 이펙트 스폰 (캐스케이드)
 	if (ImpactEffect)
 	{
-		// UNiagaraFunctionLibrary::SpawnSystemAtLocation -> UGameplayStatics::SpawnEmitterAtLocation
-		UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), ImpactEffect, ImpactLocation, FRotator::ZeroRotator, ImpactEffectScale, true);
+		if (ARamdomItemDefenseCharacter* OwnerCharacter = Cast<ARamdomItemDefenseCharacter>(ActorInfo->AvatarActor.Get()))
+		{
+			OwnerCharacter->Multicast_SpawnParticleAtLocation(
+				ImpactEffect,
+				ImpactLocation,
+				FRotator::ZeroRotator,
+				ImpactEffectScale
+			);
+		}
 	}
-	// --- [ ★★★ 수정 끝 ★★★ ] ---
 
 	// (이하 데미지 및 GE 적용 로직은 동일)
 	const float CasterAttackDamage = AttributeSet->GetAttackDamage();

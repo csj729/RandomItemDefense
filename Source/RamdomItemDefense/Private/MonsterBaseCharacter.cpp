@@ -134,6 +134,14 @@ void AMonsterBaseCharacter::SetSpawner(AMonsterSpawner* InSpawner)
 	MySpawner = InSpawner;
 }
 
+void AMonsterBaseCharacter::Multicast_PlayMontage_Implementation(UAnimMontage* MontageToPlay)
+{
+	// 서버와 모든 클라이언트에서 실행됨
+	if (MontageToPlay)
+	{
+		PlayAnimMontage(MontageToPlay);
+	}
+}
 
 void AMonsterBaseCharacter::Die(AActor* Killer)
 {
@@ -169,13 +177,10 @@ void AMonsterBaseCharacter::Die(AActor* Killer)
 
 	if (DeathMontage)
 	{
-		float DeathAnimLength = PlayAnimMontage(DeathMontage);
+		Multicast_PlayMontage(DeathMontage);
 
-		// (★★★) 몽타주의 블렌드 아웃 시간을 가져옵니다.
+		const float DeathAnimLength = DeathMontage->GetPlayLength(); // 몽타주 길이 직접 조회
 		const float BlendOutTime = DeathMontage->BlendOut.GetBlendTime();
-
-		// (★★★) 랙돌 지연 시간 = (전체 길이 - 블렌드 아웃 시간) - (안전 버퍼)
-		// 이렇게 하면 블렌드 아웃이 시작되기 *직전에* 랙돌이 활성화됩니다.
 		RagdollDelay = FMath::Max(0.01f, DeathAnimLength - BlendOutTime - 0.05f);
 	}
 
@@ -190,19 +195,45 @@ void AMonsterBaseCharacter::Die(AActor* Killer)
 	// --- [ ★★★ 수정 끝 ★★★ ] ---
 }
 
-// (★★★) 몽타주 종료 후 랙돌로 전환하는 함수 (수정됨)
 void AMonsterBaseCharacter::GoRagdoll()
 {
-	if (GetMesh())	
-	{
-		GetMesh()->SetCollisionProfileName(TEXT("Ragdoll"));
-		GetMesh()->SetCollisionEnabled(ECollisionEnabled::PhysicsOnly);
-		GetMesh()->SetSimulatePhysics(true);
-	}
-	// 5. 랙돌이 2초(요청대로) 뒤에 사라지도록 최종 LifeSpan 설정
+	// 1. 모든 클라이언트(본인 포함)에게 랙돌 명령 전송
+	Multicast_GoRagdoll();
+
+	// 2. (서버 전용) 액터 소멸 타이머 설정 (랙돌 전환 2초 후 삭제)
 	SetLifeSpan(2.0f);
 }
 
+// [추가] 실제 랙돌 로직 (서버 + 모든 클라이언트 실행)
+void AMonsterBaseCharacter::Multicast_GoRagdoll_Implementation()
+{
+	// 1. 캡슐 콜리전 완전 제거 (시체에 길막힘 방지)
+	if (GetCapsuleComponent())
+	{
+		GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	}
+
+	// 2. 메쉬 물리 시뮬레이션 활성화
+	if (GetMesh())
+	{
+		// 랙돌용 콜리전 프로필 설정 (PhysicsBody 등)
+		GetMesh()->SetCollisionProfileName(TEXT("Ragdoll"));
+		// 물리 시뮬레이션 켜기
+		GetMesh()->SetSimulatePhysics(true);
+		// (선택) 애니메이션 인스턴스의 몽타주 강제 중지
+		if (GetMesh()->GetAnimInstance())
+		{
+			GetMesh()->GetAnimInstance()->StopAllMontages(0.0f);
+		}
+	}
+
+	// 3. 무브먼트 컴포넌트 정지 (혹시 모를 이동 방지)
+	if (GetCharacterMovement())
+	{
+		GetCharacterMovement()->StopMovementImmediately();
+		GetCharacterMovement()->DisableMovement();
+	}
+}
 
 void AMonsterBaseCharacter::SetWaveMaterial(UMaterialInterface* WaveMaterial)
 // ... (이하 SetWaveMaterial, OnRep_WaveMaterial, PlayHitEffect, Multicast_PlayHitEffect, OnStunTagChanged, OnSlowTagChanged, OnCritDamageOccurred 함수는 모두 동일) ...

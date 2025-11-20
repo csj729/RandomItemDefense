@@ -10,6 +10,8 @@ UGA_AttackSelector::UGA_AttackSelector()
 {
 	// 이 어빌리티는 Event.Attack.Perform 태그로 활성화됩니다. (BP에서 설정 필요)
 	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
+
+	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::ServerOnly;
 }
 
 void UGA_AttackSelector::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)

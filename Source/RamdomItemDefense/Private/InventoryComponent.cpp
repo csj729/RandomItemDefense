@@ -7,6 +7,7 @@
 #include "Engine/Engine.h" // GEngine 디버그 메시지
 #include "GameplayTagsManager.h" // GameplayTag 관련
 #include "RamdomItemDefense.h" // RID_LOG 매크로용 (이제 LOG_INVENTORY가 대체)
+#include "Net/UnrealNetwork.h"
 
 // --- [ ★★★ 로그 카테고리 정의 ★★★ ] ---
 // .h 파일에서 선언한 로그 카테고리를 여기서 정의(구현)합니다.
@@ -18,7 +19,25 @@ UInventoryComponent::UInventoryComponent()
 {
 	// 이 컴포넌트는 서버에만 존재하므로 Tick은 필요 없습니다.
 	PrimaryComponentTick.bCanEverTick = false;
-	// 복제 설정은 필요 없습니다.
+	SetIsReplicatedByDefault(true);
+}
+
+// [추가] 복제할 변수 등록
+void UInventoryComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	// InventoryItems 배열을 복제 대상으로 등록
+	DOREPLIFETIME(UInventoryComponent, InventoryItems);
+}
+
+void UInventoryComponent::OnRep_InventoryItems()
+{
+	// 클라이언트 UI에게 "데이터 바꼈으니 다시 그려!"라고 알림
+	OnInventoryUpdated.Broadcast();
+
+	// 로그 확인용
+	// LOG_INVENTORY(FColor::Green, TEXT("Client Inventory Updated! Count: %d"), InventoryItems.Num());
 }
 
 void UInventoryComponent::Initialize(UAbilitySystemComponent* InASC)
@@ -157,7 +176,7 @@ void UInventoryComponent::AddItem(FName ItemID)
 	}
 
 	InventoryItems.Add(ItemID);
-	OnInventoryUpdated.Broadcast();
+	OnRep_InventoryItems();
 	// --- [ ★★★ 로그 매크로 교체 ★★★ ] ---
 	LOG_INVENTORY(FColor::Green, TEXT("Item Added (SBC): %s"), *ItemID.ToString());
 	// ---------------------------------
@@ -271,7 +290,7 @@ void UInventoryComponent::RemoveItem(FName ItemID)
 	}
 	// --------------------------------------------------------
 
-	OnInventoryUpdated.Broadcast(); // UI 갱신 알림
+	OnRep_InventoryItems(); // UI 갱신 알림
 	// --- [ ★★★ 로그 매크로 교체 ★★★ ] ---
 	LOG_INVENTORY(FColor::Yellow, TEXT("Item Removed: %s"), *ItemID.ToString());
 	// ---------------------------------

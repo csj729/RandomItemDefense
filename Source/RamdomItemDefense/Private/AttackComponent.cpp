@@ -18,6 +18,8 @@ UAttackComponent::UAttackComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
 	OwnerCharacter = nullptr;
+
+	SetIsReplicatedByDefault(true);
 }
 
 void UAttackComponent::BeginPlay()
@@ -87,17 +89,13 @@ void UAttackComponent::OnAttackSpeedChanged(const FOnAttributeChangeData& Data)
 	}
 }
 
-void UAttackComponent::OrderAttack(AActor* Target)
+void UAttackComponent::OrderAttack_Implementation(AActor* Target)
 {
-	if (!Target || !GetOwner() || !GetOwner()->HasAuthority())
-	{
-		return;
-	}
+	if (!Target) return;
 
 	APawn* OwnerPawn = Cast<APawn>(GetOwner());
 	AController* MyController = OwnerPawn ? OwnerPawn->GetController() : nullptr;
 
-	// [ ★★★ UE_LOG 수정 ★★★ ]
 	UE_LOG(LogRamdomItemDefense, Log, TEXT("AttackComponent [%s]: OrderAttack received for Target(%s)."), *GetNameSafe(GetOwner()), *GetNameSafe(Target));
 
 	ManualTarget = Target;
@@ -243,13 +241,20 @@ void UAttackComponent::PerformAttack()
 					return;
 				}
 
+				// 1. 바라볼 회전값 계산 (서버에서 계산)
 				FRotator LookAtRotation = UKismetMathLibrary::FindLookAtRotation(OwnerCharacter->GetActorLocation(), TargetToAttack->GetActorLocation());
-				OwnerCharacter->SetActorRotation(FRotator(0.f, LookAtRotation.Yaw, 0.f));
+
+				// Z축 회전(Yaw)만 남기고 나머지는 0으로 (기울어짐 방지)
+				LookAtRotation.Pitch = 0.0f;
+				LookAtRotation.Roll = 0.0f;
+
+				// (서버에서도 회전 적용 - 싱크를 위해)
+				OwnerCharacter->SetActorRotation(LookAtRotation);
 
 				UAnimMontage* MontageToPlay = OwnerCharacter->GetRandomAttackMontage();
 				if (MontageToPlay)
 				{
-					OwnerCharacter->PlayAnimMontage(MontageToPlay);
+					OwnerCharacter->Multicast_PlayAttack(MontageToPlay, LookAtRotation);
 				}
 			}
 

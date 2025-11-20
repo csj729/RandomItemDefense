@@ -24,6 +24,8 @@ protected:
 	/** 위젯이 뷰포트에서 제거될 때 '매번' 호출됩니다. (델리게이트 해제용) */
 	virtual void NativeDestruct() override;
 
+	void BindPlayerState();
+
 	/** PlayerState 참조 */
 	UPROPERTY(BlueprintReadOnly, Category = "PlayerState")
 	TObjectPtr<AMyPlayerState> MyPlayerState;

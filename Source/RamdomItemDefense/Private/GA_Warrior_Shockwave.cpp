@@ -55,7 +55,16 @@ void UGA_Warrior_Shockwave::ActivateAbility(const FGameplayAbilitySpecHandle Han
 	FVector ImpactLocation = TriggerEventData->Target.Get()->GetActorLocation();
 	if (ImpactEffect)
 	{
-		UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), ImpactEffect, ImpactLocation, FRotator::ZeroRotator, FVector(1.0f), true);
+		// [수정]
+		if (ARamdomItemDefenseCharacter* OwnerCharacter = Cast<ARamdomItemDefenseCharacter>(ActorInfo->AvatarActor.Get()))
+		{
+			OwnerCharacter->Multicast_SpawnParticleAtLocation(
+				ImpactEffect,
+				ImpactLocation,
+				FRotator::ZeroRotator,
+				FVector(1.0f)
+			);
+		}
 	}
 
 	// 5. 데미지 계산 (1회)

@@ -10,6 +10,7 @@
 #include "Particles/ParticleSystem.h"
 #include "GameplayEffectTypes.h" 
 #include "RamdomItemDefense.h" 
+#include "RamdomItemDefenseCharacter.h"
 #include "RID_DamageStatics.h" 
 
 UGA_MagicFighter_MeteorStrike::UGA_MagicFighter_MeteorStrike()
@@ -56,7 +57,16 @@ void UGA_MagicFighter_MeteorStrike::ActivateAbility(
 	// 3. '떨어지는' 이펙트 스폰 (시각 효과)
 	if (FallingEffect)
 	{
-		UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), FallingEffect, SpawnLocation, FRotator::ZeroRotator, true);
+		// [수정]
+		if (ARamdomItemDefenseCharacter* OwnerCharacter = Cast<ARamdomItemDefenseCharacter>(ActorInfo->AvatarActor.Get()))
+		{
+			OwnerCharacter->Multicast_SpawnParticleAtLocation(
+				FallingEffect,
+				SpawnLocation,
+				FRotator::ZeroRotator,
+				FVector(1.0f)
+			);
+		}
 	}
 
 	// 4. FallDuration(0.5초) 후에 Explode 함수를 호출하도록 타이머 설정
@@ -107,8 +117,18 @@ void UGA_MagicFighter_MeteorStrike::Explode()
 	}
 
 	// 4. '폭발' 이펙트 스폰 (시각 효과)
-	if (ExplosionEffect) UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), ExplosionEffect, ImpactLocation, FRotator::ZeroRotator, true);
-
+	if (ExplosionEffect)
+	{
+		if (ARamdomItemDefenseCharacter* OwnerCharacter = Cast<ARamdomItemDefenseCharacter>(GetCurrentActorInfo()->AvatarActor.Get()))
+		{
+			OwnerCharacter->Multicast_SpawnParticleAtLocation(
+				ExplosionEffect,
+				ImpactLocation,
+				FRotator::ZeroRotator,
+				FVector(1.0f)
+			);
+		}
+	}
 	// 5. ImpactLocation에서 500 반경 내 몬스터 찾기
 	TArray<AActor*> OverlappedActors;
 	TArray<TEnumAsByte<EObjectTypeQuery>> ObjectTypes;

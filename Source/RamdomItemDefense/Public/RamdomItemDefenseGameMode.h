@@ -17,6 +17,12 @@ class ARamdomItemDefenseGameMode : public AGameModeBase
 public:
 	ARamdomItemDefenseGameMode();
 
+	/** * 몬스터를 죽인 플레이어의 상대방에게 몬스터를 보냅니다.
+	 * @param KillerPlayerState 몬스터를 죽인 플레이어의 PS
+	 * @param MonsterClassToSpawn 보낼 몬스터 클래스 (죽은 몬스터와 동일하거나 변형)
+	 */
+	void SendCounterAttackMonster(APlayerState* KillerPlayerState, TSubclassOf<AMonsterBaseCharacter> MonsterClassToSpawn);
+
 protected:
 	virtual void BeginPlay() override;
 

@@ -25,6 +25,9 @@ protected:
 	/** 위젯 생성 시 호출 (블루프린트의 Event Construct) */
 	virtual void NativeConstruct() override;
 
+	// [추가] PlayerState 바인딩을 재시도하기 위한 함수
+	void BindPlayerState();
+
 	/** PlayerState 참조 */
 	UPROPERTY(BlueprintReadOnly, Category = "PlayerState")
 	TObjectPtr<AMyPlayerState> MyPlayerState;

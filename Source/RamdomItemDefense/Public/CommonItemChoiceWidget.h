@@ -27,6 +27,7 @@ protected:
 	/** 위젯이 뷰포트에서 제거될 때 (델리게이트 해제) */
 	virtual void NativeDestruct() override;
 
+	void BindDataSources();
 	/** PlayerState 참조 */
 	UPROPERTY(BlueprintReadOnly, Category = "PlayerState")
 	TObjectPtr<AMyPlayerState> MyPlayerState;

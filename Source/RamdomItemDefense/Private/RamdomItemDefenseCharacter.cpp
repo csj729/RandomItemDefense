@@ -22,6 +22,8 @@
 #include "Components/WidgetComponent.h" // 위젯 컴포넌트 사용 시
 #include "RID_DamageStatics.h" // 델리게이트 바인딩을 위해 포함
 #include "Blueprint/UserWidget.h"
+#include "Kismet/GameplayStatics.h"
+#include "Particles/ParticleSystem.h"
 
 ARamdomItemDefenseCharacter::ARamdomItemDefenseCharacter()
 {
@@ -213,4 +215,26 @@ UAnimMontage* ARamdomItemDefenseCharacter::GetRandomAttackMontage() const
 
 	// 3. 해당 인덱스의 몽타주를 반환합니다.
 	return DefaultAttackMontages[RandomIndex];
+}
+
+void ARamdomItemDefenseCharacter::Multicast_PlayAttack_Implementation(UAnimMontage* MontageToPlay, FRotator TargetRotation)
+{
+	// 1. 모든 클라이언트(나 포함)에서 즉시 회전 적용
+	// (Controller의 회전이 아니라 Actor의 회전을 강제로 맞춤)
+	SetActorRotation(TargetRotation);
+
+	// 2. 그 후 애니메이션 재생
+	if (MontageToPlay)
+	{
+		PlayAnimMontage(MontageToPlay);
+	}
+}
+
+void ARamdomItemDefenseCharacter::Multicast_SpawnParticleAtLocation_Implementation(UParticleSystem* EmitterTemplate, FVector Location, FRotator Rotation, FVector Scale)
+{
+	// 서버와 모든 클라이언트(내 화면 포함)에서 실행됨
+	if (EmitterTemplate)
+	{
+		UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), EmitterTemplate, Location, Rotation, Scale, true);
+	}
 }

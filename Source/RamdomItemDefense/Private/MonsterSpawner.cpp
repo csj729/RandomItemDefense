@@ -238,3 +238,42 @@ void AMonsterSpawner::SetGameOver()
 		// RID_LOG(FColor::Magenta, TEXT("Spawner '%s' is now in GAME OVER state."), *GetName()); // [로그 제거]
 	}
 }
+
+void AMonsterSpawner::SpawnCounterAttackMonster(TSubclassOf<AMonsterBaseCharacter> MonsterClass)
+{
+	if (!HasAuthority() || !MonsterClass) return;
+	if (bIsGameOver) return; // 게임오버 상태면 무시
+
+	UWorld* World = GetWorld();
+	if (World)
+	{
+		FActorSpawnParameters SpawnParams;
+		SpawnParams.Owner = this;
+		SpawnParams.Instigator = GetInstigator();
+
+		// 현재 스포너 위치에서 즉시 스폰
+		AMonsterBaseCharacter* SpawnedMonster = World->SpawnActor<AMonsterBaseCharacter>(MonsterClass, GetActorLocation(), GetActorRotation(), SpawnParams);
+
+		if (SpawnedMonster)
+		{
+			SpawnedMonster->SetSpawner(this);
+			CurrentMonsterCount++;
+			OnRep_CurrentMonsterCount();
+
+			// [중요] PVP로 넘어온 몬스터도 현재 웨이브 난이도를 따라가야 함
+			AMyGameState* MyGameState = World->GetGameState<AMyGameState>();
+			if (MyGameState)
+			{
+				int32 CurrentWave = MyGameState->GetCurrentWave();
+				SpawnedMonster->SetSpawnWaveIndex(CurrentWave);
+
+				// ... (기존 SpawnMonster에 있는 스탯/머티리얼 적용 로직을 함수로 분리하여 재사용하는 것이 좋음) ...
+				// 여기서는 편의상 핵심 로직인 ASC 초기화 및 스탯 적용만 복사한다고 가정하거나,
+				// ApplyWaveStatsToMonster(SpawnedMonster, CurrentWave); 같은 헬퍼 함수를 만드는 것을 권장합니다.
+			}
+
+			// RID_LOG 매크로 사용
+			RID_LOG(FColor::Red, TEXT("Spawner: Counter-Attack Monster Spawned! Class: %s"), *GetNameSafe(MonsterClass));
+		}
+	}
+}

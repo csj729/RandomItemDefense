@@ -8,43 +8,48 @@
 #include "Kismet/GameplayStatics.h"
 #include "RamdomItemDefense.h"
 
-/** 위젯이 뷰포트에 추가될 때 (델리게이트 바인딩) */
 void UCommonItemChoiceWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
+	// [수정] 바인딩 함수 호출
+	BindDataSources();
+}
 
-	// PlayerState 참조 가져오기
-	MyPlayerState = GetOwningPlayerState<AMyPlayerState>();
-
-	// InventoryComponent 참조 가져오기 (캐릭터로부터)
-	if (ARamdomItemDefenseCharacter* Character = GetOwningPlayerPawn<ARamdomItemDefenseCharacter>())
+// [추가] 재귀적 바인딩 함수
+void UCommonItemChoiceWidget::BindDataSources()
+{
+	// 1. PlayerState 바인딩 시도
+	if (!MyPlayerState)
 	{
-		InventoryComp = Character->GetInventoryComponent();
+		MyPlayerState = GetOwningPlayerState<AMyPlayerState>();
+		if (MyPlayerState)
+		{
+			if (!MyPlayerState->OnCommonItemChoiceCountChangedDelegate.IsAlreadyBound(this, &UCommonItemChoiceWidget::HandleCommonItemChoiceCountChanged))
+			{
+				MyPlayerState->OnCommonItemChoiceCountChangedDelegate.AddDynamic(this, &UCommonItemChoiceWidget::HandleCommonItemChoiceCountChanged);
+			}
+			// 초기값 업데이트
+			HandleCommonItemChoiceCountChanged(MyPlayerState->GetCommonItemChoiceCount());
+		}
 	}
 
-	// PlayerState 유효성 검사 및 '델리게이트' 바인딩
-	if (MyPlayerState)
+	// 2. InventoryComponent 바인딩 시도
+	if (!InventoryComp.IsValid())
 	{
-		// [중요] '흔함 아이템 선택권' 델리게이트에 바인딩
-		MyPlayerState->OnCommonItemChoiceCountChangedDelegate.AddDynamic(this, &UCommonItemChoiceWidget::HandleCommonItemChoiceCountChanged);
-		// 현재 값으로 텍스트 즉시 업데이트
-		HandleCommonItemChoiceCountChanged(MyPlayerState->GetCommonItemChoiceCount());
+		if (ARamdomItemDefenseCharacter* Character = GetOwningPlayerPawn<ARamdomItemDefenseCharacter>())
+		{
+			InventoryComp = Character->GetInventoryComponent();
+		}
+	}
+
+	// 3. 하나라도 준비되지 않았다면 다음 틱에 재시도
+	if (!MyPlayerState || !InventoryComp.IsValid())
+	{
+		GetWorld()->GetTimerManager().SetTimerForNextTick(this, &UCommonItemChoiceWidget::BindDataSources);
 	}
 	else
 	{
-		// PlayerState가 아직 준비되지 않았다면 다음 틱에 다시 시도
-		GetWorld()->GetTimerManager().SetTimerForNextTick([this]() {
-			MyPlayerState = GetOwningPlayerState<AMyPlayerState>();
-			if (MyPlayerState)
-			{
-				MyPlayerState->OnCommonItemChoiceCountChangedDelegate.AddDynamic(this, &UCommonItemChoiceWidget::HandleCommonItemChoiceCountChanged);
-				HandleCommonItemChoiceCountChanged(MyPlayerState->GetCommonItemChoiceCount());
-			}
-			if (ARamdomItemDefenseCharacter* Character = GetOwningPlayerPawn<ARamdomItemDefenseCharacter>())
-			{
-				InventoryComp = Character->GetInventoryComponent();
-			}
-			});
+		UE_LOG(LogRamdomItemDefense, Log, TEXT("CommonItemChoiceWidget: All Data Sources Bound Successfully!"));
 	}
 }
 

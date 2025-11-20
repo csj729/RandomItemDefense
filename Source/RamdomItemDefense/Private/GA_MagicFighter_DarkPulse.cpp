@@ -135,7 +135,19 @@ void UGA_MagicFighter_DarkPulse::Explode()
 	}
 
 	// 3. 폭발 이펙트 및 사운드 재생
-	if (ExplosionEffect) UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), ExplosionEffect, TargetImpactLocation);
+	if (ExplosionEffect)
+	{
+		if (ARamdomItemDefenseCharacter* OwnerCharacter = Cast<ARamdomItemDefenseCharacter>(ActorInfo->AvatarActor.Get()))
+		{
+			OwnerCharacter->Multicast_SpawnParticleAtLocation(
+				ExplosionEffect,
+				TargetImpactLocation,
+				FRotator::ZeroRotator,
+				FVector(1.0f)
+			);
+		}
+	}
+
 	if (ExplosionSound) UGameplayStatics::PlaySoundAtLocation(this, ExplosionSound, TargetImpactLocation);
 
 	// 4. 데미지 계산

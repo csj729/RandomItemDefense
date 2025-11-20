@@ -45,6 +45,12 @@ public:
 	 */
 	UAnimMontage* GetRandomAttackMontage() const;
 
+	UFUNCTION(NetMulticast, Unreliable)
+	void Multicast_PlayAttack(UAnimMontage* MontageToPlay, FRotator TargetRotation);
+
+	UFUNCTION(NetMulticast, Unreliable)
+	void Multicast_SpawnParticleAtLocation(UParticleSystem* EmitterTemplate, FVector Location, FRotator Rotation, FVector Scale);
+
 protected:
 	virtual void BeginPlay() override;
 

@@ -305,3 +305,33 @@ APlayerController* ARamdomItemDefenseGameMode::GetControllerForSpawner(AMonsterS
 	}
 	return nullptr; // 찾지 못함
 }
+
+void ARamdomItemDefenseGameMode::SendCounterAttackMonster(APlayerState* KillerPlayerState, TSubclassOf<AMonsterBaseCharacter> MonsterClassToSpawn)
+{
+	if (!KillerPlayerState || !MonsterClassToSpawn) return;
+
+	AMyGameState* MyGameState = GetGameState<AMyGameState>();
+	if (!MyGameState) return;
+
+	// 1. 킬러의 인덱스 찾기
+	int32 KillerIndex = MyGameState->PlayerArray.Find(KillerPlayerState);
+	if (KillerIndex == INDEX_NONE) return;
+
+	// 2. 상대방 인덱스 계산 (1:1 기준)
+	// 플레이어가 2명이라고 가정: 0번이면 1번, 1번이면 0번
+	// (N명일 경우: (MyIndex + 1) % TotalNum 로 다음 사람에게 보내기 등 규칙 설정 가능)
+	int32 TargetIndex = (KillerIndex + 1) % 2;
+
+	// 3. 타겟 인덱스가 유효하고, 플레이어가 존재하는지 확인
+	if (MonsterSpawners.IsValidIndex(TargetIndex))
+	{
+		AMonsterSpawner* TargetSpawner = MonsterSpawners[TargetIndex];
+		if (TargetSpawner)
+		{
+			// 4. 상대방 스포너에 스폰 명령
+			TargetSpawner->SpawnCounterAttackMonster(MonsterClassToSpawn);
+
+			RID_LOG(FColor::Red, TEXT("PVP: Player %d sent a monster to Player %d!"), KillerIndex, TargetIndex);
+		}
+	}
+}

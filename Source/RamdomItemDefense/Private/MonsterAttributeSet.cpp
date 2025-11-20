@@ -6,6 +6,7 @@
 #include "Engine/Engine.h"
 #include "MonsterBaseCharacter.h" 
 #include "RamdomItemDefenseCharacter.h"
+#include "RamdomItemDefenseGameMode.h"
 #include "MyPlayerState.h"
 #include "RamdomItemDefense.h" // <--- UE_LOG(LogRamdomItemDefense, ...)를 위해 필요
 #include "MyGameState.h"       
@@ -126,9 +127,24 @@ void UMonsterAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCal
 						}
 
 						PS->AddGold(FMath::Max(BaseGold, FinalGold));
-
 					}
 				}
+
+				// [PVP 추가] 킬러가 유효하고, 보스 몬스터가 아니라면 상대에게 반격 몬스터 전송
+				if (KillerCharacter && !Monster->IsBoss())
+				{
+					// GameMode 가져오기
+					if (UWorld* World = Monster->GetWorld())
+					{
+						ARamdomItemDefenseGameMode* GM = Cast<ARamdomItemDefenseGameMode>(World->GetAuthGameMode());
+						if (GM)
+						{
+							// 죽은 몬스터의 클래스를 그대로 보냅니다.
+							GM->SendCounterAttackMonster(KillerCharacter->GetPlayerState(), Monster->GetClass());
+						}
+					}
+				}
+
 				FGameplayTagContainer EffectTags;
 				Data.EffectSpec.GetAllAssetTags(EffectTags);
 				Monster->PlayHitEffect(EffectTags);

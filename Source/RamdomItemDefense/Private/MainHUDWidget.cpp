@@ -34,12 +34,13 @@ bool UMainHUDWidget::Initialize()
 
 void UMainHUDWidget::BindPlayerStateEvents()
 {
-	// PlayerState가 여전히 없는지 다시 확인합니다 (예: 재시도)
+	// 1. PlayerState 찾기 시도
 	if (MyPlayerState == nullptr)
 	{
 		MyPlayerState = GetOwningPlayerState<AMyPlayerState>();
 	}
 
+	// 2. PlayerState가 유효하다면 바인딩 진행
 	if (MyPlayerState)
 	{
 		// PlayerState의 C++ 델리게이트에 이 위젯의 UFUNCTION을 바인딩합니다.
@@ -47,15 +48,22 @@ void UMainHUDWidget::BindPlayerStateEvents()
 		MyPlayerState->OnSpawnerAssignedDelegate.AddDynamic(this, &UMainHUDWidget::HandleSpawnerAssigned);
 		MyPlayerState->OnUltimateChargeChangedDelegate.AddDynamic(this, &UMainHUDWidget::HandleUltimateChargeChanged);
 
-		// 바인딩 직후, 현재 값으로 UI를 즉시 업데이트하도록 이벤트를 호출합니다.
+		// [중요] 바인딩 직후, 현재 값으로 UI를 즉시 업데이트 (초기화)
 		OnGoldChanged(MyPlayerState->GetGold());
-
 		HandleUltimateChargeChanged(MyPlayerState->GetUltimateCharge());
 
 		if (MyPlayerState->MySpawner)
 		{
 			BindSpawnerEvents();
 		}
+
+		// [로그] 연결 성공
+		UE_LOG(LogRamdomItemDefense, Log, TEXT("MainHUD: PlayerState Bound Successfully!"));
+	}
+	else
+	{
+		// 3. [★★★ 핵심 수정 ★★★] 아직 없다면, '다음 틱'에 이 함수를 다시 실행하도록 예약 (무한 재시도)
+		GetWorld()->GetTimerManager().SetTimerForNextTick(this, &UMainHUDWidget::BindPlayerStateEvents);
 	}
 }
 

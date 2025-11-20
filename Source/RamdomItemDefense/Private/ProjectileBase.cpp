@@ -9,15 +9,12 @@
 
 AProjectileBase::AProjectileBase()
 {
-	// [ ★★★ 수정 ★★★ ]
-	// Tick 함수를 사용하지 않습니다.
 	PrimaryActorTick.bCanEverTick = false;
 
-	// [ ★★★ 제거 ★★★ ]
-	// (GA가 수명을 설정할 것이므로 기본 수명 5초를 제거합니다)
-	// InitialLifeSpan = 5.0f; 
-	// (Tick을 안하므로 도착 반경도 제거합니다)
-	// ArrivalTolerance = 50.0f; 
+	// [중요] 투사체가 클라이언트에게도 보이도록 복제 설정 활성화
+	bReplicates = true;
+	// 투사체 움직임도 복제하려면 아래 설정 필요 (ProjectileMovementComponent가 있다면 보통 자동 처리되나 명시 권장)
+	SetReplicateMovement(true);
 
 	SphereComponent = CreateDefaultSubobject<USphereComponent>(TEXT("SphereComponent"));
 	RootComponent = SphereComponent;

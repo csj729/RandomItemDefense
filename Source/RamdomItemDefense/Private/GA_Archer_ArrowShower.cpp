@@ -5,6 +5,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "Particles/ParticleSystem.h"
+#include "RamdomItemDefenseCharacter.h"
 #include "TimerManager.h"
 #include "DrawDebugHelpers.h"
 #include "RamdomItemDefense.h"	
@@ -62,15 +63,15 @@ void UGA_Archer_ArrowShower::ActivateAbility(const FGameplayAbilitySpecHandle Ha
 		// X, Y, Z 모두 동일한 비율로 스케일 적용
 		const FVector EmitterScale = FVector(EmitterScaleFactor);
 
-		// 2. 스케일 값을 적용하여 파티클 스폰
-		UGameplayStatics::SpawnEmitterAtLocation(
-			GetWorld(),
-			ArrowShowerEffect,
-			TargetLocation,
-			FRotator::ZeroRotator,
-			EmitterScale, // <-- 계산된 스케일 적용
-			true
-		);
+		if (ARamdomItemDefenseCharacter* OwnerCharacter = Cast<ARamdomItemDefenseCharacter>(ActorInfo->AvatarActor.Get()))
+		{
+			OwnerCharacter->Multicast_SpawnParticleAtLocation(
+				ArrowShowerEffect,
+				TargetLocation,
+				FRotator::ZeroRotator,
+				EmitterScale
+			);
+		}
 	}
 
 	UE_LOG(LogRamdomItemDefense, Log, TEXT("GA_Archer_ArrowShower: [ACTIVATED] Starting 3-sec tick. (GE: %s)"), *GetNameSafe(DamageEffectClass));

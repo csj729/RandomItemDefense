@@ -21,6 +21,7 @@ public:
 	UAttackComponent();
 
 	/** 수동으로 대상을 공격하도록 명령합니다. */
+	UFUNCTION(Server, Reliable)
 	void OrderAttack(AActor* Target);
 
 	/** 수동 및 자동 타겟을 모두 해제합니다. */

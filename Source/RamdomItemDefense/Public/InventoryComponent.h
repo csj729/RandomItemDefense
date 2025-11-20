@@ -135,6 +135,9 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Events")
 	FOnInventoryUpdatedDelegate OnInventoryUpdated;
 
+	// [추가] 변수 복제를 위한 함수 오버라이드
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
 protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Inventory")
 	TObjectPtr<UDataTable> ItemDataTable;
@@ -152,8 +155,11 @@ private:
 	UPROPERTY()
 	TWeakObjectPtr<UAbilitySystemComponent> AbilitySystemComponent;
 
-	UPROPERTY(VisibleInstanceOnly, Category = "Inventory")
+	UPROPERTY(VisibleInstanceOnly, Category = "Inventory", ReplicatedUsing = OnRep_InventoryItems)
 	TArray<FName> InventoryItems;
+
+	UFUNCTION()
+	void OnRep_InventoryItems();
 
 	/** (신) TArray: 아이템의 '각 인스턴스'별로 스탯 GE 핸들을 추적합니다. */
 	UPROPERTY()

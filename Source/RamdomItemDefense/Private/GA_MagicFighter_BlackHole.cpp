@@ -73,7 +73,15 @@ void UGA_MagicFighter_BlackHole::ActivateAbility(const FGameplayAbilitySpecHandl
 	OwnerCharacter->SetActorRotation(FRotator(0.f, LookAtRotation.Yaw, 0.f));
 
 	// 5. 파티클 스폰 (스케일 수정됨)
-	if (BlackHoleEffect) { UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), BlackHoleEffect, BlackHoleLocation, FRotator::ZeroRotator, FVector(2.0f), true); }
+	if (BlackHoleEffect)
+	{
+		OwnerCharacter->Multicast_SpawnParticleAtLocation(
+			BlackHoleEffect,
+			BlackHoleLocation,
+			FRotator::ZeroRotator,
+			FVector(2.0f) // 스케일 2.0
+		);
+	}
 	if (CasterEffect && OwnerCharacter->GetMesh()) { UGameplayStatics::SpawnEmitterAttached(CasterEffect, OwnerCharacter->GetMesh(), NAME_None, FVector::ZeroVector, FRotator::ZeroRotator, FVector(0.5f), EAttachLocation::KeepRelativeOffset, true); }
 
 	// --- 6. (즉시 실행) '총' 데미지 계산 ---

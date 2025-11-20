@@ -57,11 +57,11 @@ void UGA_Archer_UltimateFocus::ActivateAbility(const FGameplayAbilitySpecHandle 
 	// A. 1회성 발동 이펙트 스폰 (부착 안 함)
 	if (ActivationEffect)
 	{
-		UGameplayStatics::SpawnEmitterAtLocation(
-			GetWorld(),
+		OwnerCharacter->Multicast_SpawnParticleAtLocation(
 			ActivationEffect,
 			OwnerCharacter->GetActorLocation(),
-			OwnerCharacter->GetActorRotation()
+			OwnerCharacter->GetActorRotation(),
+			FVector(1.0f)
 		);
 	}
 

@@ -93,36 +93,37 @@ void ARamdomItemDefensePlayerController::OnPossess(APawn* InPawn)
 	// 로컬 플레이어 컨트롤러인 경우에만 PlayerState 델리게이트 바인딩
 	if (IsLocalPlayerController())
 	{
-		MyPlayerStateRef = GetPlayerState<AMyPlayerState>();
-		if (MyPlayerStateRef)
+		TryBindPlayerState();
+	}
+}
+
+// [추가] 재귀적 바인딩 함수 구현
+void ARamdomItemDefensePlayerController::TryBindPlayerState()
+{
+	MyPlayerStateRef = GetPlayerState<AMyPlayerState>();
+
+	if (MyPlayerStateRef)
+	{
+		// 1. (일반) 라운드 선택 델리게이트 바인딩
+		if (!MyPlayerStateRef->OnChoiceCountChangedDelegate.IsAlreadyBound(this, &ARamdomItemDefensePlayerController::OnPlayerChoiceCountChanged))
 		{
-			// (일반) 라운드 선택 델리게이트 바인딩
 			MyPlayerStateRef->OnChoiceCountChangedDelegate.AddDynamic(this, &ARamdomItemDefensePlayerController::OnPlayerChoiceCountChanged);
 			OnPlayerChoiceCountChanged(MyPlayerStateRef->GetChoiceCount());
-
-			// --- [ ★★★ 코드 추가 ★★★ ] ---
-			// (신규) 흔함 아이템 선택 델리게이트 바인딩
-			MyPlayerStateRef->OnCommonItemChoiceCountChangedDelegate.AddDynamic(this, &ARamdomItemDefensePlayerController::OnPlayerCommonChoiceCountChanged);
-			OnPlayerCommonChoiceCountChanged(MyPlayerStateRef->GetCommonItemChoiceCount()); // 초기 상태 반영
-			// --- [ ★★★ 코드 추가 끝 ★★★ ] ---
 		}
-		else
+
+		// 2. (신규) 흔함 아이템 선택 델리게이트 바인딩
+		if (!MyPlayerStateRef->OnCommonItemChoiceCountChangedDelegate.IsAlreadyBound(this, &ARamdomItemDefensePlayerController::OnPlayerCommonChoiceCountChanged))
 		{
-			// 아직 PlayerState가 준비되지 않았다면 잠시 후 재시도
-			GetWorld()->GetTimerManager().SetTimerForNextTick([this]() {
-				MyPlayerStateRef = GetPlayerState<AMyPlayerState>();
-				if (MyPlayerStateRef)
-				{
-					MyPlayerStateRef->OnChoiceCountChangedDelegate.AddDynamic(this, &ARamdomItemDefensePlayerController::OnPlayerChoiceCountChanged);
-					OnPlayerChoiceCountChanged(MyPlayerStateRef->GetChoiceCount());
-
-					// --- [ ★★★ 코드 추가 ★★★ ] ---
-					MyPlayerStateRef->OnCommonItemChoiceCountChangedDelegate.AddDynamic(this, &ARamdomItemDefensePlayerController::OnPlayerCommonChoiceCountChanged);
-					OnPlayerCommonChoiceCountChanged(MyPlayerStateRef->GetCommonItemChoiceCount());
-					// --- [ ★★★ 코드 추가 끝 ★★★ ] ---
-				}
-				});
+			MyPlayerStateRef->OnCommonItemChoiceCountChangedDelegate.AddDynamic(this, &ARamdomItemDefensePlayerController::OnPlayerCommonChoiceCountChanged);
+			OnPlayerCommonChoiceCountChanged(MyPlayerStateRef->GetCommonItemChoiceCount());
 		}
+
+		UE_LOG(LogRamdomItemDefense, Log, TEXT("PlayerController: PlayerState Bound Successfully!"));
+	}
+	else
+	{
+		// [★★★ 핵심 수정 ★★★] 실패 시 다음 틱에 자기 자신(TryBindPlayerState)을 다시 호출
+		GetWorld()->GetTimerManager().SetTimerForNextTick(this, &ARamdomItemDefensePlayerController::TryBindPlayerState);
 	}
 }
 
