@@ -24,6 +24,7 @@
 #include "Blueprint/UserWidget.h"
 #include "Kismet/GameplayStatics.h"
 #include "Particles/ParticleSystem.h"
+#include "Particles/ParticleSystemComponent.h"
 
 ARamdomItemDefenseCharacter::ARamdomItemDefenseCharacter()
 {
@@ -236,5 +237,78 @@ void ARamdomItemDefenseCharacter::Multicast_SpawnParticleAtLocation_Implementati
 	if (EmitterTemplate)
 	{
 		UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), EmitterTemplate, Location, Rotation, Scale, true);
+	}
+}
+
+void ARamdomItemDefenseCharacter::Multicast_AddBuffEffect_Implementation(FGameplayTag BuffTag, UParticleSystem* EmitterTemplate, FName SocketName, FVector LocationOffset, FVector Scale)
+{
+	// 1. 이미 해당 태그로 실행 중인 이펙트가 있다면 중복 실행 방지
+	if (ActiveBuffParticles.Contains(BuffTag))
+	{
+		return;
+	}
+
+	if (EmitterTemplate && GetMesh())
+	{
+		// 2. 이펙트 스폰 및 부착 (bAutoDestroy=false로 설정하여 수동 관리)
+		UParticleSystemComponent* NewPSC = UGameplayStatics::SpawnEmitterAttached(
+			EmitterTemplate,
+			GetMesh(),
+			SocketName,
+			LocationOffset,
+			FRotator::ZeroRotator,
+			Scale,
+			EAttachLocation::SnapToTarget,
+			false // bAutoDestroy: 수동으로 끌 것이므로 false
+		);
+
+		if (NewPSC)
+		{
+			// 3. 맵에 저장하여 추적
+			ActiveBuffParticles.Add(BuffTag, NewPSC);
+			// RID_LOG(FColor::Green, TEXT("AddBuffEffect: Added FX for Tag [%s]"), *BuffTag.ToString());
+		}
+	}
+}
+
+void ARamdomItemDefenseCharacter::Multicast_RemoveBuffEffect_Implementation(FGameplayTag BuffTag)
+{
+	// 1. 맵에서 해당 태그의 이펙트 컴포넌트 찾기 (값의 포인터 반환)
+	if (TObjectPtr<UParticleSystemComponent>* FoundPSC = ActiveBuffParticles.Find(BuffTag))
+	{
+		// 2. TObjectPtr을 일반 포인터로 가져옵니다. (*FoundPSC로 역참조)
+		UParticleSystemComponent* PSC = *FoundPSC;
+
+		// 3. 유효성 검사: IsValidLowLevel() 대신 IsValid()를 사용하세요. (훨씬 안전함)
+		if (IsValid(PSC))
+		{
+			// 4. 이펙트 비활성화 및 제거
+			PSC->Deactivate();
+			PSC->DestroyComponent();
+		}
+
+		// 5. 맵에서 제거
+		ActiveBuffParticles.Remove(BuffTag);
+
+		// 로그 확인 (선택 사항)
+		// UE_LOG(LogRamdomItemDefense, Log, TEXT("Buff Effect Removed for Tag: %s"), *BuffTag.ToString());
+	}
+}
+
+void ARamdomItemDefenseCharacter::Multicast_SpawnParticleAttached_Implementation(UParticleSystem* EmitterTemplate, FName SocketName, FVector LocationOffset, FRotator RotationOffset, FVector Scale)
+{
+	if (EmitterTemplate && GetMesh())
+	{
+		// 소켓에 "부착"하여 스폰 (캐릭터 움직임에 따라감)
+		UGameplayStatics::SpawnEmitterAttached(
+			EmitterTemplate,
+			GetMesh(),
+			SocketName,
+			LocationOffset,
+			RotationOffset,
+			Scale,
+			EAttachLocation::SnapToTarget, // 소켓 위치/회전에 딱 붙임
+			true // bAutoDestroy (1회성이므로 자동 제거)
+		);
 	}
 }

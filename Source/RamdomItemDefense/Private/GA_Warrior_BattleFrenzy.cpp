@@ -79,19 +79,16 @@ void UGA_Warrior_BattleFrenzy::ActivateAbility(const FGameplayAbilitySpecHandle 
 
 	// --- [ ★★★ 핵심 로직 수정 ★★★ ] ---
 
-	// 6. [갱신] 이미 버프가 활성화되어 있는지(BuffIsActiveTag 태그가 있는지) 확인
+// 6. [갱신] 이미 버프가 활성화되어 있는지 확인
 	if (CasterASC->HasMatchingGameplayTag(BuffIsActiveTag))
 	{
-		// 6-1. [갱신] 이미 태그가 있다면, 이 어빌리티는 버프 '갱신'만 담당
-		// (GE 블루프린트 설정 덕분에) 단순히 GE를 다시 적용하는 것만으로
-		// 기존 GE의 지속시간과 SetByCaller 값이 갱신됩니다.
+		// 6-1. [갱신] GE만 다시 적용 (지속시간 갱신)
 		CasterASC->ApplyGameplayEffectSpecToSelf(*BuffSpecHandle.Data.Get());
 
-		RID_LOG(FColor::Green, TEXT("GA_Warrior_BattleFrenzy: [Refreshed] AttackSpeed Buff: +%.2f (%.1f AD * %.2f Coeff) for %.1fs"),
-			AttackSpeedBuffValue, CasterAttackDamage, AttackSpeedCoefficient, BuffDuration);
+		// **중요**: 이미 이펙트가 떠 있을 것이므로, 이펙트 재생 로직은 건너뜁니다.
+		RID_LOG(FColor::Green, TEXT("GA_Warrior_BattleFrenzy: [Refreshed]"));
 
-		// 6-2. [갱신] 이 어빌리티(새 인스턴스)는 할 일을 다 했으므로 즉시 종료
-		// (기존 버프를 관리하던 *이전* 어빌리티 인스턴스는 계속 살아있음)
+		// 6-2. 종료
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
 	}
 	else
@@ -99,21 +96,20 @@ void UGA_Warrior_BattleFrenzy::ActivateAbility(const FGameplayAbilitySpecHandle 
 		// 7-1. [신규] 버프 GE 적용
 		ActiveBuffEffectHandle = CasterASC->ApplyGameplayEffectSpecToSelf(*BuffSpecHandle.Data.Get());
 
-		// 7-2. [신규] 버프 이펙트 스폰
+		// 7-2. [신규] ★★★ 캐릭터에게 모든 클라이언트에서 이펙트를 켜라고 명령 ★★★
 		if (BuffEffect)
 		{
-			ActiveBuffFXComponent = UGameplayStatics::SpawnEmitterAttached(
+			// BuffIsActiveTag를 키(Key)로 사용하여 이펙트를 등록합니다.
+			OwnerCharacter->Multicast_AddBuffEffect(
+				BuffIsActiveTag,
 				BuffEffect,
-				OwnerCharacter->GetMesh(),
 				AttachSocketName,
 				FVector::ZeroVector,
-				FRotator::ZeroRotator,
-				EAttachLocation::SnapToTarget,
-				true
+				FVector(1.0f)
 			);
 		}
 
-		// 7-3. [신규] 버프 GE가 제거될 때까지 대기하는 태스크 등록
+		// 7-3. [신규] 버프 GE가 제거될 때까지 대기
 		if (ActiveBuffEffectHandle.IsValid())
 		{
 			UAbilityTask_WaitGameplayEffectRemoved* WaitEffectRemovedTask = UAbilityTask_WaitGameplayEffectRemoved::WaitForGameplayEffectRemoved(this, ActiveBuffEffectHandle);
@@ -121,52 +117,44 @@ void UGA_Warrior_BattleFrenzy::ActivateAbility(const FGameplayAbilitySpecHandle 
 			WaitEffectRemovedTask->ReadyForActivation();
 		}
 
-		RID_LOG(FColor::Green, TEXT("GA_Warrior_BattleFrenzy: [Applied New] AttackSpeed Buff: +%.2f (%.1f AD * %.2f Coeff) for %.1fs"),
-			AttackSpeedBuffValue, CasterAttackDamage, AttackSpeedCoefficient, BuffDuration);
-
-		// 7-4. [신규] 어빌리티를 종료하지 않고 태스크가 완료(버프가 제거)되기를 기다림
-		// (EndAbility() 호출 없음)
+		RID_LOG(FColor::Green, TEXT("GA_Warrior_BattleFrenzy: [New Start]"));
 	}
-	// --- [ ★★★ 로직 수정 끝 ★★★ ] ---
 }
 
 void UGA_Warrior_BattleFrenzy::OnBuffEffectRemoved(const FGameplayEffectRemovalInfo& EffectRemovalInfo)
 {
-	// 버프 GE가 제거될 때 (지속시간이 끝나거나, 갱신을 위해 수동 제거되거나)
-	// 이펙트를 제거하고, 이 어빌리티 인스턴스를 종료합니다.
-
-	if (ActiveBuffFXComponent && ActiveBuffFXComponent->IsValidLowLevel())
+	// [수정] 로컬 변수 제어 대신 캐릭터에게 이펙트 제거 명령
+	ARamdomItemDefenseCharacter* OwnerCharacter = Cast<ARamdomItemDefenseCharacter>(GetAvatarActorFromActorInfo());
+	if (OwnerCharacter)
 	{
-		ActiveBuffFXComponent->DestroyComponent();
-		ActiveBuffFXComponent = nullptr;
-		RID_LOG(FColor::Yellow, TEXT("GA_Warrior_BattleFrenzy: Buff Effect removed."));
+		OwnerCharacter->Multicast_RemoveBuffEffect(BuffIsActiveTag);
 	}
 
-	// --- [ ★★★ 추가 ★★★ ] ---
-	// 이 어빌리티 인스턴스를 정상 종료
+	RID_LOG(FColor::Yellow, TEXT("GA_Warrior_BattleFrenzy: Buff Removed. FX Cleared via Multicast."));
+
 	EndAbility(GetCurrentAbilitySpecHandle(), GetCurrentActorInfo(), GetCurrentActivationInfo(), true, false);
-	// --- [ ★★★ 추가 끝 ★★★ ] ---
 }
 
 void UGA_Warrior_BattleFrenzy::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
 {
-	// bWasCancelled이 true일 경우, 즉 어빌리티가 중간에 취소된 경우
+	// [수정] 취소되었을 때도 이펙트 확실히 제거
 	if (bWasCancelled)
 	{
 		UAbilitySystemComponent* CasterASC = ActorInfo ? ActorInfo->AbilitySystemComponent.Get() : nullptr;
 		if (CasterASC && ActiveBuffEffectHandle.IsValid())
 		{
-			// 적용했던 GE를 강제로 제거
 			CasterASC->RemoveActiveGameplayEffect(ActiveBuffEffectHandle);
-			ActiveBuffEffectHandle.Invalidate();
 		}
-		// 이펙트도 강제 제거
-		if (ActiveBuffFXComponent && ActiveBuffFXComponent->IsValidLowLevel())
+
+		// 캐릭터에게 이펙트 제거 명령
+		ARamdomItemDefenseCharacter* OwnerCharacter = Cast<ARamdomItemDefenseCharacter>(ActorInfo ? ActorInfo->AvatarActor.Get() : nullptr);
+		if (OwnerCharacter)
 		{
-			ActiveBuffFXComponent->DestroyComponent();
-			ActiveBuffFXComponent = nullptr;
+			OwnerCharacter->Multicast_RemoveBuffEffect(BuffIsActiveTag);
 		}
 	}
+
+	// (기존 로직: 로컬 변수 ActiveBuffFXComponent->DestroyComponent() 는 삭제)
 
 	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }

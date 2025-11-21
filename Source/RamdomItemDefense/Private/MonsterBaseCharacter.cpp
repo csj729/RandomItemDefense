@@ -19,6 +19,9 @@
 #include "Blueprint/UserWidget.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Animation/AnimMontage.h"
+#include "Particles/ParticleSystemComponent.h"
+#include "NiagaraComponent.h"
+#include "NiagaraFunctionLibrary.h"
 #include "GameFramework/CharacterMovementComponent.h"
 
 
@@ -165,7 +168,13 @@ void AMonsterBaseCharacter::Die(AActor* Killer)
 		GetCharacterMovement()->StopMovementImmediately();
 		GetCharacterMovement()->DisableMovement();
 	}
-	// --- [ ★★★ 수정 2 끝 ★★★ ] ---
+
+	if (HasAuthority())
+	{
+		// 파티클 템플릿 인자는 제거 시 필요 없으므로 nullptr 전달
+		Multicast_SetStatusEffectState(FGameplayTag::RequestGameplayTag(FName("State.Slow")), false, nullptr);
+		Multicast_SetStatusEffectState(FGameplayTag::RequestGameplayTag(FName("State.ArmorShred")), false, nullptr);
+	}
 
 	// 캡슐 콜리전 비활성화 (트레이스, 물리 모두)
 	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -313,28 +322,6 @@ void AMonsterBaseCharacter::OnStunTagChanged(const FGameplayTag Tag, int32 NewCo
 	OnStunStateChanged(bIsStunned);
 }
 
-void AMonsterBaseCharacter::OnSlowTagChanged(const FGameplayTag Tag, int32 NewCount)
-{
-	if (bIsDying)
-	{
-		return;
-	}
-	bool bIsSlowed = NewCount > 0;
-	OnSlowStateChanged(bIsSlowed);
-}
-
-void AMonsterBaseCharacter::OnArmorShredTagChanged(const FGameplayTag Tag, int32 NewCount)
-{
-	if (bIsDying)
-	{	
-		return;
-	}
-	bool bIsShredded = NewCount > 0;
-
-	// 블루프린트 이벤트(OnArmorShredStateChanged)를 호출합니다.
-	OnArmorShredStateChanged(bIsShredded);
-}
-
 void AMonsterBaseCharacter::OnCritDamageOccurred(AActor* TargetActor, float CritDamageAmount)
 {
 	if (TargetActor != this || !DamageTextWidgetClass)
@@ -360,4 +347,77 @@ void AMonsterBaseCharacter::OnCritDamageOccurred(AActor* TargetActor, float Crit
 			UE_LOG(LogTemp, Warning, TEXT("CritDam Ocurred"));
 		}
 	}
+}
+
+// 1. 멀티캐스트 함수 구현 (나이아가라 버전)
+void AMonsterBaseCharacter::Multicast_SetStatusEffectState_Implementation(FGameplayTag StatusTag, bool bIsActive, UNiagaraSystem* EffectTemplate)
+{
+	if (bIsActive)
+	{
+		// [켜기] 이미 켜져있지 않다면 이펙트 생성
+		if (!ActiveStatusParticles.Contains(StatusTag) && EffectTemplate && GetMesh())
+		{
+			// 나이아가라 스폰 (bAutoDestroy = false)
+			UNiagaraComponent* NC = UNiagaraFunctionLibrary::SpawnSystemAttached(
+				EffectTemplate,
+				GetMesh(),
+				NAME_None, // 필요시 소켓 이름 지정 (예: "Root")
+				FVector::ZeroVector,
+				FRotator::ZeroRotator,
+				EAttachLocation::SnapToTarget,
+				false // bAutoDestroy = false (지속 이펙트이므로 수동 관리)
+			);
+
+			if (NC)
+			{
+				ActiveStatusParticles.Add(StatusTag, NC);
+			}
+		}
+	}
+	else
+	{
+		// [끄기] 맵에 있다면 찾아서 제거
+		if (TObjectPtr<UNiagaraComponent>* FoundNC = ActiveStatusParticles.Find(StatusTag))
+		{
+			UNiagaraComponent* NC = *FoundNC;
+			if (::IsValid(NC))
+			{
+				NC->Deactivate();
+				NC->DestroyComponent();
+			}
+			ActiveStatusParticles.Remove(StatusTag);
+		}
+	}
+}
+
+// 2. OnSlowTagChanged 수정
+void AMonsterBaseCharacter::OnSlowTagChanged(const FGameplayTag Tag, int32 NewCount)
+{
+	if (bIsDying) return;
+
+	bool bIsSlowed = NewCount > 0;
+
+	// [서버] 멀티캐스트 호출
+	if (HasAuthority())
+	{
+		Multicast_SetStatusEffectState(Tag, bIsSlowed, SlowEffectTemplate);
+	}
+
+	OnSlowStateChanged(bIsSlowed);
+}
+
+// 3. OnArmorShredTagChanged 수정
+void AMonsterBaseCharacter::OnArmorShredTagChanged(const FGameplayTag Tag, int32 NewCount)
+{
+	if (bIsDying) return;
+
+	bool bIsShredded = NewCount > 0;
+
+	// [서버] 멀티캐스트 호출
+	if (HasAuthority())
+	{
+		Multicast_SetStatusEffectState(Tag, bIsShredded, ArmorShredEffectTemplate);
+	}
+
+	OnArmorShredStateChanged(bIsShredded);
 }

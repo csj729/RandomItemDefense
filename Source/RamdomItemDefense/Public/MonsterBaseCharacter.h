@@ -16,6 +16,8 @@ class AMonsterSpawner;
 class UAnimMontage;
 class UMaterialInterface;
 class UParticleSystem;
+class UNiagaraSystem;
+class UNiagaraComponent;
 class USoundBase;
 class AMonsterAIController;
 struct FOnAttributeChangeData;
@@ -76,6 +78,8 @@ public:
 	void SetSpawnWaveIndex(int32 InWaveIndex) { SpawnWaveIndex = InWaveIndex; }
 	int32 GetSpawnWaveIndex() const { return SpawnWaveIndex; }
 
+	UFUNCTION(NetMulticast, Reliable)
+	void Multicast_SetStatusEffectState(FGameplayTag StatusTag, bool bIsActive, UNiagaraSystem* EffectTemplate);
 
 protected:
 	virtual void BeginPlay() override;
@@ -101,6 +105,18 @@ protected:
 
 	/** MoveSpeed 속성 변경 콜백 */
 	virtual void HandleMoveSpeedChanged(const FOnAttributeChangeData& Data);
+
+	/** (BP 설정) 슬로우 상태일 때 몬스터에게 붙일 지속 이펙트 (Niagara) */
+	UPROPERTY(EditDefaultsOnly, Category = "Visuals|Status")
+	TObjectPtr<UNiagaraSystem> SlowEffectTemplate;
+
+	/** (BP 설정) 방어력 감소 상태일 때 몬스터에게 붙일 지속 이펙트 (Niagara) */
+	UPROPERTY(EditDefaultsOnly, Category = "Visuals|Status")
+	TObjectPtr<UNiagaraSystem> ArmorShredEffectTemplate;
+
+	/** 현재 활성화된 상태 이펙트들을 관리하는 맵 (NiagaraComponent) */
+	UPROPERTY()
+	TMap<FGameplayTag, TObjectPtr<UNiagaraComponent>> ActiveStatusParticles;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Stats")
 	float BaseMoveSpeed;

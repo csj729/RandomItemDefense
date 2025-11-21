@@ -43,12 +43,12 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Config|FX")
 	FVector BuffEffectScale;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Config|GAS")
+	FGameplayTag BuffIsActiveTag;
+
 private:
 	UFUNCTION()
 	void OnBuffEffectRemoved(const FGameplayEffectRemovalInfo& EffectRemovalInfo);
 
 	FActiveGameplayEffectHandle UltimateBuffEffectHandle;
-
-	UPROPERTY()
-	TObjectPtr<UParticleSystemComponent> BuffEffectComponent;
 };

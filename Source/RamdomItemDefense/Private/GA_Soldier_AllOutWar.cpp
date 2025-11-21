@@ -13,7 +13,7 @@ UGA_Soldier_AllOutWar::UGA_Soldier_AllOutWar()
 {
 	AttackSpeedBuffTag = FGameplayTag::RequestGameplayTag(FName("State.Player.Soldier.AttackSpeed"));
 	BuffEffectAttachSocketName = FName("Root");
-	BuffEffectComponent = nullptr;
+	BuffIsActiveTag = FGameplayTag::RequestGameplayTag(FName("State.Player.Soldier.AllOutWar.Active"));
 	BuffEffectScale = FVector(1.0f);
 }
 
@@ -54,59 +54,42 @@ void UGA_Soldier_AllOutWar::ActivateAbility(const FGameplayAbilitySpecHandle Han
 
 		if (UltimateBuffEffectHandle.IsValid())
 		{
-			// 2-4. 지속 이펙트 스폰
+			// [★★★ 수정 ★★★] 캐릭터에게 이펙트 실행 명령
 			if (BuffEffect)
 			{
-				BuffEffectComponent = UGameplayStatics::SpawnEmitterAttached(
+				OwnerCharacter->Multicast_AddBuffEffect(
+					BuffIsActiveTag,
 					BuffEffect,
-					OwnerCharacter->GetMesh(),
 					BuffEffectAttachSocketName,
-					FVector(130.f, 0.f, -10.f), // Relative Location
-					FRotator::ZeroRotator, // Relative Rotation
-					BuffEffectScale,
-					EAttachLocation::SnapToTarget,
-					true // bAutoDestroy
+					FVector(130.f, 0.f, -10.f), // 기존 오프셋 유지
+					BuffEffectScale
 				);
 			}
 
-			// 2-5. 버프 제거 감지 태스크 등록 (이 로직은 그대로 유지)
-			UAbilityTask_WaitGameplayEffectRemoved* WaitEffectRemovedTask = UAbilityTask_WaitGameplayEffectRemoved::WaitForGameplayEffectRemoved(this, UltimateBuffEffectHandle);
-			WaitEffectRemovedTask->OnRemoved.AddDynamic(this, &UGA_Soldier_AllOutWar::OnBuffEffectRemoved);
-			WaitEffectRemovedTask->ReadyForActivation();
+			// 제거 대기 태스크
+			UAbilityTask_WaitGameplayEffectRemoved* Task = UAbilityTask_WaitGameplayEffectRemoved::WaitForGameplayEffectRemoved(this, UltimateBuffEffectHandle);
+			Task->OnRemoved.AddDynamic(this, &UGA_Soldier_AllOutWar::OnBuffEffectRemoved);
+			Task->ReadyForActivation();
 		}
 	}
 }
 
 void UGA_Soldier_AllOutWar::OnBuffEffectRemoved(const FGameplayEffectRemovalInfo& EffectRemovalInfo)
 {
-	if (BuffEffectComponent && BuffEffectComponent->IsValidLowLevel())
+	ARamdomItemDefenseCharacter* OwnerCharacter = Cast<ARamdomItemDefenseCharacter>(GetAvatarActorFromActorInfo());
+	if (OwnerCharacter)
 	{
-		BuffEffectComponent->DestroyComponent();
-		BuffEffectComponent = nullptr;
-		RID_LOG(FColor::Yellow, TEXT("GA_Soldier_AllOutWar: Buff Effect removed (Duration Ended)."));
+		OwnerCharacter->Multicast_RemoveBuffEffect(BuffIsActiveTag);
 	}
-
-	// 버프가 종료되면 어빌리티를 정상 종료시킵니다.
 	EndAbility(GetCurrentAbilitySpecHandle(), GetCurrentActorInfo(), GetCurrentActivationInfo(), true, false);
 }
 
 void UGA_Soldier_AllOutWar::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
 {
-	UAbilitySystemComponent* SourceASC = ActorInfo ? ActorInfo->AbilitySystemComponent.Get() : nullptr;
-
-	if (BuffEffectComponent && BuffEffectComponent->IsValidLowLevel())
+	ARamdomItemDefenseCharacter* OwnerCharacter = Cast<ARamdomItemDefenseCharacter>(ActorInfo ? ActorInfo->AvatarActor.Get() : nullptr);
+	if (OwnerCharacter)
 	{
-		BuffEffectComponent->DestroyComponent();
-		BuffEffectComponent = nullptr;
-	}
-
-	if (SourceASC)
-	{
-		// 어빌리티가 취소(Cancelled)된 경우, 적용했던 버프도 즉시 제거합니다.
-		if (UltimateBuffEffectHandle.IsValid())
-		{
-			SourceASC->RemoveActiveGameplayEffect(UltimateBuffEffectHandle);
-		}
+		OwnerCharacter->Multicast_RemoveBuffEffect(BuffIsActiveTag);
 	}
 
 	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);

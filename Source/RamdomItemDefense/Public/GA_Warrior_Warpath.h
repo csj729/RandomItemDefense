@@ -50,11 +50,15 @@ protected:
 
 	/** (BP 설정) 버프가 지속되는 동안 캐릭터에 Attach할 '지속' 이펙트 */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Config|FX")
-	TObjectPtr<UNiagaraSystem> BuffEffect;
+	TObjectPtr<UParticleSystem> BuffEffect;
 
 	/** (BP 설정) 지속 이펙트를 Attach할 소켓 이름 (예: "Root") */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Config|FX")
 	FName BuffEffectAttachSocketName;
+
+	/** 스폰된 지속 버프 이펙트 컴포넌트 (제거용) */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Config|GAS")
+	FGameplayTag BuffIsActiveTag;
 
 private:
 	/** 몽타주 종료 콜백 */
@@ -74,8 +78,4 @@ private:
 
 	/** 적용된 버프 GE 핸들 (제거용) */
 	FActiveGameplayEffectHandle UltimateBuffEffectHandle;
-
-	/** 스폰된 지속 버프 이펙트 컴포넌트 (제거용) */
-	UPROPERTY()
-	TObjectPtr<UNiagaraComponent> BuffEffectComponent;
 };

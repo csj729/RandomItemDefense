@@ -26,7 +26,7 @@ UGA_Warrior_Warpath::UGA_Warrior_Warpath()
 
 	// --- [ ★★★ 추가 ★★★ ] ---
 	BuffEffectAttachSocketName = FName("Root"); // 기본 소켓
-	BuffEffectComponent = nullptr;
+	BuffIsActiveTag = FGameplayTag::RequestGameplayTag(FName("State.Player.Warrior.WarpathBuffActive"));
 	// --- [ ★★★ 추가 끝 ★★★ ] ---
 }
 
@@ -40,7 +40,7 @@ void UGA_Warrior_Warpath::ActivateAbility(const FGameplayAbilitySpecHandle Handl
 	AMyPlayerState* PS = OwnerCharacter ? OwnerCharacter->GetPlayerState<AMyPlayerState>() : nullptr;
 	UAbilitySystemComponent* SourceASC = ActorInfo->AbilitySystemComponent.Get();
 
-	if (!OwnerCharacter || !PS || !PS->MySpawner || !SourceASC || !UltimateStateEffectClass || !UltimateBuffEffectClass || !DamageEffectClass)
+	if (!OwnerCharacter || !PS || !SourceASC || !UltimateStateEffectClass || !UltimateBuffEffectClass || !DamageEffectClass)
 	{
 		RID_LOG(FColor::Red, TEXT("GA_Warrior_Warpath: Missing required components or classes."));
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
@@ -65,42 +65,37 @@ void UGA_Warrior_Warpath::ActivateAbility(const FGameplayAbilitySpecHandle Handl
 		FGameplayEffectSpecHandle SpecHandle = SourceASC->MakeOutgoingSpec(UltimateBuffEffectClass, 1.0f, ContextHandle);
 		if (SpecHandle.IsValid())
 		{
-			// 이 GE는 20초 지속, SkillActivationChance +0.15 여야 함
 			UltimateBuffEffectHandle = SourceASC->ApplyGameplayEffectSpecToSelf(*SpecHandle.Data.Get());
 			RID_LOG(FColor::Green, TEXT("GA_Warrior_Warpath: Applied 20s Skill Chance Buff."));
 
-			// --- [ ★★★ 추가 ★★★ ] ---
-			// 4-1. 버프 GE가 유효하게 적용되었다면, 이펙트 스폰 및 제거 태스크 등록
 			if (UltimateBuffEffectHandle.IsValid())
 			{
-				// 4-2. 지속 이펙트 스폰
+				// --- [ ★★★ 수정: 파티클 시스템 멀티캐스트 호출 ★★★ ] ---
+				// 캐릭터에게 모든 클라이언트에서 파티클을 켜라고 명령
 				if (BuffEffect)
 				{
-					BuffEffectComponent = UNiagaraFunctionLibrary::SpawnSystemAttached(
+					// 앞서 만든 Multicast_AddBuffEffect (캐스케이드용) 호출
+					OwnerCharacter->Multicast_AddBuffEffect(
+						BuffIsActiveTag,
 						BuffEffect,
-						OwnerCharacter->GetMesh(),
 						BuffEffectAttachSocketName,
 						FVector::ZeroVector,
-						FRotator::ZeroRotator,
-						EAttachLocation::SnapToTarget,
-						true, // bAutoDestroy
-						true  // bAutoActivate
+						FVector(1.0f) // 기본 스케일
 					);
 				}
+				// -------------------------------------------------------
 
-				// 4-3. 버프 제거 감지 태스크 등록
+				// 버프 제거 감지 태스크 등록
 				UAbilityTask_WaitGameplayEffectRemoved* WaitEffectRemovedTask = UAbilityTask_WaitGameplayEffectRemoved::WaitForGameplayEffectRemoved(this, UltimateBuffEffectHandle);
 				WaitEffectRemovedTask->OnRemoved.AddDynamic(this, &UGA_Warrior_Warpath::OnBuffEffectRemoved);
 				WaitEffectRemovedTask->ReadyForActivation();
 			}
-			// --- [ ★★★ 추가 끝 ★★★ ] ---
 		}
 	}
 
 	// 5. (광역 데미지) ... (데미지 로직은 변경 없음) ...
-	FVector SpawnerLocation = PS->MySpawner->GetActorLocation();
 	FVector CasterLocation = OwnerCharacter->GetActorLocation();
-	FVector DamageCenter = FVector(SpawnerLocation.X, SpawnerLocation.Y, CasterLocation.Z);
+	FVector DamageCenter = CasterLocation;
 	const UMyAttributeSet* AttributeSet = Cast<const UMyAttributeSet>(SourceASC->GetAttributeSet(UMyAttributeSet::StaticClass()));
 	const float TotalBaseDamage = DamageBase + (AttributeSet->GetAttackDamage() * DamageCoefficient);
 	const bool bDidCrit = URID_DamageStatics::CheckForCrit(SourceASC, true);
@@ -142,9 +137,14 @@ void UGA_Warrior_Warpath::ActivateAbility(const FGameplayAbilitySpecHandle Handl
 	}
 
 	// 6. 시각 효과 (캐릭터 - '1회성' 발동 이펙트)
-	if (CasterEffect && OwnerCharacter->GetMesh())
+	if (CasterEffect)
 	{
-		UGameplayStatics::SpawnEmitterAttached(CasterEffect, OwnerCharacter->GetMesh(), NAME_None, FVector::ZeroVector, FRotator::ZeroRotator, FVector(1.0f), EAttachLocation::KeepRelativeOffset, true);
+		OwnerCharacter->Multicast_SpawnParticleAtLocation(
+			CasterEffect,
+			OwnerCharacter->GetActorLocation(), // 현재 위치에 스폰
+			FRotator::ZeroRotator,              // 회전 없음
+			FVector(1.0f)                       // 스케일 1.0
+		);
 	}
 
 	// 7. 몽타주 재생 및 종료 바인딩
@@ -168,19 +168,18 @@ void UGA_Warrior_Warpath::ActivateAbility(const FGameplayAbilitySpecHandle Handl
 /** 버프 GE가 제거될 때 (지속시간 20초 만료 등) */
 void UGA_Warrior_Warpath::OnBuffEffectRemoved(const FGameplayEffectRemovalInfo& EffectRemovalInfo)
 {
-	// 1. 버프 GE가 제거될 때 스폰했던 '지속' 이펙트도 제거합니다.
-	if (BuffEffectComponent && BuffEffectComponent->IsValidLowLevel())
+	// [★★★ 수정 ★★★] 캐릭터에게 이펙트 제거 명령
+	ARamdomItemDefenseCharacter* OwnerCharacter = Cast<ARamdomItemDefenseCharacter>(GetAvatarActorFromActorInfo());
+	if (OwnerCharacter)
 	{
-		BuffEffectComponent->DestroyComponent();
-		BuffEffectComponent = nullptr;
-		RID_LOG(FColor::Yellow, TEXT("GA_Warrior_Warpath: Buff Effect removed (Duration Ended)."));
+		OwnerCharacter->Multicast_RemoveBuffEffect(BuffIsActiveTag);
 	}
+
+	RID_LOG(FColor::Yellow, TEXT("GA_Warrior_Warpath: Buff Removed. FX Cleared via Multicast."));
 
 	// 2. 이 어빌리티 인스턴스를 정상 종료
 	EndAbility(GetCurrentAbilitySpecHandle(), GetCurrentActorInfo(), GetCurrentActivationInfo(), true, false);
 }
-// --- [ ★★★ 추가 끝 ★★★ ] ---
-
 
 /** 몽타주 재생이 '성공적으로' 끝났을 때 */
 void UGA_Warrior_Warpath::OnMontageFinished()
@@ -209,31 +208,29 @@ void UGA_Warrior_Warpath::EndAbility(const FGameplayAbilitySpecHandle Handle, co
 {
 	UAbilitySystemComponent* SourceASC = ActorInfo ? ActorInfo->AbilitySystemComponent.Get() : nullptr;
 
-	// 0. (정리) 지속 이펙트가 남아있다면 강제 제거
-	if (BuffEffectComponent && BuffEffectComponent->IsValidLowLevel())
+	// (기존 로컬 BuffEffectComponent 정리 코드 삭제)
+
+	// [★★★ 수정 ★★★] 취소되었을 때도 이펙트 확실히 제거
+	if (bWasCancelled)
 	{
-		BuffEffectComponent->DestroyComponent();
-		BuffEffectComponent = nullptr;
-		RID_LOG(FColor::Orange, TEXT("GA_Warrior_Warpath: EndAbility - Force-cleaned up BuffEffectComponent."));
+		ARamdomItemDefenseCharacter* OwnerCharacter = Cast<ARamdomItemDefenseCharacter>(ActorInfo ? ActorInfo->AvatarActor.Get() : nullptr);
+		if (OwnerCharacter)
+		{
+			OwnerCharacter->Multicast_RemoveBuffEffect(BuffIsActiveTag);
+		}
 	}
 
 	if (SourceASC)
 	{
-		// 1. (애니메이션 락) 상태 GE 제거
 		if (UltimateStateEffectHandle.IsValid())
 		{
 			SourceASC->RemoveActiveGameplayEffect(UltimateStateEffectHandle);
-			RID_LOG(FColor::Orange, TEXT("GA_Warrior_Warpath: EndAbility - Removed State lock."));
 		}
-
-		// 2. (자가 버프) 스킬 확률 버프 GE 제거
 		if (UltimateBuffEffectHandle.IsValid())
 		{
 			SourceASC->RemoveActiveGameplayEffect(UltimateBuffEffectHandle);
-			RID_LOG(FColor::Orange, TEXT("GA_Warrior_Warpath: EndAbility - Removed Skill Chance Buff."));
 		}
 	}
 
-	// 3. (필수!) 부모의 EndAbility 호출
 	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }

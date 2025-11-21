@@ -10,8 +10,8 @@
 UGA_Archer_UltimateFocus::UGA_Archer_UltimateFocus()
 {
 	BuffDuration = 20.0f; // 20초 버프 지속
-	ActiveBuffParticleComponent = nullptr;
-	ActiveHeadBuffParticleComponent = nullptr;
+	BuffIsActiveTag = FGameplayTag::RequestGameplayTag(FName("State.Player.Archer.FocusActive"));
+	HeadBuffIsActiveTag = FGameplayTag::RequestGameplayTag(FName("State.Player.Archer.FocusActive.Head"));
 }
 
 void UGA_Archer_UltimateFocus::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
@@ -65,49 +65,30 @@ void UGA_Archer_UltimateFocus::ActivateAbility(const FGameplayAbilitySpecHandle 
 		);
 	}
 
-	// B. 몸 지속 이펙트 스폰 (부착 + 핸들 저장)
-	if (BuffParticleSystem && OwnerCharacter->GetMesh())
+	// 1. 몸 이펙트 (Body)
+	if (BuffParticleSystem)
 	{
-		ActiveBuffParticleComponent = UGameplayStatics::SpawnEmitterAttached(
+		OwnerCharacter->Multicast_AddBuffEffect(
+			BuffIsActiveTag,
 			BuffParticleSystem,
-			OwnerCharacter->GetMesh(),
-			NAME_None, // 소켓 이름 (몸 전체)
+			NAME_None,
 			FVector::ZeroVector,
-			FRotator::ZeroRotator,
-			FVector(1.5f), // 스케일 조정 (더 크게)
-			EAttachLocation::SnapToTarget,
-			true // <-- bAutoDestroy = true (여기서 이미 설정됨)
+			FVector(1.5f) // Scale 1.5
 		);
 	}
 
-	// C. 머리 지속 이펙트 스폰 (부착 + 핸들 저장)
-	if (HeadBuffParticleSystem && OwnerCharacter->GetMesh())
+	// 2. 머리 이펙트 (Head)
+	if (HeadBuffParticleSystem)
 	{
-		// 'head' 소켓이 있다면 거기에 부착
-		ActiveHeadBuffParticleComponent = UGameplayStatics::SpawnEmitterAttached(
-			HeadBuffParticleSystem,
-			OwnerCharacter->GetMesh(),
-			TEXT("FX_Head"), // 스켈레탈 메쉬에 'head' 소켓이 있는지 확인 필요
-			FVector(50, 0, 0), // 머리 위로 약간 올림
-			FRotator::ZeroRotator,
-			FVector(1.0f),
-			EAttachLocation::SnapToTarget,
-			true // <-- bAutoDestroy = true (여기서 이미 설정됨)
-		);
-
-		// 'head' 소켓이 없거나 실패했다면, 몸 기준으로 높이 띄움
-		if (!ActiveHeadBuffParticleComponent)
+		// HeadBuffIsActiveTag가 유효한지 확인 (없으면 Body 태그와 겹쳐서 하나만 뜰 수 있음)
+		if (HeadBuffIsActiveTag.IsValid())
 		{
-			UE_LOG(LogRamdomItemDefense, Warning, TEXT("GA_Archer_UltimateFocus: 'head' socket not found. Attaching to root with offset."));
-			ActiveHeadBuffParticleComponent = UGameplayStatics::SpawnEmitterAttached(
+			OwnerCharacter->Multicast_AddBuffEffect(
+				HeadBuffIsActiveTag,
 				HeadBuffParticleSystem,
-				OwnerCharacter->GetMesh(),
-				NAME_None, // 소켓 대신 루트
-				FVector(100, 0, 0), // 몸통 기준 150cm 위
-				FRotator::ZeroRotator,
-				FVector(1.0f),
-				EAttachLocation::KeepRelativeOffset, // 상대 위치 유지
-				true // <-- bAutoDestroy = true (여기서 이미 설정됨)
+				TEXT("FX_Head"), // 소켓 이름
+				FVector(50, 0, 0),
+				FVector(1.0f)
 			);
 		}
 	}
@@ -139,31 +120,14 @@ void UGA_Archer_UltimateFocus::OnBuffDurationEnded()
 /** 어빌리티 종료 시 호출 (버프 GE 및 파티클 제거) */
 void UGA_Archer_UltimateFocus::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
 {
-	// 1. 버프 GE 제거 (부모 클래스의 UltimateStateEffectHandle도 여기서 처리됨)
-	if (UltimateBuffEffectHandle.IsValid() && ActorInfo && ActorInfo->AbilitySystemComponent.IsValid())
+	ARamdomItemDefenseCharacter* OwnerCharacter = Cast<ARamdomItemDefenseCharacter>(ActorInfo ? ActorInfo->AvatarActor.Get() : nullptr);
+	if (OwnerCharacter)
 	{
-		ActorInfo->AbilitySystemComponent->RemoveActiveGameplayEffect(UltimateBuffEffectHandle);
-		UE_LOG(LogRamdomItemDefense, Log, TEXT("GA_Archer_UltimateFocus: Removed UltimateBuffEffect."));
+		OwnerCharacter->Multicast_RemoveBuffEffect(BuffIsActiveTag);
+		OwnerCharacter->Multicast_RemoveBuffEffect(HeadBuffIsActiveTag);
 	}
 
-	// --- [ ★★★ 코드 수정 (SetAutoDestroy 제거) ★★★ ] ---
-	// 2. 몸 지속 파티클 컴포넌트 제거
-	if (ActiveBuffParticleComponent)
-	{
-		ActiveBuffParticleComponent->Deactivate();
-		ActiveBuffParticleComponent = nullptr;
-		UE_LOG(LogRamdomItemDefense, Log, TEXT("GA_Archer_UltimateFocus: Deactivated BuffParticleComponent."));
-	}
-	// 3. 머리 지속 파티클 컴포넌트 제거
-	if (ActiveHeadBuffParticleComponent)
-	{
-		ActiveHeadBuffParticleComponent->Deactivate();
-		ActiveHeadBuffParticleComponent = nullptr;
-		UE_LOG(LogRamdomItemDefense, Log, TEXT("GA_Archer_UltimateFocus: Deactivated HeadBuffParticleComponent."));
-	}
-	// --- [ ★★★ 코드 수정 끝 ★★★ ] ---
-
-	// 4. 타이머가 혹시라도 아직 돌고 있었다면 중지
+	// 타이머가 혹시라도 아직 돌고 있었다면 중지
 	if (GetWorld())
 	{
 		GetWorld()->GetTimerManager().ClearTimer(BuffDurationTimerHandle);

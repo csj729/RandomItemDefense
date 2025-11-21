@@ -4,6 +4,7 @@
 #include "RamdomItemDefenseCharacter.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "AbilitySystemComponent.h"
+#include "RamdomItemDefenseCharacter.h"
 #include "SoldierDrone.h" // 드론 헤더
 #include "Components/SceneComponent.h"
 
@@ -31,39 +32,37 @@ void UGA_BaseSkill::ActivateAbility(const FGameplayAbilitySpecHandle Handle, con
 	// 1. (최우선) MuzzleFlashEffect가 유효하면 스폰합니다.
 	if (MuzzleFlashEffect)
 	{
-		// --- [ ★★★ 로직 수정 ★★★ ] ---
-		USceneComponent* AttachComponent = nullptr;
 		AActor* AvatarActor = ActorInfo->AvatarActor.Get();
 
-		// 1. 시전자가 캐릭터인지 확인
+		// 1. 캐릭터인 경우: 멀티캐스트로 모든 클라이언트 동기화 (부착)
 		if (ARamdomItemDefenseCharacter* OwnerCharacter = Cast<ARamdomItemDefenseCharacter>(AvatarActor))
 		{
-			AttachComponent = OwnerCharacter->GetMesh();
-		}
-		// 2. 시전자가 드론인지 확인
-		else if (ASoldierDrone* OwnerDrone = Cast<ASoldierDrone>(AvatarActor))
-		{
-			// 드론의 Mesh는 private/protected일 수 있으니, 안전하게 RootComponent에 부착합니다.
-			// (드론 블루프린트에서 "MuzzlePoint" 소켓을 RootComponent에 추가해야 합니다)
-			AttachComponent = OwnerDrone->GetRootComponent(); //
-		}
-
-		// 3. 부착할 컴포넌트를 찾았다면 이펙트 스폰
-		if (AttachComponent)
-		{
-			// 캐스케이드 이펙트 스폰
-			UGameplayStatics::SpawnEmitterAttached(
+			OwnerCharacter->Multicast_SpawnParticleAttached(
 				MuzzleFlashEffect,
-				AttachComponent, // ACharacter->GetMesh() 또는 ASoldierDrone->GetRootComponent()
 				MuzzleSocketName,
-				FVector::ZeroVector,    // Location Offset
-				FRotator::ZeroRotator,  // Rotation Offset
-				FVector(1.0f),          // Scale
-				EAttachLocation::SnapToTarget,
-				true                    // Auto Destroy
+				FVector::ZeroVector,
+				FRotator::ZeroRotator,
+				FVector(1.0f)
 			);
 		}
-		// --- [ ★★★ 로직 수정 끝 ★★★ ] ---
+		// 2. 드론인 경우: (드론 클래스에 멀티캐스트가 없다면) 서버에서만이라도 재생
+		else if (ASoldierDrone* OwnerDrone = Cast<ASoldierDrone>(AvatarActor))
+		{
+			// 드론 메쉬에 부착
+			if (OwnerDrone->GetMesh())
+			{
+				UGameplayStatics::SpawnEmitterAttached(
+					MuzzleFlashEffect,
+					OwnerDrone->GetMesh(),
+					MuzzleSocketName,
+					FVector::ZeroVector,
+					FRotator::ZeroRotator,
+					FVector(1.0f),
+					EAttachLocation::SnapToTarget,
+					true
+				);
+			}
+		}
 	}
 
 	// 2. (필수) 부모(UGameplayAbility)의 ActivateAbility를 호출합니다.

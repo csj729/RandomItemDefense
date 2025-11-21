@@ -51,6 +51,24 @@ public:
 	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_SpawnParticleAtLocation(UParticleSystem* EmitterTemplate, FVector Location, FRotator Rotation, FVector Scale);
 
+	UFUNCTION(NetMulticast, Unreliable)
+	void Multicast_SpawnParticleAttached(UParticleSystem* EmitterTemplate, FName SocketName, FVector LocationOffset = FVector::ZeroVector, FRotator RotationOffset = FRotator::ZeroRotator, FVector Scale = FVector(1.0f));
+
+	/** * @brief (서버->모든 클라) 특정 태그와 연결된 지속 이펙트를 생성하고 부착합니다.
+	 * @param BuffTag 이펙트를 식별할 고유 태그 (예: State.Player.Warrior.AttackSpeed.Active)
+	 * @param EmitterTemplate 생성할 파티클
+	 * @param SocketName 부착할 소켓 이름
+	 * @param LocationOffset 위치 오프셋
+	 * @param Scale 스케일
+	 */
+	UFUNCTION(NetMulticast, Reliable)
+	void Multicast_AddBuffEffect(FGameplayTag BuffTag, UParticleSystem* EmitterTemplate, FName SocketName, FVector LocationOffset = FVector::ZeroVector, FVector Scale = FVector(1.0f));
+
+	/** * @brief (서버->모든 클라) 특정 태그와 연결된 지속 이펙트를 제거합니다.
+	 */
+	UFUNCTION(NetMulticast, Reliable)
+	void Multicast_RemoveBuffEffect(FGameplayTag BuffTag);
+
 protected:
 	virtual void BeginPlay() override;
 
@@ -75,6 +93,9 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, Category = "GAS")
 	TSubclassOf<class UGameplayEffect> DefaultStatsEffect;
+
+	UPROPERTY()
+	TMap<FGameplayTag, TObjectPtr<UParticleSystemComponent>> ActiveBuffParticles;
 
 	/**
 	 * @brief 캐릭터가 기본적으로 보유할 어빌리티 목록입니다.

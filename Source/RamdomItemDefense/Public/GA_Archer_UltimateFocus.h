@@ -46,21 +46,18 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Config|FX")
 	TObjectPtr<USoundBase> BuffStartSound;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Config|GAS")
+	FGameplayTag BuffIsActiveTag;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Config|GAS")
+	FGameplayTag HeadBuffIsActiveTag;
+
 private:
 	/** 버프 GE가 활성화되었을 때의 핸들 (제거용) */
 	FActiveGameplayEffectHandle UltimateBuffEffectHandle;
 
 	/** 버프 지속시간을 관리하는 타이머 핸들 */
 	FTimerHandle BuffDurationTimerHandle;
-
-	/** 몸(Body) 지속 파티클 컴포넌트 참조 (제거용) */
-	UPROPERTY()
-	TObjectPtr<UParticleSystemComponent> ActiveBuffParticleComponent;
-
-	/** 머리(Head) 지속 파티클 컴포넌스 참조 (제거용) */
-	UPROPERTY()
-	TObjectPtr<UParticleSystemComponent> ActiveHeadBuffParticleComponent;
-
 	/** 버프 지속 시간이 끝났을 때 호출될 함수 */
 	UFUNCTION()
 	void OnBuffDurationEnded();
