@@ -81,6 +81,12 @@ public:
 	UFUNCTION(NetMulticast, Reliable)
 	void Multicast_SetStatusEffectState(FGameplayTag StatusTag, bool bIsActive, UNiagaraSystem* EffectTemplate);
 
+	/** 이 몬스터가 PVP 반격으로 생성된 몬스터인지 설정합니다. */
+	void SetIsCounterAttackMonster(bool bInValue) { bIsCounterAttackMonster = bInValue; }
+
+	/** 이 몬스터가 PVP 반격 몬스터인지 여부를 반환합니다. */
+	bool IsCounterAttackMonster() const { return bIsCounterAttackMonster; }
+
 protected:
 	virtual void BeginPlay() override;
 
@@ -183,6 +189,8 @@ protected:
 	 */
 	UFUNCTION()
 	void OnCritDamageOccurred(AActor* TargetActor, float CritDamageAmount);
+
+	bool bIsCounterAttackMonster;
 
 	// --- [ ★★★ 코드 추가 ★★★ ] ---
 private:

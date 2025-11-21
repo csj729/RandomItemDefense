@@ -10,6 +10,8 @@
 #include "MonsterBaseCharacter.h"
 #include "RamdomItemDefensePlayerController.h"
 #include "GameFramework/PlayerState.h"
+#include "GameFramework/PlayerStart.h" 
+#include "GameFramework/Controller.h"
 #include "Engine/Engine.h"
 #include "RamdomItemDefense.h" // RID_LOG 매크로용
 
@@ -45,36 +47,42 @@ void ARamdomItemDefenseGameMode::BeginPlay()
 
 void ARamdomItemDefenseGameMode::OnPostLogin(AController* NewPlayer)
 {
-	Super::OnPostLogin(NewPlayer); // 부모 함수를 먼저 호출합니다.
+	Super::OnPostLogin(NewPlayer);
 
-	// 서버에서만, 그리고 스포너 목록이 비어있을 때 딱 한 번만 실행합니다.
+	// [수정] 스포너를 태그("Player1", "Player2")를 기준으로 명시적 할당
 	if (HasAuthority() && MonsterSpawners.Num() == 0)
 	{
-		// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
-		RID_LOG(FColor::Magenta, TEXT("First player logged in. Finding Spawners..."));
-		// -----------------------------------------
+		RID_LOG(FColor::Magenta, TEXT("Finding Spawners by Tag..."));
+
+		// 2인용 게임이므로 2칸을 미리 비워둡니다. (0번: P1용, 1번: P2용)
+		MonsterSpawners.Init(nullptr, 2);
 
 		TArray<AActor*> FoundSpawners;
 		UGameplayStatics::GetAllActorsOfClass(GetWorld(), AMonsterSpawner::StaticClass(), FoundSpawners);
 
-		for (AActor* SpawnerActor : FoundSpawners)
+		for (AActor* Actor : FoundSpawners)
 		{
-			AMonsterSpawner* Spawner = Cast<AMonsterSpawner>(SpawnerActor);
+			AMonsterSpawner* Spawner = Cast<AMonsterSpawner>(Actor);
 			if (Spawner)
 			{
-				MonsterSpawners.Add(Spawner);
+				if (Spawner->ActorHasTag(FName("Player1")))
+				{
+					MonsterSpawners[0] = Spawner; // Player1 태그는 무조건 0번 인덱스
+					RID_LOG(FColor::Green, TEXT("Registered Spawner for Player1 (Index 0): %s"), *Spawner->GetName());
+				}
+				else if (Spawner->ActorHasTag(FName("Player2")))
+				{
+					MonsterSpawners[1] = Spawner; // Player2 태그는 무조건 1번 인덱스
+					RID_LOG(FColor::Green, TEXT("Registered Spawner for Player2 (Index 1): %s"), *Spawner->GetName());
+				}
 			}
 		}
 
-		// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
-		// [수정] FString 변수를 만들지 않고 매크로에 직접 전달합니다.
-		RID_LOG(FColor::Magenta, TEXT("Dynamically found %d Spawners in the level."), MonsterSpawners.Num());
-		// -----------------------------------------
-
-		// (선택 사항: 스포너를 이름순으로 정렬하여 인덱스를 고정시킬 수 있습니다)
-		MonsterSpawners.Sort([](const TObjectPtr<AMonsterSpawner>& A, const TObjectPtr<AMonsterSpawner>& B) {
-			return A->GetName() < B->GetName();
-			});
+		// [검증] 태그 세팅을 까먹었을 경우를 대비한 경고
+		if (MonsterSpawners[0] == nullptr || MonsterSpawners[1] == nullptr)
+		{
+			RID_LOG(FColor::Red, TEXT("CRITICAL ERROR: Spawners missing 'Player1' or 'Player2' tags!"));
+		}
 	}
 
 	if (NewPlayer == nullptr) return;
@@ -334,4 +342,43 @@ void ARamdomItemDefenseGameMode::SendCounterAttackMonster(APlayerState* KillerPl
 			RID_LOG(FColor::Red, TEXT("PVP: Player %d sent a monster to Player %d!"), KillerIndex, TargetIndex);
 		}
 	}
+}
+
+AActor* ARamdomItemDefenseGameMode::ChoosePlayerStart_Implementation(AController* Player)
+{
+	// 1. 부모 로직 호출 (함수 이름 주의: _Implementation)
+	AActor* BestStart = Super::ChoosePlayerStart_Implementation(Player);
+
+	// 2. GameState를 통해 플레이어 인덱스 확인
+	int32 PlayerIndex = 0;
+	AMyGameState* MyGameState = GetGameState<AMyGameState>();
+
+	if (MyGameState && Player && Player->PlayerState)
+	{
+		PlayerIndex = MyGameState->PlayerArray.Find(Player->PlayerState);
+		if (PlayerIndex == INDEX_NONE)
+		{
+			PlayerIndex = MyGameState->PlayerArray.Num() > 0 ? MyGameState->PlayerArray.Num() - 1 : 0;
+		}
+	}
+
+	// 3. 태그 생성 (Player1, Player2...)
+	FString TargetTag = FString::Printf(TEXT("Player%d"), PlayerIndex + 1);
+
+	// 4. 월드에 있는 모든 PlayerStart를 찾아서 태그 비교
+	TArray<AActor*> FoundPlayerStarts;
+	UGameplayStatics::GetAllActorsOfClass(GetWorld(), APlayerStart::StaticClass(), FoundPlayerStarts);
+
+	for (AActor* StartActor : FoundPlayerStarts)
+	{
+		if (StartActor && StartActor->ActorHasTag(FName(*TargetTag)))
+		{
+			BestStart = StartActor;
+			// 로그 확인
+			// RID_LOG(FColor::Green, TEXT("ChoosePlayerStart: Found '%s' for Player %d"), *TargetTag, PlayerIndex);
+			break;
+		}
+	}
+
+	return BestStart;
 }

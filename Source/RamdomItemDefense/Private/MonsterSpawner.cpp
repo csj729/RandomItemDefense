@@ -15,6 +15,8 @@
 AMonsterSpawner::AMonsterSpawner()
 {
 	PrimaryActorTick.bCanEverTick = false;
+	bReplicates = true;
+
 	TotalToSpawn = 0;
 	SpawnCounter = 0;
 	bEnableDebug = true;
@@ -257,7 +259,9 @@ void AMonsterSpawner::SpawnCounterAttackMonster(TSubclassOf<AMonsterBaseCharacte
 		if (SpawnedMonster)
 		{
 			SpawnedMonster->SetSpawner(this);
+			SpawnedMonster->SetIsCounterAttackMonster(true);
 			CurrentMonsterCount++;
+
 			OnRep_CurrentMonsterCount();
 
 			// [중요] PVP로 넘어온 몬스터도 현재 웨이브 난이도를 따라가야 함

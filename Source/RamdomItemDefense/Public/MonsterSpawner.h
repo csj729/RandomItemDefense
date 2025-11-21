@@ -38,6 +38,9 @@ public:
 
 	void SpawnCounterAttackMonster(TSubclassOf<AMonsterBaseCharacter> MonsterClass);
 
+	UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category = "Config")
+	TObjectPtr<AActor> PatrolPathActor;
+
 protected:
 	virtual void BeginPlay() override;
 

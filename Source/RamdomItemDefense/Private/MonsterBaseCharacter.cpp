@@ -44,6 +44,8 @@ AMonsterBaseCharacter::AMonsterBaseCharacter()
 
 	BaseMoveSpeed = 300.0f;
 	SpawnWaveIndex = 1;
+
+	bIsCounterAttackMonster = false;
 }
 
 // ... (GetLifetimeReplicatedProps, GetAbilitySystemComponent, PossessedBy, BeginPlay, HandleHealthChanged, HandleMoveSpeedChanged, SetSpawner 함수는 모두 동일) ...
@@ -124,17 +126,28 @@ void AMonsterBaseCharacter::HandleMoveSpeedChanged(const FOnAttributeChangeData&
 	{
 		const float NewSpeedMultiplier = Data.NewValue;
 		MoveComp->MaxWalkSpeed = BaseMoveSpeed * NewSpeedMultiplier;
-		/*RID_LOG(FColor::Blue, TEXT("%s Final MoveSpeed set to: %.1f (Base: %.1f * Multiplier: %.2f)"),
-			*GetName(),
-			GetCharacterMovement()->MaxWalkSpeed,
-			BaseMoveSpeed,
-			NewSpeedMultiplier);*/
 	}
 }
 
 void AMonsterBaseCharacter::SetSpawner(AMonsterSpawner* InSpawner)
 {
 	MySpawner = InSpawner;
+
+	// [추가] 스포너에 설정된 경로를 AI 컨트롤러에게 전달
+	if (InSpawner && InSpawner->PatrolPathActor)
+	{
+		// 1. AI 컨트롤러 캐싱 확인 (혹시 null일 경우 대비)
+		if (!MonsterAIController.IsValid())
+		{
+			MonsterAIController = Cast<AMonsterAIController>(GetController());
+		}
+
+		// 2. AI 컨트롤러에게 경로 주입
+		if (MonsterAIController.IsValid())
+		{
+			MonsterAIController->SetPatrolPath(InSpawner->PatrolPathActor);
+		}
+	}
 }
 
 void AMonsterBaseCharacter::Multicast_PlayMontage_Implementation(UAnimMontage* MontageToPlay)
@@ -421,3 +434,4 @@ void AMonsterBaseCharacter::OnArmorShredTagChanged(const FGameplayTag Tag, int32
 
 	OnArmorShredStateChanged(bIsShredded);
 }
+

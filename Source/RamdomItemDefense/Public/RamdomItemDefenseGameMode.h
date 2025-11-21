@@ -23,6 +23,8 @@ public:
 	 */
 	void SendCounterAttackMonster(APlayerState* KillerPlayerState, TSubclassOf<AMonsterBaseCharacter> MonsterClassToSpawn);
 
+	virtual AActor* ChoosePlayerStart_Implementation(AController* Player) override;
+
 protected:
 	virtual void BeginPlay() override;
 

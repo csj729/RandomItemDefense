@@ -12,6 +12,8 @@ class RAMDOMITEMDEFENSE_API AMonsterAIController : public AAIController
 public:
 	AMonsterAIController();
 
+	void SetPatrolPath(AActor* PathActor);
+
 protected:
 	virtual void OnPossess(APawn* InPawn) override;
 

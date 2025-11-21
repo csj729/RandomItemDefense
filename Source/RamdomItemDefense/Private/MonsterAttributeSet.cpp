@@ -131,15 +131,13 @@ void UMonsterAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCal
 				}
 
 				// [PVP 추가] 킬러가 유효하고, 보스 몬스터가 아니라면 상대에게 반격 몬스터 전송
-				if (KillerCharacter && !Monster->IsBoss())
+				if (KillerCharacter && !Monster->IsBoss() && !Monster->IsCounterAttackMonster())
 				{
-					// GameMode 가져오기
 					if (UWorld* World = Monster->GetWorld())
 					{
 						ARamdomItemDefenseGameMode* GM = Cast<ARamdomItemDefenseGameMode>(World->GetAuthGameMode());
 						if (GM)
 						{
-							// 죽은 몬스터의 클래스를 그대로 보냅니다.
 							GM->SendCounterAttackMonster(KillerCharacter->GetPlayerState(), Monster->GetClass());
 						}
 					}
