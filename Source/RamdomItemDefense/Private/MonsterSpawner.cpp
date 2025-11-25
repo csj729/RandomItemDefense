@@ -1,3 +1,4 @@
+
 // csj729/randomitemdefense/RandomItemDefense-78a128504f0127dc02646504d4a1e1c677a0e811/Source/RamdomItemDefense/Private/MonsterSpawner.cpp
 #include "MonsterSpawner.h"
 #include "MonsterBaseCharacter.h"
@@ -8,8 +9,8 @@
 #include "RamdomItemDefense.h" // RID_LOG 매크로용
 #include "MyGameState.h"
 #include "Materials/MaterialInterface.h"
-#include "AbilitySystemComponent.h" // ASC 사용을 위해 추가
-#include "GameplayTagContainer.h" // FGameplayTag 사용을 위해 추가
+#include "AbilitySystemComponent.h" 
+#include "GameplayTagContainer.h" 
 
 
 AMonsterSpawner::AMonsterSpawner()
@@ -53,12 +54,6 @@ void AMonsterSpawner::BeginSpawning(TSubclassOf<AMonsterBaseCharacter> MonsterCl
 	TotalToSpawn = Count;
 	SpawnCounter = 0;
 
-	if (bEnableDebug)
-	{
-		// FString MonsterName = GetNameSafe(MonsterClassToSpawn);
-		// RID_LOG(FColor::Cyan, TEXT("Spawner '%s' received command: Spawn %d of '%s'."), *GetName(), Count, *MonsterName); // [로그 제거]
-	}
-
 	if (MonsterClassToSpawn && TotalToSpawn > 0)
 	{
 		GetWorld()->GetTimerManager().SetTimer(
@@ -101,17 +96,15 @@ void AMonsterSpawner::SpawnMonster()
 					int32 CurrentWave = MyGameState->GetCurrentWave(); // (1부터 시작)
 
 					SpawnedMonster->SetSpawnWaveIndex(CurrentWave);
-					// --- [ ★★★ 웨이브 스케일링 스탯 적용 로직 (수정됨) ★★★ ] ---
+
+					// --- 스탯 적용 로직 ---
 					UAbilitySystemComponent* MonsterASC = SpawnedMonster->GetAbilitySystemComponent();
 					if (MonsterASC)
 					{
-						// 2. (중요) 스폰된 액터의 ASC를 즉시 초기화합니다.
-						// (BeginPlay보다 먼저 실행되므로, 여기서 수동으로 해줘야 합니다)
 						MonsterASC->InitAbilityActorInfo(SpawnedMonster, SpawnedMonster);
 
-						if (MonsterStatInitEffect) // (h파일에 추가한 변수)
+						if (MonsterStatInitEffect)
 						{
-							// 3. 스펙(Spec) 생성
 							FGameplayEffectContextHandle ContextHandle = MonsterASC->MakeEffectContext();
 							ContextHandle.AddSourceObject(this);
 							FGameplayEffectSpecHandle SpecHandle = MonsterASC->MakeOutgoingSpec(MonsterStatInitEffect, 1.0f, ContextHandle);
@@ -119,104 +112,52 @@ void AMonsterSpawner::SpawnMonster()
 							if (SpecHandle.IsValid())
 							{
 								float BaseHP = MONSTER_BASE_HP;
-								// 4. 웨이브 보너스 HP 계산 (Wave 1 = 0, Wave 2 = 50, ...)
-								// (요구사항: 스테이지마다 50씩 상승)
-								// (CurrentWave 1 기준 0)
 								float FinalHP = BaseHP + FMath::Max(0.f, (float)(CurrentWave - 1) * 50.f);
-
-								// 5. SetByCaller로 보너스 HP 값 주입
-								// (주의: 태그 이름이 "Data.Wave.BonusHP"로 정확해야 함)
 								SpecHandle.Data.Get()->SetSetByCallerMagnitude(FGameplayTag::RequestGameplayTag(FName("Data.Wave.BonusHP")), FinalHP);
-								// --- [ ★★★ 방어력 계산 로직 추가 ★★★ ] ---
+
 								int FinalArmor = 0;
-
-								const int32 BossStage = CurrentWave / 10; // (Wave 1-9 -> 0), (Wave 11-19 -> 1)
+								const int32 BossStage = CurrentWave / 10;
 								const float BaseArmor = BossStage * 20.0f;
-
 								const int32 WaveNumInBlock = (CurrentWave % 10);
 								FinalArmor = BaseArmor + WaveNumInBlock;
-
-								// 6. SetByCaller로 보너스 Armor 값 주입
 								SpecHandle.Data.Get()->SetSetByCallerMagnitude(FGameplayTag::RequestGameplayTag(FName("Data.Wave.BonusArmor")), FinalArmor);
-								//RID_LOG(FColor::White, TEXT("SpawnMonster: Wave %d -> HP: %.1f, Armor: %.1f"), CurrentWave, BonusHP, FinalArmor);
-								// --- [ ★★★ 방어력 계산 로직 끝 ★★★ ] ---
 
-
-								// 7. 스펙 적용
 								MonsterASC->ApplyGameplayEffectSpecToSelf(*SpecHandle.Data.Get());
-
-								//RID_LOG(FColor::Green, TEXT("Applied GE_MonsterStatInit to %s. Wave: %d, BonusHP: %.1f"), *SpawnedMonster->GetName(), CurrentWave, BonusHP);
 							}
 						}
-						else
-						{
-							RID_LOG(FColor::Red, TEXT("Spawner ERROR: MonsterStatInitEffect is not set on the Spawner BP!"));
-						}
 					}
-					// --- [ 스탯 적용 로직 끝 ] ---
 
-					// [추가] 보스 웨이브인지 확인 (GameMode 로직과 동일)
+					// --- 머티리얼 적용 로직 ---
 					const bool bIsBossWave = (CurrentWave > 0 && CurrentWave % 10 == 0);
-
-					// [수정] 보스 웨이브가 아닐 때(!bIsBossWave)만 머티리얼 변경 로직 실행
 					if (!bIsBossWave)
 					{
-						// 2. 몬스터의 머티리얼 목록 가져오기
 						const TArray<TObjectPtr<UMaterialInterface>>& WaveMaterials = SpawnedMonster->GetWaveMaterials();
-
-						// 3. 머티리얼 배열이 9개(인덱스 0~8)인지 확인 (매우 중요)
 						if (WaveMaterials.Num() == 9)
 						{
-							// 4. 웨이브의 '일의 자리' 숫자를 인덱스로 사용합니다. (0~8)
-							// Wave 1 -> (1 % 10) - 1 = 0 (인덱스 0)
-							// Wave 9 -> (9 % 10) - 1 = 8 (인덱스 8)
-							// Wave 11 -> (11 % 10) - 1 = 0 (인덱스 0)
 							int32 MaterialIndex = (CurrentWave % 10) - 1;
-
-							// (혹시 모를 음수 인덱스 방지 - 로직상 발생 안 함)
 							if (MaterialIndex >= 0 && MaterialIndex < WaveMaterials.Num())
 							{
 								UMaterialInterface* MaterialToApply = WaveMaterials[MaterialIndex];
-
-								// 5. 몬스터에 머티리얼 설정 (서버 전용 함수 호출)
 								if (MaterialToApply)
 								{
 									SpawnedMonster->SetWaveMaterial(MaterialToApply);
 								}
-								else
-								{
-									// (디버그 로그) 해당 인덱스에 머티리얼이 비어있음
-									// RID_LOG(FColor::Yellow, TEXT("Spawner: WaveMaterials[%d] is NULL for Wave %d."), MaterialIndex, CurrentWave); // [로그 제거]
-								}
 							}
 						}
-						else
-						{
-							// (디버그 로그) 몬스터 BP에 머티리얼이 9개 설정되지 않음
-							// RID_LOG(FColor::Red, TEXT("Spawner ERROR: Monster BP '%s' must have exactly 9 elements in WaveMaterials (found %d)."), // [로그 제거]
-								// *GetNameSafe(MonsterClassToSpawn), WaveMaterials.Num()); // [로그 제거]
-						}
 					}
-					// (else: 보스 웨이브인 경우, 아무것도 하지 않고 몬스터의 기본 머티리얼을 사용합니다)
 				}
-				// --- [코드 수정 끝] ---
 			}
 
 			SpawnCounter++;
 
 			if (bEnableDebug)
 			{
-				// RID_LOG(FColor::Green, TEXT("Spawner '%s' spawned monster #%d/%d. (Live: %d)"), *GetName(), SpawnCounter, TotalToSpawn, CurrentMonsterCount); // [로그 제거]
 				DrawDebugSphere(GetWorld(), GetActorLocation(), 100.0f, 12, FColor::Green, false, 2.0f);
 			}
 		}
 	}
 	else
 	{
-		if (bEnableDebug)
-		{
-			// RID_LOG(FColor::White, TEXT("Spawner '%s' finished spawning wave."), *GetName()); // [로그 제거]
-		}
 		GetWorld()->GetTimerManager().ClearTimer(SpawnTimerHandle);
 	}
 }
@@ -234,14 +175,9 @@ void AMonsterSpawner::SetGameOver()
 {
 	bIsGameOver = true;
 	GetWorld()->GetTimerManager().ClearTimer(SpawnTimerHandle);
-
-	if (bEnableDebug)
-	{
-		// RID_LOG(FColor::Magenta, TEXT("Spawner '%s' is now in GAME OVER state."), *GetName()); // [로그 제거]
-	}
 }
 
-void AMonsterSpawner::SpawnCounterAttackMonster(TSubclassOf<AMonsterBaseCharacter> MonsterClass)
+void AMonsterSpawner::SpawnCounterAttackMonster(TSubclassOf<AMonsterBaseCharacter> MonsterClass, int32 MonsterWaveIndex)
 {
 	if (!HasAuthority() || !MonsterClass) return;
 	if (bIsGameOver) return; // 게임오버 상태면 무시
@@ -259,25 +195,52 @@ void AMonsterSpawner::SpawnCounterAttackMonster(TSubclassOf<AMonsterBaseCharacte
 		if (SpawnedMonster)
 		{
 			SpawnedMonster->SetSpawner(this);
-			SpawnedMonster->SetIsCounterAttackMonster(true);
+			SpawnedMonster->SetIsCounterAttackMonster(true); // [중요] 반격 몬스터 플래그
 			CurrentMonsterCount++;
-
 			OnRep_CurrentMonsterCount();
 
-			// [중요] PVP로 넘어온 몬스터도 현재 웨이브 난이도를 따라가야 함
-			AMyGameState* MyGameState = World->GetGameState<AMyGameState>();
-			if (MyGameState)
-			{
-				int32 CurrentWave = MyGameState->GetCurrentWave();
-				SpawnedMonster->SetSpawnWaveIndex(CurrentWave);
+			// [ ★★★ 핵심 수정 ★★★ ]
+			// GameState->GetCurrentWave() 대신, 인자로 받은 'MonsterWaveIndex'를 사용합니다.
+			int32 TargetWaveIndex = MonsterWaveIndex;
 
-				// ... (기존 SpawnMonster에 있는 스탯/머티리얼 적용 로직을 함수로 분리하여 재사용하는 것이 좋음) ...
-				// 여기서는 편의상 핵심 로직인 ASC 초기화 및 스탯 적용만 복사한다고 가정하거나,
-				// ApplyWaveStatsToMonster(SpawnedMonster, CurrentWave); 같은 헬퍼 함수를 만드는 것을 권장합니다.
+			// (안전 장치: 혹시 0 이하가 들어오면 1로 보정)
+			if (TargetWaveIndex <= 0) TargetWaveIndex = 1;
+
+			SpawnedMonster->SetSpawnWaveIndex(TargetWaveIndex);
+
+			// 스탯 적용 로직에도 TargetWaveIndex를 사용
+			UAbilitySystemComponent* MonsterASC = SpawnedMonster->GetAbilitySystemComponent();
+			if (MonsterASC)
+			{
+				MonsterASC->InitAbilityActorInfo(SpawnedMonster, SpawnedMonster);
+				if (MonsterStatInitEffect)
+				{
+					FGameplayEffectContextHandle ContextHandle = MonsterASC->MakeEffectContext();
+					ContextHandle.AddSourceObject(this);
+					FGameplayEffectSpecHandle SpecHandle = MonsterASC->MakeOutgoingSpec(MonsterStatInitEffect, 1.0f, ContextHandle);
+
+					if (SpecHandle.IsValid())
+					{
+						// [수정] TargetWaveIndex 기준 스탯 계산
+						float BaseHP = MONSTER_BASE_HP;
+						float FinalHP = BaseHP + FMath::Max(0.f, (float)(TargetWaveIndex - 1) * 50.f);
+						SpecHandle.Data.Get()->SetSetByCallerMagnitude(FGameplayTag::RequestGameplayTag(FName("Data.Wave.BonusHP")), FinalHP);
+
+						int FinalArmor = 0;
+						const int32 BossStage = TargetWaveIndex / 10;
+						const float BaseArmor = BossStage * 20.0f;
+						const int32 WaveNumInBlock = (TargetWaveIndex % 10);
+						FinalArmor = BaseArmor + WaveNumInBlock;
+						SpecHandle.Data.Get()->SetSetByCallerMagnitude(FGameplayTag::RequestGameplayTag(FName("Data.Wave.BonusArmor")), FinalArmor);
+
+						MonsterASC->ApplyGameplayEffectSpecToSelf(*SpecHandle.Data.Get());
+					}
+				}
 			}
 
-			// RID_LOG 매크로 사용
-			RID_LOG(FColor::Red, TEXT("Spawner: Counter-Attack Monster Spawned! Class: %s"), *GetNameSafe(MonsterClass));
+			// 로그 확인
+			RID_LOG(FColor::Red, TEXT("Spawner: Counter-Attack Monster Spawned! Class: %s (Wave: %d)"),
+				*GetNameSafe(MonsterClass), TargetWaveIndex);
 		}
 	}
 }

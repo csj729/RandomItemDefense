@@ -36,7 +36,7 @@ public:
 	// 이 스테이지가 게임오버 상태인지 확인하는 함수
 	bool IsGameOver() const { return bIsGameOver; }
 
-	void SpawnCounterAttackMonster(TSubclassOf<AMonsterBaseCharacter> MonsterClass);
+	void SpawnCounterAttackMonster(TSubclassOf<AMonsterBaseCharacter> MonsterClass, int32 MonsterWaveIndex);
 
 	UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category = "Config")
 	TObjectPtr<AActor> PatrolPathActor;

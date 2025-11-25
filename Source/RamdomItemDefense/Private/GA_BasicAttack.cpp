@@ -77,7 +77,7 @@ void UGA_BasicAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle, c
 	// (RID_DamageStatics::ApplyCritDamage는 이미 수정된 GetAttributeSetFromASC를 사용하므로 안전)
 	const float FinalDamage = URID_DamageStatics::ApplyCritDamage(BaseDamage, SourceASC, TargetActor, false);
 
-	RID_LOG(FColor::White, TEXT("GA_BasicAttack: Applying Damage: %.1f (AD: %.1f * Coeff: %.1f) -> CritApplied: %.1f"), BaseDamage, OwnerAttackDamage, DamageCoefficient, FinalDamage);
+	//RID_LOG(FColor::White, TEXT("GA_BasicAttack: Applying Damage: %.1f (AD: %.1f * Coeff: %.1f) -> CritApplied: %.1f"), BaseDamage, OwnerAttackDamage, DamageCoefficient, FinalDamage);
 
 	// 5. 데미지 GE Spec 생성 및 SetByCaller로 최종 데미지 값 주입
 	FGameplayEffectSpecHandle SpecHandle = SourceASC->MakeOutgoingSpec(DamageEffectClass, 1.0f, SourceASC->MakeEffectContext());

@@ -21,7 +21,7 @@ public:
 	 * @param KillerPlayerState 몬스터를 죽인 플레이어의 PS
 	 * @param MonsterClassToSpawn 보낼 몬스터 클래스 (죽은 몬스터와 동일하거나 변형)
 	 */
-	void SendCounterAttackMonster(APlayerState* KillerPlayerState, TSubclassOf<AMonsterBaseCharacter> MonsterClassToSpawn);
+	void SendCounterAttackMonster(APlayerState* KillerPlayerState, TSubclassOf<AMonsterBaseCharacter> MonsterClassToSpawn, int32 MonsterWaveIndex);
 
 	virtual AActor* ChoosePlayerStart_Implementation(AController* Player) override;
 
@@ -50,11 +50,7 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category = "Wave Data|Boss")
 	float BossStageTimeLimit;
 
-	// ================== [코드 수정] ==================
-	// 이제 에디터에서 설정할 필요가 없으므로 UPROPERTY 지정자를 제거합니다.
-	// GameMode 내부에서만 사용하는 변수가 됩니다.
 	TArray<TObjectPtr<AMonsterSpawner>> MonsterSpawners;
-	// ===============================================
 
 	FTimerHandle StageTimerHandle;
 	FTimerHandle GameOverCheckTimerHandle;

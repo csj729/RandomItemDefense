@@ -12,8 +12,9 @@
 #include "MyGameState.h"       
 #include "Engine/World.h"      
 #include "Kismet/KismetMathLibrary.h" // FMath::Pow() 함수 사용
+#include "AbilitySystemBlueprintLibrary.h"
 
-void UMonsterAttributeSet::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+void UMonsterAttributeSet::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>&OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
@@ -26,44 +27,16 @@ void UMonsterAttributeSet::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>&
 
 float UMonsterAttributeSet::CalculateReducedDamage(float IncomingDamage) const
 {
-	// 1. 현재 방어력 가져오기 (최소 0)
 	const float CurrentArmor = FMath::Max(0.f, GetArmor());
-
-	// 2. 방어력이 0 이하면, 원본 데미지(양수)를 그대로 반환
 	if (CurrentArmor <= 0.f)
 	{
-		// --- [ ★★★ 새 디버그 로그 1 ★★★ ] ---
-		// 방어력이 0일 때의 로그
-		AActor* AvatarActor = GetOwningAbilitySystemComponent() ? GetOwningAbilitySystemComponent()->GetAvatarActor() : nullptr;
-		UE_LOG(LogRamdomItemDefense, Warning, TEXT("[CalculateReducedDamage] Monster: %s | Armor: 0.0 | Reduction: 0.0%% | Damage: %.1f -> %.1f"),
-			*GetNameSafe(AvatarActor),
-			IncomingDamage,
-			IncomingDamage);
-		// --- [ ★★★ 로그 끝 ★★★ ] ---
 		return IncomingDamage;
 	}
 
-	// 3. 방어력 공식을 통한 데미지 감소율(%) 계산
-	// 데미지 감소율 = 0.05 * (방어력 ^ 0.4515)
 	float DamageReductionPercent = 0.05f * FMath::Pow(CurrentArmor, 0.4515f);
-
-	// (안전장치) 데미지 감소율이 90%를 넘지 않도록 제한
 	DamageReductionPercent = FMath::Min(DamageReductionPercent, 0.9f);
 
-	// 4. 최종 데미지(양수) 계산 및 반환
 	const float ReducedDamage = IncomingDamage * (1.0f - DamageReductionPercent);
-
-	// --- [ ★★★ 새 디버그 로그 2 ★★★ ] ---
-	// 방어력이 0보다 클 때의 상세 계산 로그
-	AActor* AvatarActor = GetOwningAbilitySystemComponent() ? GetOwningAbilitySystemComponent()->GetAvatarActor() : nullptr;
-	UE_LOG(LogRamdomItemDefense, Warning, TEXT("[CalculateReducedDamage] Monster: %s | Armor: %.1f | Reduction: %.1f%% | Damage: %.1f -> %.1f"),
-		*GetNameSafe(AvatarActor),
-		CurrentArmor,
-		DamageReductionPercent * 100.0f, // 퍼센트(%)로 표시
-		IncomingDamage,
-		ReducedDamage);
-	// --- [ ★★★ 로그 끝 ★★★ ] ---
-
 	return ReducedDamage;
 }
 
@@ -75,7 +48,7 @@ void UMonsterAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCal
 	if (Data.EvaluatedData.Attribute == GetHealthAttribute())
 	{
 		const float Magnitude = Data.EvaluatedData.Magnitude;
-		const float NewHealth = GetHealth(); // (참고: 이 값은 이미 Magnitude가 적용된 값)
+		const float NewHealth = GetHealth();
 
 		AMonsterBaseCharacter* Monster = Cast<AMonsterBaseCharacter>(GetOwningAbilitySystemComponent()->GetAvatarActor());
 
@@ -83,62 +56,84 @@ void UMonsterAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCal
 		{
 			if (NewHealth <= 0.f)
 			{
-				// [1] --- 몬스터 사망 로직 ---
-				// (기존 사망 로직과 동일)
+				// [1] 킬러 액터 확인
 				AActor* InstigatorActor = Data.EffectSpec.GetContext().GetInstigator();
 				AActor* EffectCauserActor = Data.EffectSpec.GetContext().GetEffectCauser();
-				ARamdomItemDefenseCharacter* KillerCharacter = Cast<ARamdomItemDefenseCharacter>(InstigatorActor ? InstigatorActor : EffectCauserActor);
+				AActor* KillerActor = InstigatorActor ? InstigatorActor : EffectCauserActor;
 
-				Monster->Die(KillerCharacter);
+				// [2] 몬스터 사망 처리 (KillerActor 전달)
+				Monster->Die(KillerActor);
 
-				if (KillerCharacter)
+				// [3] ★★★ 킬러의 PlayerState 찾기 (드론 등 소환수 고려) ★★★
+				AMyPlayerState* KillerPS = nullptr;
+				if (KillerActor)
 				{
-					AMyPlayerState* PS = KillerCharacter->GetPlayerState<AMyPlayerState>();
-					if (PS)
+					// 3-1. 킬러가 폰이라면 바로 PS 가져오기
+					if (APawn* KillerPawn = Cast<APawn>(KillerActor))
 					{
-						int32 CurrentWave = Monster->GetSpawnWaveIndex();
-						if (CurrentWave <= 0) CurrentWave = 1; // 안전 장치
+						KillerPS = KillerPawn->GetPlayerState<AMyPlayerState>();
+					}
 
-						int32 BaseGold = 0;
-						int32 BonusGold = 0;
-						int32 FinalGold = 0;
-
-						if (Monster->IsBoss())
+					// 3-2. PS가 없다면(예: 드론), 주인을 찾아서 PS 가져오기
+					if (!KillerPS)
+					{
+						if (APawn* OwnerPawn = Cast<APawn>(KillerActor->GetOwner()))
 						{
-							const int32 BossStage = CurrentWave / 10;
-							const int32 ItemChoiceReward = BossStage * 3;
-							PS->AddCommonItemChoice(ItemChoiceReward);
-							BaseGold = 3000;
-							BonusGold = (BossStage - 1) * 4000;
+							KillerPS = OwnerPawn->GetPlayerState<AMyPlayerState>();
 						}
-						else
-						{
-							BaseGold = 10;
-							BonusGold = (CurrentWave - 1) * 5;
-						}
-
-						FinalGold = BaseGold + BonusGold;
-
-						if (KillerCharacter->GetAbilitySystemComponent() &&
-							KillerCharacter->GetAbilitySystemComponent()->HasMatchingGameplayTag(FGameplayTag::RequestGameplayTag(FName("ButtonAction.Reward.Gold"))))
-						{
-							FinalGold *= 1.5f; // 버프가 있으면 2배!
-							// (선택) 화면에 "골드 2배!" 같은 로그나 이펙트를 띄울 수도 있음
-						}
-
-						PS->AddGold(FMath::Max(BaseGold, FinalGold));
 					}
 				}
 
-				// [PVP 추가] 킬러가 유효하고, 보스 몬스터가 아니라면 상대에게 반격 몬스터 전송
-				if (KillerCharacter && !Monster->IsBoss() && !Monster->IsCounterAttackMonster())
+				// [4] 보상 및 반격 로직 (KillerPS가 존재하면 실행)
+				if (KillerPS)
 				{
-					if (UWorld* World = Monster->GetWorld())
+					// --- [골드 지급] ---
+					int32 CurrentWave = Monster->GetSpawnWaveIndex();
+					if (CurrentWave <= 0) CurrentWave = 1;
+
+					int32 BaseGold = 0;
+					int32 BonusGold = 0;
+					int32 FinalGold = 0;
+
+					if (Monster->IsBoss())
 					{
-						ARamdomItemDefenseGameMode* GM = Cast<ARamdomItemDefenseGameMode>(World->GetAuthGameMode());
-						if (GM)
+						const int32 BossStage = CurrentWave / 10;
+						const int32 ItemChoiceReward = BossStage * 3;
+						KillerPS->AddCommonItemChoice(ItemChoiceReward);
+						BaseGold = 3000;
+						BonusGold = (BossStage - 1) * 4000;
+					}
+					else
+					{
+						BaseGold = 10;
+						BonusGold = (CurrentWave - 1) * 5;
+					}
+
+					FinalGold = BaseGold + BonusGold;
+
+					// (보너스 태그 확인: 킬러 액터의 ASC를 확인해야 함)
+					UAbilitySystemComponent* KillerASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(KillerActor);
+					if (KillerASC && KillerASC->HasMatchingGameplayTag(FGameplayTag::RequestGameplayTag(FName("ButtonAction.Reward.Gold"))))
+					{
+						FinalGold *= 1.5f;
+					}
+
+					KillerPS->AddGold(FMath::Max(BaseGold, FinalGold));
+
+
+					// --- [PVP 반격 몬스터 전송] ---
+					// 보스가 아니고, 반격으로 태어난 몬스터가 아닐 때만
+					if (!Monster->IsBoss() && !Monster->IsCounterAttackMonster())
+					{
+						if (UWorld* World = Monster->GetWorld())
 						{
-							GM->SendCounterAttackMonster(KillerCharacter->GetPlayerState(), Monster->GetClass());
+							ARamdomItemDefenseGameMode* GM = Cast<ARamdomItemDefenseGameMode>(World->GetAuthGameMode());
+							if (GM)
+							{
+								// [수정] 찾은 KillerPS와 몬스터의 WaveIndex를 전달
+								int32 MyWaveIndex = Monster->GetSpawnWaveIndex();
+								GM->SendCounterAttackMonster(KillerPS, Monster->GetClass(), MyWaveIndex);
+							}
 						}
 					}
 				}
@@ -147,44 +142,26 @@ void UMonsterAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCal
 				Data.EffectSpec.GetAllAssetTags(EffectTags);
 				Monster->PlayHitEffect(EffectTags);
 			}
+
 			else if (Magnitude < 0.f)
 			{
-				// [2] --- ★★★ 몬스터 피격 (데미지) 로직 (수정됨) ★★★ ---
+				// [2] --- 몬스터 피격 (데미지) 로직 ---
+				const float OriginalDamage = Magnitude;
+				const float HealthBeforeDamage = NewHealth - OriginalDamage;
+				const float ActualDamageToApply = CalculateReducedDamage(-OriginalDamage);
+				SetHealth(HealthBeforeDamage - ActualDamageToApply);
 
-				// 2-1. 원본 데미지(음수)와 피해 입기 전 체력 계산
-				const float OriginalDamage = Magnitude; // 예: -100
-				const float HealthBeforeDamage = NewHealth - OriginalDamage; // 예: 400 - (-100) = 500
-
-				// 2-2. 새 함수를 호출하여 실제 적용될 데미지(양수) 계산
-				// 원본 데미지를 양수로 변환하여 전달 ( -OriginalDamage )
-				const float ActualDamageToApply = CalculateReducedDamage(-OriginalDamage); // 예: CalculateReducedDamage(100) -> 60 반환
-
-				// 2-3. 새 체력 값 설정
-				// (피해 입기 전 체력) - (방어력이 적용된 실제 데미지)
-				SetHealth(HealthBeforeDamage - ActualDamageToApply); // 예: 500 - 60 = 440
-				UE_LOG(LogTemp, Warning, TEXT("Damage = %f"), ActualDamageToApply);
-				// 2-4. 피격 이펙트 재생
 				FGameplayTagContainer EffectTags;
 				Data.EffectSpec.GetAllAssetTags(EffectTags);
 				Monster->PlayHitEffect(EffectTags);
-
-				// --- [ ★★★ 수정 끝 ★★★ ] ---
-			}
-			else
-			{
-				// [3] 힐 또는 기타 효과 (기존과 동일)
-				// RID_LOG(FColor::Orange, TEXT("MonsterAttributeSet: Health changed, but NOT hit (Magnitude: %.1f) and NOT dead (NewHealth: %.1f)."), Magnitude, NewHealth);
 			}
 		}
 	}
-	// --- [ Health/MaxHealth 동기화 로직 ] ---
 	else if (Data.EvaluatedData.Attribute == GetMaxHealthAttribute())
 	{
-		// (기존과 동일)
 		const float NewMaxHealth = GetMaxHealth();
 		SetHealth(NewMaxHealth);
 	}
-	// --- [ 로직 끝 ] ---
 }
 
 // RepNotify 함수들 구현
