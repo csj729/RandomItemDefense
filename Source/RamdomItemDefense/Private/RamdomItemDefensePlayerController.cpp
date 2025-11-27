@@ -461,3 +461,92 @@ void ARamdomItemDefensePlayerController::HandleButtonActionInput(EButtonActionKe
 		}
 	}
 }
+
+void ARamdomItemDefensePlayerController::HideMainHUD()
+{
+	if (MainHUDInstance && MainHUDInstance->IsInViewport())
+	{
+		MainHUDInstance->SetVisibility(ESlateVisibility::Hidden);
+	}
+	// 다른 UI들도 필요하면 숨김 처리
+}
+
+void ARamdomItemDefensePlayerController::Client_ShowWaitingUI_Implementation()
+{
+	// 1. 위젯 생성 및 표시 (기존 코드)
+	if (!WaitingWidgetInstance && WaitingWidgetClass)
+	{
+		WaitingWidgetInstance = CreateWidget<UUserWidget>(this, WaitingWidgetClass);
+	}
+
+	if (WaitingWidgetInstance)
+	{
+		HideMainHUD();
+		if (!WaitingWidgetInstance->IsInViewport())
+		{
+			WaitingWidgetInstance->AddToViewport(10);
+		}
+		WaitingWidgetInstance->SetVisibility(ESlateVisibility::Visible);
+
+		FInputModeUIOnly InputMode;
+		SetInputMode(InputMode);
+		bShowMouseCursor = false;
+	}
+}
+
+void ARamdomItemDefensePlayerController::Client_HideWaitingUI_Implementation()
+{
+	// 1. 위젯 제거 (기존 코드)
+	if (WaitingWidgetInstance)
+	{
+		WaitingWidgetInstance->RemoveFromParent();
+		WaitingWidgetInstance = nullptr;
+	}
+
+	if (MainHUDInstance)
+	{
+		MainHUDInstance->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+	}
+
+	FInputModeGameAndUI InputMode;
+	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+	InputMode.SetHideCursorDuringCapture(false);
+	SetInputMode(InputMode);
+	bShowMouseCursor = true;
+}
+
+void ARamdomItemDefensePlayerController::Client_ShowVictoryUI_Implementation()
+{
+	if (!VictoryWidgetInstance && VictoryWidgetClass)
+	{
+		VictoryWidgetInstance = CreateWidget<UUserWidget>(this, VictoryWidgetClass);
+	}
+
+	if (VictoryWidgetInstance)
+	{
+		HideMainHUD();
+		VictoryWidgetInstance->AddToViewport(20);
+
+		FInputModeUIOnly InputMode;
+		SetInputMode(InputMode);
+		bShowMouseCursor = false;
+	}
+}
+
+void ARamdomItemDefensePlayerController::Client_ShowDefeatUI_Implementation()
+{
+	if (!DefeatWidgetInstance && DefeatWidgetClass)
+	{
+		DefeatWidgetInstance = CreateWidget<UUserWidget>(this, DefeatWidgetClass);
+	}
+
+	if (DefeatWidgetInstance)
+	{
+		HideMainHUD();
+		DefeatWidgetInstance->AddToViewport(20);
+
+		FInputModeUIOnly InputMode;
+		SetInputMode(InputMode);
+		bShowMouseCursor = false;
+	}
+}

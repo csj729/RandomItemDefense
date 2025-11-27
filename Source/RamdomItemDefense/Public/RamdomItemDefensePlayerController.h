@@ -91,6 +91,22 @@ public:
 	/** 게임오버 UI를 숨깁니다. (재시작 시 호출될 수 있음) */
 	void HideGameOverUI();
 
+	// 대기 UI 켜기
+	UFUNCTION(Client, Reliable)
+	void Client_ShowWaitingUI();
+
+	// 대기 UI 끄기 (게임 시작)
+	UFUNCTION(Client, Reliable)
+	void Client_HideWaitingUI();
+
+	// 승리 UI 켜기
+	UFUNCTION(Client, Reliable)
+	void Client_ShowVictoryUI();
+
+	// 패배 UI 켜기
+	UFUNCTION(Client, Reliable)
+	void Client_ShowDefeatUI();
+
 	/** (추가) (Called by PlayerState) Tells this client to show the boost UI */
 	UFUNCTION(Client, Reliable)
 	void Client_OnShowButtonActionUI(float TimingWindow, EButtonActionKey KeyToPress);
@@ -149,8 +165,16 @@ protected:
 	/** WBP_CommonItemChoice 블루프린트 클래스 */
 	UPROPERTY(EditDefaultsOnly, Category = "UI")
 	TSubclassOf<UCommonItemChoiceWidget> CommonItemChoiceWidgetClass;
-	// --- [ ★★★ 코드 추가 끝 ★★★ ] ---
 
+	// --- UI 위젯 클래스 (에디터 할당용) ---
+	UPROPERTY(EditDefaultsOnly, Category = "UI|PVP")
+	TSubclassOf<UUserWidget> WaitingWidgetClass;
+
+	UPROPERTY(EditDefaultsOnly, Category = "UI|PVP")
+	TSubclassOf<UUserWidget> VictoryWidgetClass;
+
+	UPROPERTY(EditDefaultsOnly, Category = "UI|PVP")
+	TSubclassOf<UUserWidget> DefeatWidgetClass;
 
 	/** 실제 생성된 메인 HUD 위젯 인스턴스 */
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "UI")
@@ -172,7 +196,15 @@ protected:
 	/** 생성된 흔함 아이템 선택 위젯 인스턴스 */
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "UI")
 	TObjectPtr<UCommonItemChoiceWidget> CommonItemChoiceInstance;
-	// --- [ ★★★ 코드 추가 끝 ★★★ ] ---
+
+	UPROPERTY()
+	TObjectPtr<UUserWidget> WaitingWidgetInstance;
+
+	UPROPERTY()
+	TObjectPtr<UUserWidget> VictoryWidgetInstance;
+
+	UPROPERTY()
+	TObjectPtr<UUserWidget> DefeatWidgetInstance;
 
 	UPROPERTY()
 	TObjectPtr<AMyPlayerState> MyPlayerStateRef;
@@ -201,6 +233,8 @@ protected:
 	void HandleButtonActionInput(EButtonActionKey KeyPressed);
 
 	void TryBindPlayerState();
+
+	void HideMainHUD();
 
 private:
 	FVector CachedDestination;

@@ -25,11 +25,17 @@ public:
 
 	virtual AActor* ChoosePlayerStart_Implementation(AController* Player) override;
 
+	virtual UClass* GetDefaultPawnClassForController_Implementation(AController* InController) override;
+
 protected:
 	virtual void BeginPlay() override;
 
 	/** 플레이어가 성공적으로 로그인했을 때 서버에서 호출됩니다. (PIE, Listen, Dedicated 모두) */
 	virtual void OnPostLogin(AController* NewPlayer) override;
+
+	void CheckPlayerCountAndStart();
+
+	virtual void Logout(AController* Exiting) override;
 
 private:
 	void StartNextWave();
@@ -57,4 +63,6 @@ private:
 
 	/** 스포너와 연결된 플레이어 컨트롤러를 찾아 반환하는 헬퍼 함수 */
 	APlayerController* GetControllerForSpawner(AMonsterSpawner* Spawner) const;
+
+	bool bGameStarted = false;
 };

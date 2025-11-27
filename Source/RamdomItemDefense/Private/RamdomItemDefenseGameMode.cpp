@@ -12,12 +12,14 @@
 #include "GameFramework/PlayerState.h"
 #include "GameFramework/PlayerStart.h" 
 #include "GameFramework/Controller.h"
+#include "RIDGameInstance.h"
 #include "Engine/Engine.h"
 #include "RamdomItemDefense.h" // RID_LOG 매크로용
 
 ARamdomItemDefenseGameMode::ARamdomItemDefenseGameMode()
 {
 	PrimaryActorTick.bCanEverTick = false;
+	bUseSeamlessTravel = true;
 
 	GameStateClass = AMyGameState::StaticClass();
 
@@ -33,82 +35,91 @@ void ARamdomItemDefenseGameMode::BeginPlay()
 
 	RID_LOG(FColor::Yellow, TEXT("GameMode BeginPlay called."));
 
-	// [수정] BeginPlay에서도 스포너를 찾습니다. (혹시 OnPostLogin보다 늦게 실행될 경우를 대비)
-	if (HasAuthority() && MonsterSpawners.Num() == 0)
-	{
-		// 로직을 함수화하거나 중복 코드를 작성합니다. 여기서는 간단히 블록 내부에서 처리합니다.
-		MonsterSpawners.Init(nullptr, 2);
-		TArray<AActor*> FoundSpawners;
-		UGameplayStatics::GetAllActorsOfClass(GetWorld(), AMonsterSpawner::StaticClass(), FoundSpawners);
-
-		for (AActor* Actor : FoundSpawners)
-		{
-			AMonsterSpawner* Spawner = Cast<AMonsterSpawner>(Actor);
-			if (Spawner)
-			{
-				if (Spawner->ActorHasTag(FName("Player1"))) MonsterSpawners[0] = Spawner;
-				else if (Spawner->ActorHasTag(FName("Player2"))) MonsterSpawners[1] = Spawner;
-			}
-		}
-	}
-
-	FTimerHandle FirstWaveStartTimer;
-	GetWorld()->GetTimerManager().SetTimer(FirstWaveStartTimer, this, &ARamdomItemDefenseGameMode::StartNextWave, 3.0f, false);
 	GetWorld()->GetTimerManager().SetTimer(GameOverCheckTimerHandle, this, &ARamdomItemDefenseGameMode::CheckGameOver, 0.5f, true);
 }
 
 void ARamdomItemDefenseGameMode::OnPostLogin(AController* NewPlayer)
 {
-	// 1. [안전 장치] 스포너 리스트가 비어있다면 즉시 채워넣기 (호스트 접속 시점 대비)
-	if (HasAuthority() && MonsterSpawners.Num() == 0)
+	URIDGameInstance* RIDGI = Cast<URIDGameInstance>(GetGameInstance());
+	if (RIDGI && !RIDGI->PlayerName.IsEmpty())
 	{
-		MonsterSpawners.Init(nullptr, 2);
-		TArray<AActor*> FoundSpawners;
-		UGameplayStatics::GetAllActorsOfClass(GetWorld(), AMonsterSpawner::StaticClass(), FoundSpawners);
-
-		for (AActor* Actor : FoundSpawners)
+		// 2. [이름 변경] PlayerState에 이름 적용
+		if (NewPlayer->PlayerState)
 		{
-			AMonsterSpawner* Spawner = Cast<AMonsterSpawner>(Actor);
-			if (Spawner)
-			{
-				if (Spawner->ActorHasTag(FName("Player1"))) MonsterSpawners[0] = Spawner;
-				else if (Spawner->ActorHasTag(FName("Player2"))) MonsterSpawners[1] = Spawner;
-			}
+			NewPlayer->PlayerState->SetPlayerName(RIDGI->PlayerName);
+
+			// 로그로 확인
+			UE_LOG(LogTemp, Warning, TEXT("Player Name Updated to: %s"), *RIDGI->PlayerName);
 		}
-	}
-
-	// 2. [핵심] GameState의 PlayerArray를 이용해 내 순서(Index) 확인
-	// (PlayerArray에는 접속한 플레이어들이 순서대로 들어옵니다. 0=호스트, 1=첫 접속자)
-	int32 MyIndex = 0;
-	AMyGameState* MyGameState = GetGameState<AMyGameState>();
-	AMyPlayerState* MyPS = NewPlayer->GetPlayerState<AMyPlayerState>();
-
-	if (MyGameState && MyPS)
-	{
-		// 현재 리스트에 내가 없다면(아직 추가 전이라면) 맨 뒤 번호로 가정
-		MyIndex = MyGameState->PlayerArray.Find(MyPS);
-		if (MyIndex == INDEX_NONE)
-		{
-			MyIndex = MyGameState->PlayerArray.Num();
-		}
-	}
-
-	// 2인 게임이므로 0, 1 인덱스만 유효하도록 보정
-	MyIndex = MyIndex % 2;
-
-	// 3. [선 할당] 부모의 OnPostLogin(스폰) 호출 전에, 스포너를 먼저 쥐어줍니다.
-	if (MyPS && MonsterSpawners.IsValidIndex(MyIndex) && MonsterSpawners[MyIndex] != nullptr)
-	{
-		MyPS->MySpawner = MonsterSpawners[MyIndex];
-		RID_LOG(FColor::Green, TEXT(">>> [Pre-Assign] Player Index %d assigned to Spawner '%s'"), MyIndex, *GetNameSafe(MyPS->MySpawner));
-	}
-	else
-	{
-		RID_LOG(FColor::Red, TEXT(">>> [Error] Could not assign spawner for Player Index %d"), MyIndex);
 	}
 
 	// 4. [스폰 실행] 이제 부모 로직을 호출합니다. (내부에서 ChoosePlayerStart가 실행됨)
 	Super::OnPostLogin(NewPlayer);
+
+	CheckPlayerCountAndStart();
+}
+
+void ARamdomItemDefenseGameMode::CheckPlayerCountAndStart()
+{
+	if (bGameStarted) return;
+
+	int32 CurrentPlayers = GetNumPlayers();
+
+	// 1. 현재 접속한 모든 플레이어에게 "대기 중" UI 띄우기 (아직 시작 안 했으므로)
+	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+	{
+		ARamdomItemDefensePlayerController* PC = Cast<ARamdomItemDefensePlayerController>(It->Get());
+		if (PC && CurrentPlayers < 2)
+		{
+			// 2명 미만이면 대기 UI 표시
+			PC->Client_ShowWaitingUI();
+		}
+	}
+
+	if (CurrentPlayers >= 2)
+	{
+		bGameStarted = true;
+		RID_LOG(FColor::Green, TEXT("!!! GAME START !!!"));
+
+		// 2. 게임 시작! 모든 플레이어의 대기 UI 끄기
+		for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+		{
+			ARamdomItemDefensePlayerController* PC = Cast<ARamdomItemDefensePlayerController>(It->Get());
+			if (PC)
+			{
+				PC->Client_HideWaitingUI();
+			}
+		}
+
+		// 3초 뒤 웨이브 시작
+		FTimerHandle StartTimer;
+		GetWorld()->GetTimerManager().SetTimer(StartTimer, this, &ARamdomItemDefenseGameMode::StartNextWave, 3.0f, false);
+	}
+}
+
+void ARamdomItemDefenseGameMode::Logout(AController* Exiting)
+{
+	Super::Logout(Exiting);
+
+	if (bGameStarted)
+	{
+		// 남은 사람 찾기
+		for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+		{
+			APlayerController* RemainingPC = It->Get();
+			if (RemainingPC && RemainingPC != Exiting)
+			{
+				// 남은 사람 = 승리자
+				ARamdomItemDefensePlayerController* PC = Cast<ARamdomItemDefensePlayerController>(RemainingPC);
+				if (PC)
+				{
+					PC->Client_ShowVictoryUI(); // 기권승 UI 표시
+				}
+			}
+		}
+		bGameStarted = false;
+		GetWorldTimerManager().ClearTimer(StageTimerHandle);
+	}
 }
 
 void ARamdomItemDefenseGameMode::StartNextWave()
@@ -250,26 +261,53 @@ void ARamdomItemDefenseGameMode::StartNextWave()
 
 void ARamdomItemDefenseGameMode::CheckGameOver()
 {
-	// 등록된 모든 스포너를 순회하며 검사합니다.
+	if (!bGameStarted) return;
+
 	for (AMonsterSpawner* Spawner : MonsterSpawners)
 	{
-		// 스포너가 유효하고, 아직 게임오버 상태가 아니며, 몬스터 수가 60마리를 초과했는지 확인
 		if (Spawner && !Spawner->IsGameOver() && Spawner->GetCurrentMonsterCount() > GameoverMonsterNum)
 		{
-			// 해당 스포너를 게임오버 상태로 만듭니다.
 			Spawner->SetGameOver();
 
-			APlayerController* Controller = GetControllerForSpawner(Spawner);
-			ARamdomItemDefensePlayerController* PC = Cast<ARamdomItemDefensePlayerController>(Controller);
-			if (PC)
+			// 패배자 & 승리자 찾기
+			APlayerController* LoserPC = GetControllerForSpawner(Spawner);
+			APlayerController* WinnerPC = nullptr;
+
+			// (2인 게임 기준) 패배자가 아닌 사람이 승리자
+			for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
 			{
-				// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
-				RID_LOG(FColor::Red, TEXT("GAME OVER: Monster limit exceeded for %s"), *PC->GetName());
-				// -----------------------------------------
-				PC->ShowGameOverUI();
+				APlayerController* PC = It->Get();
+				if (PC && PC != LoserPC)
+				{
+					WinnerPC = PC;
+					break;
+				}
 			}
 
-			// TODO: 이 스포너와 연결된 플레이어에게 게임오버 UI를 띄우는 로직
+			// 승리자 이름 가져오기
+			FString WinnerName = TEXT("Player");
+			if (WinnerPC && WinnerPC->PlayerState)
+			{
+				WinnerName = WinnerPC->PlayerState->GetPlayerName();
+			}
+
+			// [패배 처리]
+			if (LoserPC)
+			{
+				ARamdomItemDefensePlayerController* PC = Cast<ARamdomItemDefensePlayerController>(LoserPC);
+				if (PC) PC->Client_ShowDefeatUI(); // 패배 UI 호출
+			}
+				
+			// [승리 처리]
+			if (WinnerPC)
+			{
+				ARamdomItemDefensePlayerController* PC = Cast<ARamdomItemDefensePlayerController>(WinnerPC);
+				if (PC) PC->Client_ShowVictoryUI(); // 승리 UI 호출
+			}
+
+			// 게임 종료 처리
+			GetWorldTimerManager().ClearTimer(StageTimerHandle);
+			bGameStarted = false;
 		}
 	}
 }
@@ -337,38 +375,93 @@ AActor* ARamdomItemDefenseGameMode::ChoosePlayerStart_Implementation(AController
 {
 	// 1. 플레이어의 PlayerState를 가져와서, 할당된 스포너가 있는지 확인
 	AMyPlayerState* MyPS = Player ? Player->GetPlayerState<AMyPlayerState>() : nullptr;
+	if (!MyPS) return Super::ChoosePlayerStart_Implementation(Player);
 
-	FString TargetTag = TEXT("");
+	// 2. [핵심 수정] 스포너가 없다면? (타이밍 문제 or 할당 실패 시) -> 여기서 즉시 찾아서 연결!
+	if (!MyPS->MySpawner)
+	{
+		RID_LOG(FColor::Yellow, TEXT("ChoosePlayerStart: MySpawner is NULL. Attempting Emergency Assignment..."));
 
-	// 2. 내 스포너가 있다면, 그 스포너의 태그("Player1" or "Player2")를 그대로 사용
-	if (MyPS && MyPS->MySpawner)
+		// (1) 호스트(Local)면 Player1, 클라이언트(Remote)면 Player2 태그 찾기
+		FName TargetSpawnerTag = FName("Player1");
+		if (!Player->IsLocalPlayerController())
+		{
+			TargetSpawnerTag = FName("Player2");
+		}
+
+		// (2) 월드에서 해당 태그를 가진 스포너 직접 검색
+		TArray<AActor*> FoundActors;
+		UGameplayStatics::GetAllActorsOfClassWithTag(GetWorld(), AMonsterSpawner::StaticClass(), TargetSpawnerTag, FoundActors);
+
+		if (FoundActors.Num() > 0)
+		{
+			AMonsterSpawner* FoundSpawner = Cast<AMonsterSpawner>(FoundActors[0]);
+			if (FoundSpawner)
+			{
+				// (3) 찾았다! 강제 할당
+				MyPS->MySpawner = FoundSpawner;
+
+				// 스포너 배열도 갱신 (나중을 위해)
+				int32 Index = (TargetSpawnerTag == "Player1") ? 0 : 1;
+				if (MonsterSpawners.IsValidIndex(Index))
+				{
+					MonsterSpawners[Index] = FoundSpawner;
+				}
+
+				// UI 업데이트를 위해 알림 발송
+				MyPS->OnSpawnerAssignedDelegate.Broadcast(0);
+
+				RID_LOG(FColor::Green, TEXT("ChoosePlayerStart: [Emergency Success] Found & Assigned '%s' to %s"), *TargetSpawnerTag.ToString(), *Player->GetName());
+			}
+		}
+		else
+		{
+			RID_LOG(FColor::Red, TEXT("ChoosePlayerStart: [Emergency Fail] CRITICAL! No Spawner found with tag '%s' in the level!"), *TargetSpawnerTag.ToString());
+		}
+	}
+
+	// 3. 이제 스포너가 있을 것이므로(위에서 찾았으니), 해당 태그의 PlayerStart를 찾음
+	FString PlayerStartTag = TEXT("");
+	if (MyPS->MySpawner)
 	{
 		if (MyPS->MySpawner->ActorHasTag(FName("Player1")))
 		{
-			TargetTag = TEXT("Player1");
+			PlayerStartTag = TEXT("Player1");
 		}
 		else if (MyPS->MySpawner->ActorHasTag(FName("Player2")))
 		{
-			TargetTag = TEXT("Player2");
+			PlayerStartTag = TEXT("Player2");
 		}
 	}
 
-	// 3. 해당 태그를 가진 PlayerStart 찾기
-	if (!TargetTag.IsEmpty())
+	if (!PlayerStartTag.IsEmpty())
 	{
 		TArray<AActor*> FoundStarts;
-		UGameplayStatics::GetAllActorsOfClass(GetWorld(), APlayerStart::StaticClass(), FoundStarts);
+		UGameplayStatics::GetAllActorsOfClassWithTag(GetWorld(), APlayerStart::StaticClass(), FName(*PlayerStartTag), FoundStarts);
 
-		for (AActor* Start : FoundStarts)
+		if (FoundStarts.Num() > 0)
 		{
-			if (Start && Start->ActorHasTag(FName(*TargetTag)))
-			{
-				RID_LOG(FColor::Cyan, TEXT("ChoosePlayerStart: Matched Tag '%s' -> Start '%s'"), *TargetTag, *Start->GetName());
-				return Start; // 찾았으면 즉시 반환
-			}
+			RID_LOG(FColor::Cyan, TEXT("ChoosePlayerStart: Matched Tag '%s' -> Spawning at '%s'"), *PlayerStartTag, *FoundStarts[0]->GetName());
+			return FoundStarts[0]; // 찾은 스타트 지점 반환
 		}
 	}
 
-	// 4. 못 찾았거나(에러 상황) 태그가 없다면 기본 로직 사용
+	RID_LOG(FColor::Orange, TEXT("ChoosePlayerStart: TargetTag is Empty or Not Found. Using Random Spawn."));
 	return Super::ChoosePlayerStart_Implementation(Player);
+}
+
+UClass* ARamdomItemDefenseGameMode::GetDefaultPawnClassForController_Implementation(AController* InController)
+{
+	// 1. PlayerState 확인
+	if (AMyPlayerState* PS = InController->GetPlayerState<AMyPlayerState>())
+	{
+		// PlayerState에 저장된 클래스가 있다면 그걸로 스폰
+		if (PS->SelectedCharacterClass)
+		{
+			return PS->SelectedCharacterClass;
+		}
+	}
+
+	// 2. 없다면 기존 GameInstance 확인 (혹시 모르니 유지)
+	return Super::GetDefaultPawnClassForController_Implementation(InController);
 }

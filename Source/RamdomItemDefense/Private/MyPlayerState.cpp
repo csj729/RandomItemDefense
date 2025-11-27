@@ -55,6 +55,8 @@ void AMyPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 	// [ ★★★ 버튼 액션 변수 복제 등록 ★★★ ]
 	DOREPLIFETIME(AMyPlayerState, ButtonActionLevel);
 	DOREPLIFETIME(AMyPlayerState, bIsButtonActionSequenceFinishedThisStage);
+
+	DOREPLIFETIME(AMyPlayerState, SelectedCharacterClass);
 }
 
 // --- 골드 관련 (수정됨) ---
@@ -622,4 +624,11 @@ void AMyPlayerState::Client_NotifyButtonActionResult_Implementation(bool bWasSuc
 		// Controller에게 보상 인덱스까지 전달
 		PC->OnButtonActionResult(bWasSuccess, RewardIndex);
 	}
+}
+
+void AMyPlayerState::Server_SetSelectedCharacter_Implementation(TSubclassOf<APawn> NewClass)
+{
+	SelectedCharacterClass = NewClass;
+
+	// UE_LOG(LogTemp, Warning, TEXT("Server: Player %s selected %s"), *GetPlayerName(), *GetNameSafe(NewClass));
 }

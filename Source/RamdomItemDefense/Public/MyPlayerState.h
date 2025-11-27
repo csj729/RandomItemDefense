@@ -63,6 +63,14 @@ public:
 	UPROPERTY(ReplicatedUsing = OnRep_MySpawner, BlueprintReadOnly, Category = "Player State")
 	TObjectPtr<AMonsterSpawner> MySpawner;
 
+	// 선택된 캐릭터 클래스 (서버 저장용)
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Game Data")
+	TSubclassOf<APawn> SelectedCharacterClass;
+
+	// 서버에 내 캐릭터 선택을 알리는 함수
+	UFUNCTION(Server, Reliable, BlueprintCallable)
+	void Server_SetSelectedCharacter(TSubclassOf<APawn> NewClass);
+
 protected:
 	UPROPERTY(ReplicatedUsing = OnRep_Gold)
 	int32 Gold;
