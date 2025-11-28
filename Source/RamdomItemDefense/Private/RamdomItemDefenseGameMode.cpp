@@ -40,6 +40,7 @@ void ARamdomItemDefenseGameMode::BeginPlay()
 
 void ARamdomItemDefenseGameMode::OnPostLogin(AController* NewPlayer)
 {
+	RID_LOG(FColor::Green, TEXT("PostLogin"));
 	URIDGameInstance* RIDGI = Cast<URIDGameInstance>(GetGameInstance());
 	if (RIDGI && !RIDGI->PlayerName.IsEmpty())
 	{
@@ -64,7 +65,7 @@ void ARamdomItemDefenseGameMode::CheckPlayerCountAndStart()
 	if (bGameStarted) return;
 
 	int32 CurrentPlayers = GetNumPlayers();
-
+	RID_LOG(FColor::Green, TEXT("Player Num = %d"), CurrentPlayers);
 	// 1. 현재 접속한 모든 플레이어에게 "대기 중" UI 띄우기 (아직 시작 안 했으므로)
 	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
 	{
@@ -373,23 +374,21 @@ void ARamdomItemDefenseGameMode::SendCounterAttackMonster(APlayerState* KillerPl
 
 AActor* ARamdomItemDefenseGameMode::ChoosePlayerStart_Implementation(AController* Player)
 {
-	// 1. 플레이어의 PlayerState를 가져와서, 할당된 스포너가 있는지 확인
+	// 1. PlayerState 확인
 	AMyPlayerState* MyPS = Player ? Player->GetPlayerState<AMyPlayerState>() : nullptr;
 	if (!MyPS) return Super::ChoosePlayerStart_Implementation(Player);
 
-	// 2. [핵심 수정] 스포너가 없다면? (타이밍 문제 or 할당 실패 시) -> 여기서 즉시 찾아서 연결!
+	// 2. [비상 할당 로직] 스포너가 없다면 직접 찾기
 	if (!MyPS->MySpawner)
 	{
-		RID_LOG(FColor::Yellow, TEXT("ChoosePlayerStart: MySpawner is NULL. Attempting Emergency Assignment..."));
-
-		// (1) 호스트(Local)면 Player1, 클라이언트(Remote)면 Player2 태그 찾기
+		// (1) 호스트/클라이언트 구분 태그 설정
 		FName TargetSpawnerTag = FName("Player1");
 		if (!Player->IsLocalPlayerController())
 		{
 			TargetSpawnerTag = FName("Player2");
 		}
 
-		// (2) 월드에서 해당 태그를 가진 스포너 직접 검색
+		// (2) 월드에서 스포너 검색
 		TArray<AActor*> FoundActors;
 		UGameplayStatics::GetAllActorsOfClassWithTag(GetWorld(), AMonsterSpawner::StaticClass(), TargetSpawnerTag, FoundActors);
 
@@ -401,26 +400,36 @@ AActor* ARamdomItemDefenseGameMode::ChoosePlayerStart_Implementation(AController
 				// (3) 찾았다! 강제 할당
 				MyPS->MySpawner = FoundSpawner;
 
-				// 스포너 배열도 갱신 (나중을 위해)
+				// 배열 인덱스 계산
 				int32 Index = (TargetSpawnerTag == "Player1") ? 0 : 1;
+
+				// 배열 크기가 작다면 강제로 늘려줍니다. (이게 핵심!)
+				if (MonsterSpawners.Num() <= Index)
+				{
+					MonsterSpawners.SetNum(2); // 크기를 2로 설정 (나머지는 nullptr로 채워짐)
+				}
+
+				// 이제 안전하게 할당 가능
 				if (MonsterSpawners.IsValidIndex(Index))
 				{
 					MonsterSpawners[Index] = FoundSpawner;
+					RID_LOG(FColor::Green, TEXT("ChoosePlayerStart: [Emergency Array Fix] MonsterSpawners[%d] Updated."), Index);
 				}
+				// -------------------------------
 
-				// UI 업데이트를 위해 알림 발송
+				// UI 업데이트 알림
 				MyPS->OnSpawnerAssignedDelegate.Broadcast(0);
 
-				RID_LOG(FColor::Green, TEXT("ChoosePlayerStart: [Emergency Success] Found & Assigned '%s' to %s"), *TargetSpawnerTag.ToString(), *Player->GetName());
+				RID_LOG(FColor::Green, TEXT("ChoosePlayerStart: [Success] Assigned '%s' to %s"), *TargetSpawnerTag.ToString(), *Player->GetName());
 			}
 		}
 		else
 		{
-			RID_LOG(FColor::Red, TEXT("ChoosePlayerStart: [Emergency Fail] CRITICAL! No Spawner found with tag '%s' in the level!"), *TargetSpawnerTag.ToString());
+			RID_LOG(FColor::Red, TEXT("ChoosePlayerStart: [Fail] No Spawner found with tag '%s'!"), *TargetSpawnerTag.ToString());
 		}
 	}
 
-	// 3. 이제 스포너가 있을 것이므로(위에서 찾았으니), 해당 태그의 PlayerStart를 찾음
+	// 3. PlayerStart 찾기 (기존 코드 유지)
 	FString PlayerStartTag = TEXT("");
 	if (MyPS->MySpawner)
 	{
@@ -441,12 +450,10 @@ AActor* ARamdomItemDefenseGameMode::ChoosePlayerStart_Implementation(AController
 
 		if (FoundStarts.Num() > 0)
 		{
-			RID_LOG(FColor::Cyan, TEXT("ChoosePlayerStart: Matched Tag '%s' -> Spawning at '%s'"), *PlayerStartTag, *FoundStarts[0]->GetName());
-			return FoundStarts[0]; // 찾은 스타트 지점 반환
+			return FoundStarts[0];
 		}
 	}
 
-	RID_LOG(FColor::Orange, TEXT("ChoosePlayerStart: TargetTag is Empty or Not Found. Using Random Spawn."));
 	return Super::ChoosePlayerStart_Implementation(Player);
 }
 
@@ -457,7 +464,7 @@ UClass* ARamdomItemDefenseGameMode::GetDefaultPawnClassForController_Implementat
 	{
 		if (PS->SelectedCharacterClass)
 		{
-			RID_LOG(FColor::Green, TEXT("Spawn (PS): Found Class '%s'"), *GetNameSafe(PS->SelectedCharacterClass));
+			//RID_LOG(FColor::Green, TEXT("Spawn (PS): Found Class '%s'"), *GetNameSafe(PS->SelectedCharacterClass));
 			return PS->SelectedCharacterClass;
 		}
 	}
@@ -470,13 +477,25 @@ UClass* ARamdomItemDefenseGameMode::GetDefaultPawnClassForController_Implementat
 		{
 			if (GI->SelectedCharacterClass)
 			{
-				RID_LOG(FColor::Green, TEXT("Spawn (GI): Found Class '%s' from GameInstance"), *GetNameSafe(GI->SelectedCharacterClass));
+				//RID_LOG(FColor::Green, TEXT("Spawn (GI): Found Class '%s' from GameInstance"), *GetNameSafe(GI->SelectedCharacterClass));
 				return GI->SelectedCharacterClass;
 			}
 		}
 	}
 
 	// 3. 실패 시 기본 캐릭터
-	RID_LOG(FColor::Yellow, TEXT("Spawn: Using Default Pawn"));
+	//RID_LOG(FColor::Yellow, TEXT("Spawn: Using Default Pawn"));
 	return Super::GetDefaultPawnClassForController_Implementation(InController);
+}
+
+void ARamdomItemDefenseGameMode::HandleSeamlessTravelPlayer(AController*& C)
+{
+	// 1. 부모 로직 실행 (필수: PlayerState 복사 등 기본 처리)
+	Super::HandleSeamlessTravelPlayer(C);
+
+	// 2. 로그 확인
+	RID_LOG(FColor::Cyan, TEXT("HandleSeamlessTravelPlayer: Player '%s' arrived via Seamless Travel."), *C->GetName());
+
+	// 3. [핵심] 여기서도 인원수를 체크하고 게임을 시작해야 합니다!
+	CheckPlayerCountAndStart();
 }

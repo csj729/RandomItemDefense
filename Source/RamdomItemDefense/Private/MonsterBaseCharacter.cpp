@@ -65,6 +65,12 @@ void AMonsterBaseCharacter::PossessedBy(AController* NewController)
 {
 	Super::PossessedBy(NewController);
 	MonsterAIController = Cast<AMonsterAIController>(NewController);
+
+	if (MonsterAIController.IsValid() && MySpawner && MySpawner->PatrolPathActor)
+	{
+		MonsterAIController->SetPatrolPath(MySpawner->PatrolPathActor);
+	}
+
 	if (AbilitySystemComponent)
 	{
 		AbilitySystemComponent->InitAbilityActorInfo(this, this);
@@ -133,6 +139,7 @@ void AMonsterBaseCharacter::SetSpawner(AMonsterSpawner* InSpawner)
 {
 	MySpawner = InSpawner;
 
+	FString PathName = (InSpawner && InSpawner->PatrolPathActor) ? InSpawner->PatrolPathActor->GetName() : TEXT("NULL");
 	// [추가] 스포너에 설정된 경로를 AI 컨트롤러에게 전달
 	if (InSpawner && InSpawner->PatrolPathActor)
 	{

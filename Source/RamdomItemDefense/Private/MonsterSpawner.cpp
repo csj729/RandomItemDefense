@@ -10,6 +10,7 @@
 #include "MyGameState.h"
 #include "Materials/MaterialInterface.h"
 #include "AbilitySystemComponent.h" 
+#include "Kismet/GameplayStatics.h"
 #include "GameplayTagContainer.h" 
 
 
@@ -77,87 +78,102 @@ void AMonsterSpawner::SpawnMonster()
 		UWorld* World = GetWorld();
 		if (World)
 		{
-			FActorSpawnParameters SpawnParams;
-			SpawnParams.Owner = this;
-			SpawnParams.Instigator = GetInstigator();
-
-			AMonsterBaseCharacter* SpawnedMonster = World->SpawnActor<AMonsterBaseCharacter>(MonsterClassToSpawn, GetActorLocation(), GetActorRotation(), SpawnParams);
+			FTransform SpawnTransform(GetActorRotation(), GetActorLocation());
+			// 1. [핵심 수정] SpawnActorDeferred를 사용하여 '지연 스폰' 시작
+			// 이 시점에는 아직 BeginPlay와 AIController 빙의(Possess)가 실행되지 않습니다.
+			AMonsterBaseCharacter* SpawnedMonster = World->SpawnActorDeferred<AMonsterBaseCharacter>(
+				MonsterClassToSpawn,
+				SpawnTransform,
+				this,           // Owner
+				GetInstigator(), // Instigator
+				ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn
+			);
 
 			if (SpawnedMonster)
 			{
+				// 2. [데이터 주입] AI가 켜지기 전에 필수 데이터를 먼저 넣어줍니다.
+				// 이렇게 하면 AIController가 BeginPlay에서 블랙보드 값을 읽을 때 null이 아닙니다.
 				SpawnedMonster->SetSpawner(this);
+
+				// GameState에서 현재 웨이브 정보를 가져와 몬스터에게 설정
+				if (AMyGameState* MyGameState = World->GetGameState<AMyGameState>())
+				{
+					int32 CurrentWave = MyGameState->GetCurrentWave();
+					SpawnedMonster->SetSpawnWaveIndex(CurrentWave);
+				}
+
+				// 3. [스폰 마무리] 이제 스폰을 완료합니다.
+				// 이때 비로소 BeginPlay -> OnPossess -> AI Behavior Tree가 실행됩니다.
+				UGameplayStatics::FinishSpawningActor(SpawnedMonster, SpawnTransform);
+
+				// --- [기존 로직 유지] ---
 				CurrentMonsterCount++;
 				OnRep_CurrentMonsterCount(); // 서버 UI 즉시 업데이트
 
-				// 1. GameState에서 현재 웨이브 가져오기
-				AMyGameState* MyGameState = World->GetGameState<AMyGameState>();
-				if (MyGameState)
+				// ASC(Ability System Component) 초기화 및 스탯 적용
+				// (FinishSpawningActor 이후에 해야 안전합니다)
+				UAbilitySystemComponent* MonsterASC = SpawnedMonster->GetAbilitySystemComponent();
+				if (MonsterASC)
 				{
-					int32 CurrentWave = MyGameState->GetCurrentWave(); // (1부터 시작)
+					MonsterASC->InitAbilityActorInfo(SpawnedMonster, SpawnedMonster);
 
-					SpawnedMonster->SetSpawnWaveIndex(CurrentWave);
-
-					// --- 스탯 적용 로직 ---
-					UAbilitySystemComponent* MonsterASC = SpawnedMonster->GetAbilitySystemComponent();
-					if (MonsterASC)
+					if (MonsterStatInitEffect)
 					{
-						MonsterASC->InitAbilityActorInfo(SpawnedMonster, SpawnedMonster);
+						FGameplayEffectContextHandle ContextHandle = MonsterASC->MakeEffectContext();
+						ContextHandle.AddSourceObject(this);
+						FGameplayEffectSpecHandle SpecHandle = MonsterASC->MakeOutgoingSpec(MonsterStatInitEffect, 1.0f, ContextHandle);
 
-						if (MonsterStatInitEffect)
+						if (SpecHandle.IsValid())
 						{
-							FGameplayEffectContextHandle ContextHandle = MonsterASC->MakeEffectContext();
-							ContextHandle.AddSourceObject(this);
-							FGameplayEffectSpecHandle SpecHandle = MonsterASC->MakeOutgoingSpec(MonsterStatInitEffect, 1.0f, ContextHandle);
+							// GameState를 다시 가져오거나 위에서 저장한 CurrentWave 사용
+							// (여기서는 안전하게 다시 가져오거나 위 변수를 활용)
+							int32 CurrentWave = SpawnedMonster->GetSpawnWaveIndex(); // 방금 설정했으므로 가져올 수 있음
 
-							if (SpecHandle.IsValid())
-							{
-								float BaseHP = MONSTER_BASE_HP;
-								float FinalHP = BaseHP + FMath::Max(0.f, (float)(CurrentWave - 1) * 50.f);
-								SpecHandle.Data.Get()->SetSetByCallerMagnitude(FGameplayTag::RequestGameplayTag(FName("Data.Wave.BonusHP")), FinalHP);
+							float BaseHP = MONSTER_BASE_HP;
+							float FinalHP = BaseHP + FMath::Max(0.f, (float)(CurrentWave - 1) * 50.f);
+							SpecHandle.Data.Get()->SetSetByCallerMagnitude(FGameplayTag::RequestGameplayTag(FName("Data.Wave.BonusHP")), FinalHP);
 
-								int FinalArmor = 0;
-								const int32 BossStage = CurrentWave / 10;
-								const float BaseArmor = BossStage * 20.0f;
-								const int32 WaveNumInBlock = (CurrentWave % 10);
-								FinalArmor = BaseArmor + WaveNumInBlock;
-								SpecHandle.Data.Get()->SetSetByCallerMagnitude(FGameplayTag::RequestGameplayTag(FName("Data.Wave.BonusArmor")), FinalArmor);
+							int FinalArmor = 0;
+							const int32 BossStage = CurrentWave / 10;
+							const float BaseArmor = BossStage * 20.0f;
+							const int32 WaveNumInBlock = (CurrentWave % 10);
+							FinalArmor = BaseArmor + WaveNumInBlock;
+							SpecHandle.Data.Get()->SetSetByCallerMagnitude(FGameplayTag::RequestGameplayTag(FName("Data.Wave.BonusArmor")), FinalArmor);
 
-								MonsterASC->ApplyGameplayEffectSpecToSelf(*SpecHandle.Data.Get());
-							}
+							MonsterASC->ApplyGameplayEffectSpecToSelf(*SpecHandle.Data.Get());
 						}
 					}
+				}
 
-					// --- 머티리얼 적용 로직 ---
-					const bool bIsBossWave = (CurrentWave > 0 && CurrentWave % 10 == 0);
-					if (!bIsBossWave)
+				// --- 머티리얼 적용 로직 ---
+				// (FinishSpawningActor 이후에 실행되어야 머티리얼이 정상 적용됨)
+				int32 CurrentWave = SpawnedMonster->GetSpawnWaveIndex();
+				const bool bIsBossWave = (CurrentWave > 0 && CurrentWave % 10 == 0);
+				if (!bIsBossWave)
+				{
+					const TArray<TObjectPtr<UMaterialInterface>>& WaveMaterials = SpawnedMonster->GetWaveMaterials();
+					if (WaveMaterials.Num() == 9)
 					{
-						const TArray<TObjectPtr<UMaterialInterface>>& WaveMaterials = SpawnedMonster->GetWaveMaterials();
-						if (WaveMaterials.Num() == 9)
+						int32 MaterialIndex = (CurrentWave % 10) - 1;
+						if (MaterialIndex >= 0 && MaterialIndex < WaveMaterials.Num())
 						{
-							int32 MaterialIndex = (CurrentWave % 10) - 1;
-							if (MaterialIndex >= 0 && MaterialIndex < WaveMaterials.Num())
+							UMaterialInterface* MaterialToApply = WaveMaterials[MaterialIndex];
+							if (MaterialToApply)
 							{
-								UMaterialInterface* MaterialToApply = WaveMaterials[MaterialIndex];
-								if (MaterialToApply)
-								{
-									SpawnedMonster->SetWaveMaterial(MaterialToApply);
-								}
+								SpawnedMonster->SetWaveMaterial(MaterialToApply);
 							}
 						}
 					}
 				}
 			}
 
+			// 스폰 카운트 증가
 			SpawnCounter++;
-
-			if (bEnableDebug)
-			{
-				DrawDebugSphere(GetWorld(), GetActorLocation(), 100.0f, 12, FColor::Green, false, 2.0f);
-			}
 		}
 	}
 	else
 	{
+		// 스폰 할당량을 다 채웠으면 타이머 정지
 		GetWorld()->GetTimerManager().ClearTimer(SpawnTimerHandle);
 	}
 }

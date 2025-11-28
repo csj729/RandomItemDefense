@@ -11,11 +11,14 @@
 class AMonsterSpawner;
 class AMyGameState; // AMyGameState 전방 선언
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnIsReadyChangedDelegate, bool, bIsReady);
+
 // 2. PlayerState 전용 *개별 스위치*를 정의합니다.
 #define ENABLE_PLAYERSTATE_DEBUG 1
 
 // 3. PlayerState 전용 로그 카테고리를 선언합니다.
 DECLARE_LOG_CATEGORY_EXTERN(LogRID_PlayerState, Log, All);
+
 
 // 4. 전용 커스텀 로그 매크로를 정의합니다.
 #if ENABLE_RID_DEBUG && ENABLE_PLAYERSTATE_DEBUG
@@ -77,6 +80,18 @@ public:
 	/** Seamless Travel 시 데이터를 새 PlayerState로 복사하는 함수 */
 	virtual void CopyProperties(APlayerState* PlayerState) override;
 
+	// [추가] 준비 상태 변경 알림 델리게이트
+	UPROPERTY(BlueprintAssignable, Category = "Events")
+	FOnIsReadyChangedDelegate OnIsReadyChangedDelegate;
+
+	// [추가] 현재 준비 상태 확인용 (BlueprintPure)
+	UFUNCTION(BlueprintPure, Category = "Lobby")
+	bool IsReady() const { return bIsReady; }
+
+	// [추가] 준비 버튼을 눌렀을 때 호출할 Server RPC
+	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Lobby")
+	void Server_SetIsReady(bool bReady);
+
 protected:
 	UPROPERTY(ReplicatedUsing = OnRep_Gold)
 	int32 Gold;
@@ -85,6 +100,12 @@ protected:
 
 	UFUNCTION()
 	void OnRep_MySpawner();
+
+	UPROPERTY(ReplicatedUsing = OnRep_IsReady)
+	bool bIsReady;
+
+	UFUNCTION()
+	void OnRep_IsReady();
 
 	// --- [코드 수정] 라운드 선택 관련 ---
 public:

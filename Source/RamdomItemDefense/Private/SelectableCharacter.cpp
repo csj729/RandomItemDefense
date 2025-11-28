@@ -1,6 +1,7 @@
 #include "SelectableCharacter.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "CharacterSelectPlayerController.h"
+#include "MyPlayerState.h"
 #include "Kismet/GameplayStatics.h"
 #include "RIDGameInstance.h" 
 
@@ -63,6 +64,7 @@ void ASelectableCharacter::NotifyActorOnClicked(FKey ButtonPressed)
 	bIsSelected = true;
 	if (Mesh)
 	{
+		UE_LOG(LogTemp, Warning, TEXT("Highlight"));
 		Mesh->SetRenderCustomDepth(true);
 		Mesh->SetCustomDepthStencilValue(2);
 	}
@@ -73,6 +75,19 @@ void ASelectableCharacter::NotifyActorOnClicked(FKey ButtonPressed)
 
 void ASelectableCharacter::PlaySelectionAnimation()
 {
+	APlayerController* PC = UGameplayStatics::GetPlayerController(GetWorld(), 0);
+	if (PC)
+	{
+		AMyPlayerState* MyPS = PC->GetPlayerState<AMyPlayerState>();
+
+		// 2. 이미 준비 완료 상태라면 애니메이션 재생 안 함 (함수 종료)
+		if (MyPS && MyPS->IsReady())
+		{
+			return;
+		}
+	}
+
+	// 3. 준비 상태가 아닐 때만 정상 재생
 	if (Mesh && SelectAnimation)
 	{
 		Mesh->PlayAnimation(SelectAnimation, false);

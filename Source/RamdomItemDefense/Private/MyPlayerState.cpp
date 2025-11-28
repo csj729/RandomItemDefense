@@ -57,6 +57,7 @@ void AMyPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 	DOREPLIFETIME(AMyPlayerState, bIsButtonActionSequenceFinishedThisStage);
 
 	DOREPLIFETIME(AMyPlayerState, SelectedCharacterClass);
+	DOREPLIFETIME(AMyPlayerState, bIsReady);
 }
 
 // --- 골드 관련 (수정됨) ---
@@ -660,4 +661,18 @@ void AMyPlayerState::Server_SetPlayerName_Implementation(const FString& NewName)
 	SetPlayerName(NewName);
 
 	RID_LOG(FColor::Green, TEXT("Server: Updated Player Name to '%s'"), *NewName);
+}
+
+// [추가] 서버 구현: 상태 변경 및 알림
+void AMyPlayerState::Server_SetIsReady_Implementation(bool bReady)
+{
+	bIsReady = bReady;
+	OnIsReadyChangedDelegate.Broadcast(bIsReady);
+	RID_LOG(FColor::Green, TEXT("Server: Player %s Ready Status -> %s"), *GetPlayerName(), bReady ? TEXT("TRUE") : TEXT("FALSE"));
+}
+
+// [추가] 클라이언트 동기화 알림
+void AMyPlayerState::OnRep_IsReady()
+{
+	OnIsReadyChangedDelegate.Broadcast(bIsReady);
 }

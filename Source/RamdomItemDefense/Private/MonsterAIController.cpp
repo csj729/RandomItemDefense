@@ -37,7 +37,5 @@ void AMonsterAIController::SetPatrolPath(AActor* PathActor)
         BlackboardComponent->SetValueAsObject(TEXT("PathToFollow"), PathActor);
         // 시작 인덱스 초기화
         BlackboardComponent->SetValueAsInt(TEXT("CurrentSplinePointIndex"), 0);
-
-        // RID_LOG(FColor::Green, TEXT("AIController: Path set to '%s'"), *PathActor->GetName());
     }
 }

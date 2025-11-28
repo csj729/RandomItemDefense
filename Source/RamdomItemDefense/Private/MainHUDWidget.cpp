@@ -111,7 +111,6 @@ void UMainHUDWidget::BindPlayerStateEvents()
 
 void UMainHUDWidget::BindSpawnerEvents()
 {
-	// ... (기존 코드 유지) ...
 	if (MyPlayerState && MyPlayerState->MySpawner)
 	{
 		MyPlayerState->MySpawner->OnMonsterCountChangedDelegate.AddDynamic(this, &UMainHUDWidget::HandleMonsterCountChanged);

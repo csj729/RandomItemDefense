@@ -185,6 +185,11 @@ void ARamdomItemDefensePlayerController::OnSetDestinationTriggered()
 	{
 		CachedDestination = Hit.Location;
 	}
+	else
+	{
+		// 이 로그가 계속 뜬다면 UI가 가로막고 있는 것입니다.
+		UE_LOG(LogTemplateCharacter, Warning, TEXT("Move Trace Failed! Cursor is blocked by UI or Sky."));
+	}
 
 	APawn* ControlledPawn = GetPawn();
 	if (ControlledPawn != nullptr)
@@ -505,6 +510,23 @@ void ARamdomItemDefensePlayerController::Client_HideWaitingUI_Implementation()
 		MainHUDInstance->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
 	}
 
+	// 2. [수정] 게임 플레이 모드 복구 (확실하게 설정)
+
+	// 마우스 커서 보이기
+	bShowMouseCursor = true;
+
+	// ★ 핵심: 마우스 이벤트 다시 켜기 (이게 꺼져있으면 드래그가 꼬일 수 있음)
+	bEnableClickEvents = true;
+	bEnableMouseOverEvents = true;
+
+	// 입력 모드 재설정
+	FInputModeGameAndUI InputMode;
+	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+	InputMode.SetHideCursorDuringCapture(false);
+	// 위젯 포커스를 해제하고 뷰포트로 돌리기 위해 nullptr 지정 가능 (기본값이긴 함)
+	InputMode.SetWidgetToFocus(nullptr);
+
+	SetInputMode(InputMode);
 }
 
 void ARamdomItemDefensePlayerController::Client_ShowVictoryUI_Implementation()
