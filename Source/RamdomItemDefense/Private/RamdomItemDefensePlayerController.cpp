@@ -488,9 +488,6 @@ void ARamdomItemDefensePlayerController::Client_ShowWaitingUI_Implementation()
 		}
 		WaitingWidgetInstance->SetVisibility(ESlateVisibility::Visible);
 
-		FInputModeUIOnly InputMode;
-		SetInputMode(InputMode);
-		bShowMouseCursor = false;
 	}
 }
 
@@ -508,11 +505,6 @@ void ARamdomItemDefensePlayerController::Client_HideWaitingUI_Implementation()
 		MainHUDInstance->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
 	}
 
-	FInputModeGameAndUI InputMode;
-	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
-	InputMode.SetHideCursorDuringCapture(false);
-	SetInputMode(InputMode);
-	bShowMouseCursor = true;
 }
 
 void ARamdomItemDefensePlayerController::Client_ShowVictoryUI_Implementation()
@@ -527,9 +519,6 @@ void ARamdomItemDefensePlayerController::Client_ShowVictoryUI_Implementation()
 		HideMainHUD();
 		VictoryWidgetInstance->AddToViewport(20);
 
-		FInputModeUIOnly InputMode;
-		SetInputMode(InputMode);
-		bShowMouseCursor = false;
 	}
 }
 
@@ -545,8 +534,5 @@ void ARamdomItemDefensePlayerController::Client_ShowDefeatUI_Implementation()
 		HideMainHUD();
 		DefeatWidgetInstance->AddToViewport(20);
 
-		FInputModeUIOnly InputMode;
-		SetInputMode(InputMode);
-		bShowMouseCursor = false;
 	}
 }

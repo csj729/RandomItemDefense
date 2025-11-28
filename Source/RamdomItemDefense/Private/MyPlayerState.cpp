@@ -84,6 +84,28 @@ bool AMyPlayerState::SpendGold(int32 Amount)
 	return false; // 골드 부족
 }
 
+void AMyPlayerState::CopyProperties(APlayerState* PlayerState)
+{
+	// 1. 부모 클래스의 로직 실행 (필수: 점수, Ping 등 기본 정보 복사)
+	Super::CopyProperties(PlayerState);
+
+	// 2. 인자로 들어온 PlayerState를 내 클래스(AMyPlayerState)로 캐스팅
+	AMyPlayerState* MyNewPS = Cast<AMyPlayerState>(PlayerState);
+	if (MyNewPS)
+	{
+		// 3. [핵심] '나(this, 옛날 PS)'의 데이터를 '새 PS(MyNewPS)'에 복사
+		MyNewPS->SelectedCharacterClass = this->SelectedCharacterClass;
+
+		// [로그 확인] 복사가 잘 되었는지 확인 (Cyan 색상)
+		RID_LOG(FColor::Cyan, TEXT("CopyProperties: Transferred Class '%s' to New Map for Player '%s'"),
+			*GetNameSafe(this->SelectedCharacterClass), *GetPlayerName());
+	}
+	else
+	{
+		RID_LOG(FColor::Cyan, TEXT("CopyProperties: PS is Null"));
+	}
+}
+
 void AMyPlayerState::OnRep_Gold()
 {
 	// 골드 변경 델리게이트를 방송합니다.
@@ -630,5 +652,12 @@ void AMyPlayerState::Server_SetSelectedCharacter_Implementation(TSubclassOf<APaw
 {
 	SelectedCharacterClass = NewClass;
 
-	// UE_LOG(LogTemp, Warning, TEXT("Server: Player %s selected %s"), *GetPlayerName(), *GetNameSafe(NewClass));
+	UE_LOG(LogTemp, Warning, TEXT("Server: Player %s selected %s"), *GetPlayerName(), *GetNameSafe(NewClass));
+}
+
+void AMyPlayerState::Server_SetPlayerName_Implementation(const FString& NewName)
+{
+	SetPlayerName(NewName);
+
+	RID_LOG(FColor::Green, TEXT("Server: Updated Player Name to '%s'"), *NewName);
 }

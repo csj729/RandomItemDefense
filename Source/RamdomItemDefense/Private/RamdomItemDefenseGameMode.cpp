@@ -452,16 +452,31 @@ AActor* ARamdomItemDefenseGameMode::ChoosePlayerStart_Implementation(AController
 
 UClass* ARamdomItemDefenseGameMode::GetDefaultPawnClassForController_Implementation(AController* InController)
 {
-	// 1. PlayerState 확인
+	// 1. PlayerState 확인 (Seamless Travel 성공 시)
 	if (AMyPlayerState* PS = InController->GetPlayerState<AMyPlayerState>())
 	{
-		// PlayerState에 저장된 클래스가 있다면 그걸로 스폰
 		if (PS->SelectedCharacterClass)
 		{
+			RID_LOG(FColor::Green, TEXT("Spawn (PS): Found Class '%s'"), *GetNameSafe(PS->SelectedCharacterClass));
 			return PS->SelectedCharacterClass;
 		}
 	}
 
-	// 2. 없다면 기존 GameInstance 확인 (혹시 모르니 유지)
+	// 2. [추가] GameInstance 확인 (호스트용 안전장치)
+	// 컨트롤러가 로컬(호스트)이라면 내 컴퓨터의 GameInstance를 읽어올 수 있습니다.
+	if (InController->IsLocalController())
+	{
+		if (URIDGameInstance* GI = Cast<URIDGameInstance>(GetGameInstance()))
+		{
+			if (GI->SelectedCharacterClass)
+			{
+				RID_LOG(FColor::Green, TEXT("Spawn (GI): Found Class '%s' from GameInstance"), *GetNameSafe(GI->SelectedCharacterClass));
+				return GI->SelectedCharacterClass;
+			}
+		}
+	}
+
+	// 3. 실패 시 기본 캐릭터
+	RID_LOG(FColor::Yellow, TEXT("Spawn: Using Default Pawn"));
 	return Super::GetDefaultPawnClassForController_Implementation(InController);
 }

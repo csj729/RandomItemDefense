@@ -71,6 +71,12 @@ public:
 	UFUNCTION(Server, Reliable, BlueprintCallable)
 	void Server_SetSelectedCharacter(TSubclassOf<APawn> NewClass);
 
+	UFUNCTION(Server, Reliable, BlueprintCallable)
+	void Server_SetPlayerName(const FString& NewName);
+
+	/** Seamless Travel 시 데이터를 새 PlayerState로 복사하는 함수 */
+	virtual void CopyProperties(APlayerState* PlayerState) override;
+
 protected:
 	UPROPERTY(ReplicatedUsing = OnRep_Gold)
 	int32 Gold;
