@@ -29,15 +29,18 @@ protected:
 	UPROPERTY(BlueprintReadOnly, Category = "Controller")
 	TObjectPtr<ARamdomItemDefensePlayerController> MyPlayerController;
 
-	// UMG에서 이 이름("P1_MonsterCountText", "P2_MonsterCountText")으로 텍스트 위젯을 만들어야 합니다.
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UTextBlock> P1_MonsterCountText;
 
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UTextBlock> P2_MonsterCountText;
-	// ----------------------------------------------------------
 
-	// (기존 함수들...)
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UTextBlock> P1_NameText;
+
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UTextBlock> P2_NameText;
+
 	UFUNCTION(BlueprintImplementableEvent, Category = "UI Events")
 	void OnGoldChanged(int32 NewGold);
 

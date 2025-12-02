@@ -14,6 +14,8 @@ ASelectableCharacter::ASelectableCharacter()
 
 	// 마우스 오버 이벤트 활성화
 	Mesh->SetCollisionProfileName(TEXT("BlockAllDynamic")); // 클릭 감지를 위해 콜리전 필요
+	CameraViewPoint = CreateDefaultSubobject<USceneComponent>(TEXT("CameraViewPoint"));
+	CameraViewPoint->SetupAttachment(RootComponent);
 }
 
 void ASelectableCharacter::BeginPlay()
@@ -49,28 +51,61 @@ void ASelectableCharacter::NotifyActorOnClicked(FKey ButtonPressed)
 {
 	Super::NotifyActorOnClicked(ButtonPressed);
 
-	// 1. 다른 모든 캐릭터 선택 해제
+	APlayerController* PC = UGameplayStatics::GetPlayerController(GetWorld(), 0);
+	ACharacterSelectPlayerController* SelectPC = Cast<ACharacterSelectPlayerController>(PC);
+
+	// --- [Case 1] 이미 선택된 나를 '다시' 클릭함 -> 선택 해제 (초기화) ---
+	if (bIsSelected)
+	{
+		// 1. 카메라 줌 아웃 (원래 위치로)
+		if (SelectPC) SelectPC->ResetView();
+
+		// 2. 모든 캐릭터 다시 보이게 처리
+		TArray<AActor*> AllChars;
+		UGameplayStatics::GetAllActorsOfClass(GetWorld(), ASelectableCharacter::StaticClass(), AllChars);
+		for (AActor* Actor : AllChars)
+		{
+			if (ASelectableCharacter* Char = Cast<ASelectableCharacter>(Actor))
+			{
+				Char->SetActorHiddenInGame(false); // 다시 보이기
+				Char->ResetSelection(); // 하이라이트 끄기
+			}
+		}
+		return; // 여기서 종료
+	}
+
+	// --- [Case 2] 새로운 캐릭터 선택 -> 집중 모드 (나머지 숨김) ---
+
+	// 1. 카메라 줌 인 (나에게로)
+	if (SelectPC) SelectPC->SetTargetCharacter(this);
+
+	// 2. 캐릭터들 순회
 	TArray<AActor*> AllChars;
 	UGameplayStatics::GetAllActorsOfClass(GetWorld(), ASelectableCharacter::StaticClass(), AllChars);
+
 	for (AActor* Actor : AllChars)
 	{
-		if (ASelectableCharacter* Char = Cast<ASelectableCharacter>(Actor))
+		ASelectableCharacter* Char = Cast<ASelectableCharacter>(Actor);
+		if (!Char) continue;
+
+		if (Char == this)
 		{
-			Char->ResetSelection(); // 기존 선택 해제 (하이라이트 끄기 등)
+			Char->SetActorHiddenInGame(false);
+			Char->bIsSelected = true;
+
+			if (Char->Mesh)
+			{
+				Char->Mesh->SetRenderCustomDepth(true);
+				Char->Mesh->SetCustomDepthStencilValue(2);
+			}
+			Char->PlaySelectionAnimation();
+		}
+		else
+		{
+			Char->ResetSelection();
+			Char->SetActorHiddenInGame(true);
 		}
 	}
-
-	// 2. 나 선택 (하이라이트 색상 변경 - 예: 주황색 스텐실 2)
-	bIsSelected = true;
-	if (Mesh)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("Highlight"));
-		Mesh->SetRenderCustomDepth(true);
-		Mesh->SetCustomDepthStencilValue(2);
-	}
-
-	// 3. 애니메이션 재생
-	PlaySelectionAnimation();
 }
 
 void ASelectableCharacter::PlaySelectionAnimation()

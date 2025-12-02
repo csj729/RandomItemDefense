@@ -45,6 +45,11 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Config", meta = (MultiLine = true)) // <-- 변경됨
     FText CharacterDescription;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera")
+	TObjectPtr<USceneComponent> CameraViewPoint;
+
+	USceneComponent* GetCameraViewPoint() const { return CameraViewPoint; }
+
 	/** 선택 여부 상태 */
 	bool bIsSelected;
 

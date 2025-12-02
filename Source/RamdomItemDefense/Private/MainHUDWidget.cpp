@@ -61,19 +61,34 @@ void UMainHUDWidget::UpdatePVPMonsterCounts()
 			// GAMEOVER_MONSTER_NUM(60) 매크로 사용 (ItemTypes.h에 정의됨)
 			FString StatusText = FString::Printf(TEXT("%d / %d"), CurrentCount, GAMEOVER_MONSTER_NUM);
 
-			// 3. 스포너 태그에 따라 UI 업데이트
+			// [★★★ 코드 추가: 플레이어 이름 가져오기 ★★★]
+			FString PlayerName = MyPS->GetPlayerName();
+
+			// 3. 스포너 태그에 따라 UI 업데이트 (이름과 숫자를 동시에 갱신)
 			if (MyPS->MySpawner->ActorHasTag(FName("Player1")))
 			{
+				// [Player 1 UI 갱신]
 				if (P1_MonsterCountText)
 				{
 					P1_MonsterCountText->SetText(FText::FromString(StatusText));
 				}
+				// 이름도 같이 갱신하여 매칭 보장
+				if (P1_NameText)
+				{
+					P1_NameText->SetText(FText::FromString(PlayerName));
+				}
 			}
 			else if (MyPS->MySpawner->ActorHasTag(FName("Player2")))
 			{
+				// [Player 2 UI 갱신]
 				if (P2_MonsterCountText)
 				{
 					P2_MonsterCountText->SetText(FText::FromString(StatusText));
+				}
+				// 이름도 같이 갱신하여 매칭 보장
+				if (P2_NameText)
+				{
+					P2_NameText->SetText(FText::FromString(PlayerName));
 				}
 			}
 		}

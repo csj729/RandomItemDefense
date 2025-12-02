@@ -2,6 +2,9 @@
 
 #include "CharacterSelectPlayerController.h"
 #include "Blueprint/UserWidget.h"
+#include "SelectableCharacter.h"
+#include "Camera/CameraActor.h"
+#include "Kismet/GameplayStatics.h"
 
 ACharacterSelectPlayerController::ACharacterSelectPlayerController()
 {
@@ -9,6 +12,7 @@ ACharacterSelectPlayerController::ACharacterSelectPlayerController()
 	bShowMouseCursor = true;
 	bEnableClickEvents = true;
 	bEnableMouseOverEvents = true;
+	PrimaryActorTick.bCanEverTick = true;
 }
 
 void ACharacterSelectPlayerController::BeginPlay()
@@ -44,5 +48,63 @@ void ACharacterSelectPlayerController::BeginPlay()
 		{
 			UE_LOG(LogTemp, Warning, TEXT("CharacterSelectPlayerController: Widget Class NOT assigned!"));
 		}
+
+		AActor* FoundCamera = UGameplayStatics::GetActorOfClass(GetWorld(), ACameraActor::StaticClass());
+		MainCamera = Cast<ACameraActor>(FoundCamera);
+
+		if (!MainCamera)
+		{
+			// 없으면 현재 뷰 위치에 새로 스폰
+			FTransform SpawnTransform = PlayerCameraManager ? PlayerCameraManager->GetTransform() : FTransform::Identity;
+			MainCamera = GetWorld()->SpawnActor<ACameraActor>(ACameraActor::StaticClass(), SpawnTransform);
+		}
+
+		// 2. 플레이어의 뷰 타겟을 이 카메라로 고정
+		if (MainCamera)
+		{
+			SetViewTarget(MainCamera);
+			InitialCameraLocation = MainCamera->GetActorLocation();
+			InitialCameraRotation = MainCamera->GetActorRotation();
+		}
 	}
+}
+
+void ACharacterSelectPlayerController::Tick(float DeltaTime)
+{
+	Super::Tick(DeltaTime);
+
+	if (MainCamera)
+	{
+		// 1. 목표 위치/회전 설정
+		FVector TargetLoc = InitialCameraLocation;
+		FRotator TargetRot = InitialCameraRotation;
+
+		// 타겟 캐릭터가 있다면(선택됨), 그 캐릭터의 뷰 포인트로 목표 변경
+		if (CurrentTarget && CurrentTarget->GetCameraViewPoint())
+		{
+			TargetLoc = CurrentTarget->GetCameraViewPoint()->GetComponentLocation();
+			TargetRot = CurrentTarget->GetCameraViewPoint()->GetComponentRotation();
+		}
+
+		// 2. 부드럽게 이동 (선택 해제 시에는 초기 위치로 복귀함)
+		FVector NewLoc = FMath::VInterpTo(MainCamera->GetActorLocation(), TargetLoc, DeltaTime, CameraInterpSpeed);
+		FRotator NewRot = FMath::RInterpTo(MainCamera->GetActorRotation(), TargetRot, DeltaTime, CameraInterpSpeed);
+
+		MainCamera->SetActorLocationAndRotation(NewLoc, NewRot);
+	}
+}
+
+// [추가] 구현
+void ACharacterSelectPlayerController::ResetView()
+{
+	CurrentTarget = nullptr; // 타겟을 비워서 Tick에서 초기 위치로 돌아가게 함
+
+	ToggleCharacterInfo(false);
+}
+
+void ACharacterSelectPlayerController::SetTargetCharacter(ASelectableCharacter* NewTarget)
+{
+	CurrentTarget = NewTarget;
+
+	ToggleCharacterInfo(true);
 }
