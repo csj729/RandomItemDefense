@@ -20,7 +20,14 @@ public class RamdomItemDefense : ModuleRules
             "UMG",
             "GameplayAbilities",
             "GameplayTags",
-            "GameplayTasks"
+            "GameplayTasks",
+            "OnlineSubsystem",
+            "OnlineSubsystemUtils",
+            "MoviePlayer",
+            "Slate",
+            "SlateCore"
         });
+
+        DynamicallyLoadedModuleNames.Add("OnlineSubsystemNull");
     }
 }

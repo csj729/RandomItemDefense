@@ -1,21 +1,65 @@
+// Source/RamdomItemDefense/Public/RIDGameInstance.h
+
 #pragma once
 
 #include "CoreMinimal.h"
 #include "Engine/GameInstance.h"
+#include "Interfaces/OnlineSessionInterface.h"
+#include "FindSessionsCallbackProxy.h"
 #include "RIDGameInstance.generated.h"
 
-/** 캐릭터 클래스 타입을 정의하거나, 실제 스폰할 클래스 정보를 저장 */
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FRIDFindSessionsCompleteDelegate, const TArray<FBlueprintSessionResult>&, SessionResults);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnSessionResultDelegate, bool, bSuccessful);
+
 UCLASS()
 class RAMDOMITEMDEFENSE_API URIDGameInstance : public UGameInstance
 {
 	GENERATED_BODY()
 
 public:
-	// 선택된 캐릭터 클래스 (BP_Warrior, BP_Archer 등)
+	URIDGameInstance();
+	virtual void Init() override;
+
 	UPROPERTY(BlueprintReadWrite, Category = "Game Data")
 	TSubclassOf<class APawn> SelectedCharacterClass;
 
-	// 플레이어가 입력한 이름
 	UPROPERTY(BlueprintReadWrite, Category = "Game Data")
 	FString PlayerName;
+
+	UFUNCTION(BlueprintCallable, Category = "Network|Session")
+	void CreateServer(FString RoomName, int32 MaxPlayers = 2);
+
+	UFUNCTION(BlueprintCallable, Category = "Network|Session")
+	void FindServers();
+
+	UFUNCTION(BlueprintCallable, Category = "Network|Session")
+	void JoinServer(FBlueprintSessionResult SessionToJoin);
+
+	UPROPERTY(BlueprintAssignable, Category = "Network|Session")
+	FRIDFindSessionsCompleteDelegate OnFindSessionsComplete;
+
+	UPROPERTY(BlueprintAssignable, Category = "Network|Session")
+	FOnSessionResultDelegate OnCreateSessionResult;
+
+	UPROPERTY(BlueprintAssignable, Category = "Network|Session")
+	FOnSessionResultDelegate OnJoinSessionResult;
+
+protected:
+	IOnlineSessionPtr SessionInterface;
+	TSharedPtr<FOnlineSessionSearch> SessionSearch;
+
+	FBlueprintSessionResult PendingSessionToJoin;
+
+	void OnCreateSessionComplete(FName SessionName, bool bWasSuccessful);
+	void OnFindSessionsCompleteInternal(bool bWasSuccessful);
+	void OnJoinSessionComplete(FName SessionName, EOnJoinSessionCompleteResult::Type Result);
+	void OnDestroySessionComplete(FName SessionName, bool bWasSuccessful);
+
+	UFUNCTION()
+	void BeginLoadingScreen(const FString& MapName);
+
+	UFUNCTION()
+	void EndLoadingScreen(UWorld* InLoadedWorld);
+
+	FString DesiredRoomName;
 };

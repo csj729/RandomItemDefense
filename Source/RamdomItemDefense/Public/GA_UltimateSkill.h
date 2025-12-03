@@ -20,8 +20,8 @@ public:
 	UGA_UltimateSkill();
 
 protected:
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Animation") // <-- BlueprintReadOnly 추가!
-		UAnimMontage* UltimateMontage;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Animation")
+	UAnimMontage* UltimateMontage;
 
 protected:
 	/** (★★★) 어빌리티가 활성화될 수 있는지 (스택이 찼는지) 확인합니다. */

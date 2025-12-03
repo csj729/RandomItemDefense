@@ -44,8 +44,9 @@ void UWaveTimerWidget::UpdateTimerText()
 {
 	if (!RemainTimeText || !MyGameState) return;
 
-	// GameState의 종료 시간에서 현재 시간을 빼서 남은 시간을 계산합니다.
-	float Remaining = MyGameState->GetWaveEndTime() - GetWorld()->GetTimeSeconds();
+	// [수정 후] GameState가 제공하는 '서버 기준 시간'을 사용하여 오차 해결
+	float Remaining = MyGameState->GetWaveEndTime() - MyGameState->GetServerWorldTimeSeconds();
+
 	Remaining = FMath::Max(0.0f, Remaining); // 0초 이하로 내려가지 않도록 함
 
 	// 분과 초로 변환
