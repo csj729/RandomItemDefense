@@ -22,15 +22,17 @@ public:
 	// IAbilitySystemInterface 구현
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
 
-	/** GA_Soldier_DronePassive가 스폰 직후 호출할 함수 */
 	void SetOwnerCharacter(ARamdomItemDefenseCharacter* InOwner);
 
-	// [ ★★★ 코드 추가 ★★★ ]
-	/**
-	 * @brief 이 드론의 스태틱 메쉬 컴포넌트를 반환합니다. (GA에서 이펙트 부착용)
-	 */
 	FORCEINLINE UStaticMeshComponent* GetMesh() const { return Mesh; }
-	// [ ★★★ 코드 추가 끝 ★★★ ]
+
+	/** (서버->모든 클라) 위치에 파티클 스폰 */
+	UFUNCTION(NetMulticast, Unreliable)
+	void Multicast_SpawnParticleAtLocation(UParticleSystem* EmitterTemplate, FVector Location, FRotator Rotation, FVector Scale);
+
+	/** (서버->모든 클라) 드론 메쉬에 파티클 부착 스폰 */
+	UFUNCTION(NetMulticast, Unreliable)
+	void Multicast_SpawnParticleAttached(UParticleSystem* EmitterTemplate, FName SocketName, FVector LocationOffset = FVector::ZeroVector, FRotator RotationOffset = FRotator::ZeroRotator, FVector Scale = FVector(1.0f));
 
 protected:
 	virtual void BeginPlay() override;

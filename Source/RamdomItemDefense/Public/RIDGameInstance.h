@@ -6,6 +6,7 @@
 #include "Engine/GameInstance.h"
 #include "Interfaces/OnlineSessionInterface.h"
 #include "FindSessionsCallbackProxy.h"
+#include "Blueprint/UserWidget.h"
 #include "RIDGameInstance.generated.h"
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FRIDFindSessionsCompleteDelegate, const TArray<FBlueprintSessionResult>&, SessionResults);
@@ -43,6 +44,12 @@ public:
 
 	UPROPERTY(BlueprintAssignable, Category = "Network|Session")
 	FOnSessionResultDelegate OnJoinSessionResult;
+
+	UFUNCTION(BlueprintPure, Category = "Network|Session")
+	FString GetRoomNameFromSessionResult(const FBlueprintSessionResult& Result);
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Loading")
+	TSubclassOf<UUserWidget> LoadingWidgetClass;
 
 protected:
 	IOnlineSessionPtr SessionInterface;

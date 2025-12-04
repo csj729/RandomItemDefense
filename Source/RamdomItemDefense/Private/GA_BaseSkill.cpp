@@ -48,20 +48,14 @@ void UGA_BaseSkill::ActivateAbility(const FGameplayAbilitySpecHandle Handle, con
 		// 2. 드론인 경우: (드론 클래스에 멀티캐스트가 없다면) 서버에서만이라도 재생
 		else if (ASoldierDrone* OwnerDrone = Cast<ASoldierDrone>(AvatarActor))
 		{
-			// 드론 메쉬에 부착
-			if (OwnerDrone->GetMesh())
-			{
-				UGameplayStatics::SpawnEmitterAttached(
-					MuzzleFlashEffect,
-					OwnerDrone->GetMesh(),
-					MuzzleSocketName,
-					FVector::ZeroVector,
-					FRotator::ZeroRotator,
-					FVector(1.0f),
-					EAttachLocation::SnapToTarget,
-					true
-				);
-			}
+			// 이제 드론도 멀티캐스트 함수를 가집니다.
+			OwnerDrone->Multicast_SpawnParticleAttached(
+				MuzzleFlashEffect,
+				MuzzleSocketName,
+				FVector::ZeroVector,
+				FRotator::ZeroRotator,
+				FVector(1.0f)
+			);
 		}
 	}
 

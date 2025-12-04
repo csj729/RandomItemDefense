@@ -6,6 +6,7 @@
 #include "Online/OnlineSessionNames.h"
 #include "Kismet/GameplayStatics.h"
 #include "Engine/World.h"
+#include "RamdomItemDefense.h"
 #include "MoviePlayer.h"
 #include "Framework/Application/SlateApplication.h"
 
@@ -180,26 +181,49 @@ void URIDGameInstance::OnJoinSessionComplete(FName SessionName, EOnJoinSessionCo
 {
 	bool bSuccess = (Result == EOnJoinSessionCompleteResult::Success);
 
+	// [디버그] 결과 로그
+	if (bSuccess)
+	{
+		RID_LOG(FColor::Green, TEXT("OnJoinSessionComplete: Success! Session='%s'"), *SessionName.ToString());
+	}
+	else
+	{
+		RID_LOG(FColor::Red, TEXT("OnJoinSessionComplete: FAILED! Result Code: %d"), (int32)Result);
+	}
+
 	OnJoinSessionResult.Broadcast(bSuccess);
 
-	if (Result == EOnJoinSessionCompleteResult::Success)
+	if (bSuccess)
 	{
 		FString ConnectInfo;
 		if (SessionInterface->GetResolvedConnectString(SessionName, ConnectInfo))
 		{
-			UE_LOG(LogTemp, Log, TEXT("Join Success! Traveling to: %s"), *ConnectInfo);
+			RID_LOG(FColor::Cyan, TEXT(">> Original ConnectString: [%s]"), *ConnectInfo);
 
-			// 해당 주소로 클라이언트 이동 (ClientTravel)
+			// [핵심 수정] 포트 번호가 0인 경우 (:0) 감지 및 보정
+			if (ConnectInfo.EndsWith(TEXT(":0")))
+			{
+				RID_LOG(FColor::Yellow, TEXT(">> [Warning] Port 0 Detected! Applying Fallback Port..."));
+
+				// 기존의 :0 을 제거하고, 기본 포트(:7777)를 붙입니다.
+				// 참고: 에디터 PIE 환경에서는 17777일 수도 있으니, 접속이 안 되면 17777로 바꿔보세요.
+				ConnectInfo = ConnectInfo.LeftChop(2);
+				ConnectInfo.Append(TEXT(":7777"));
+
+				RID_LOG(FColor::Green, TEXT(">> Fixed ConnectString: [%s]"), *ConnectInfo);
+			}
+
 			APlayerController* PC = GetFirstLocalPlayerController();
 			if (PC)
 			{
+				RID_LOG(FColor::Yellow, TEXT(">> Executing ClientTravel..."));
 				PC->ClientTravel(ConnectInfo, ETravelType::TRAVEL_Absolute);
 			}
 		}
-	}
-	else
-	{
-		UE_LOG(LogTemp, Error, TEXT("Join Session Failed."));
+		else
+		{
+			RID_LOG(FColor::Red, TEXT(">> ERROR: GetResolvedConnectString Failed!"));
+		}
 	}
 }
 
@@ -208,15 +232,25 @@ void URIDGameInstance::BeginLoadingScreen(const FString& MapName)
 	if (!IsRunningDedicatedServer())
 	{
 		FLoadingScreenAttributes LoadingScreen;
-
-		// 1. 로딩이 끝나도 플레이어가 키를 누를 때까지 대기할지 여부 (False: 바로 시작)
 		LoadingScreen.bAutoCompleteWhenLoadingCompletes = false;
 
-		// 2. 테스트용 기본 로딩 위젯 사용 (텍스트만 뜹니다)
-		// 나중에 커스텀 Slate 위젯으로 교체 가능
-		LoadingScreen.WidgetLoadingScreen = FLoadingScreenAttributes::NewTestLoadingScreenWidget();
+		// [수정] LoadingWidgetClass가 설정되어 있다면 해당 위젯을 생성하여 사용
+		if (LoadingWidgetClass)
+		{
+			UUserWidget* LoadingWidget = CreateWidget<UUserWidget>(this, LoadingWidgetClass);
+			if (LoadingWidget)
+			{
+				// UMG 위젯을 Slate 위젯으로 변환하여 등록
+				LoadingScreen.WidgetLoadingScreen = LoadingWidget->TakeWidget();
+			}
+		}
+		else
+		{
+			// 설정된 위젯이 없으면 기존 테스트 위젯 사용 (안전장치)
+			LoadingScreen.WidgetLoadingScreen = FLoadingScreenAttributes::NewTestLoadingScreenWidget();
+		}
 
-		// 3. 동영상 재생을 원하면 아래 주석 해제 (Content/Movies/Loading.mp4 필요)
+		// (선택 사항) 로딩 중 동영상 재생이 필요 없다면 MoviePaths 관련 코드는 주석 처리 유지
 		// LoadingScreen.MoviePaths.Add(TEXT("Loading")); 
 
 		GetMoviePlayer()->SetupLoadingScreen(LoadingScreen);
@@ -226,4 +260,26 @@ void URIDGameInstance::BeginLoadingScreen(const FString& MapName)
 void URIDGameInstance::EndLoadingScreen(UWorld* InLoadedWorld)
 {
 	// 로딩이 끝나면 별도 처리가 필요하다면 여기에 작성
+}
+
+FString URIDGameInstance::GetRoomNameFromSessionResult(const FBlueprintSessionResult& Result)
+{
+	// 검색 결과가 유효한지 확인
+	if (Result.OnlineResult.IsValid())
+	{
+		// 세션 설정(Settings) 가져오기
+		const FOnlineSessionSettings& Settings = Result.OnlineResult.Session.SessionSettings;
+
+		// [수정] Find는 FOnlineSessionSetting 포인터를 반환합니다.
+		const FOnlineSessionSetting* RoomNameSetting = Settings.Settings.Find(SESSION_SETTINGS_KEY_ROOM_NAME);
+
+		// 데이터가 존재하면
+		if (RoomNameSetting)
+		{
+			// [수정] Setting 구조체 안의 'Data' 멤버에 접근해서 문자열로 변환합니다.
+			return RoomNameSetting->Data.ToString();
+		}
+	}
+
+	return TEXT("Unknown Room"); // 없으면 기본값 반환
 }

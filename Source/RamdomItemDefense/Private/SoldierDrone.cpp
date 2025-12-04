@@ -4,7 +4,8 @@
 #include "MyAttributeSet.h"
 #include "AttackComponent.h"
 #include "RamdomItemDefenseCharacter.h" 
-#include "Kismet/KismetMathLibrary.h" // VInterpTo
+#include "Kismet/KismetMathLibrary.h"
+#include "Kismet/GameplayStatics.h"
 
 ASoldierDrone::ASoldierDrone()
 {
@@ -83,5 +84,30 @@ void ASoldierDrone::Tick(float DeltaTime)
 
 		FRotator TargetRotation = UKismetMathLibrary::FindLookAtRotation(NewLocation, OwnerLocation);
 		SetActorRotation(TargetRotation);
+	}
+}
+
+void ASoldierDrone::Multicast_SpawnParticleAtLocation_Implementation(UParticleSystem* EmitterTemplate, FVector Location, FRotator Rotation, FVector Scale)
+{
+	if (EmitterTemplate)
+	{
+		UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), EmitterTemplate, Location, Rotation, Scale, true);
+	}
+}
+
+void ASoldierDrone::Multicast_SpawnParticleAttached_Implementation(UParticleSystem* EmitterTemplate, FName SocketName, FVector LocationOffset, FRotator RotationOffset, FVector Scale)
+{
+	if (EmitterTemplate && GetMesh())
+	{
+		UGameplayStatics::SpawnEmitterAttached(
+			EmitterTemplate,
+			GetMesh(),
+			SocketName,
+			LocationOffset,
+			RotationOffset,
+			Scale,
+			EAttachLocation::SnapToTarget,
+			true // bAutoDestroy
+		);
 	}
 }
