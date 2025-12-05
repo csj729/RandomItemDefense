@@ -18,7 +18,7 @@
 
 ARamdomItemDefenseGameMode::ARamdomItemDefenseGameMode()
 {
-	PrimaryActorTick.bCanEverTick = false;
+	PrimaryActorTick.bCanEverTick = true;
 	bUseSeamlessTravel = true;
 
 	GameStateClass = AMyGameState::StaticClass();
@@ -27,6 +27,28 @@ ARamdomItemDefenseGameMode::ARamdomItemDefenseGameMode()
 	StageTimeLimit = 60.0f;
 	GameoverMonsterNum = 60;
 	BossStageTimeLimit = 120.0f;
+}
+
+void ARamdomItemDefenseGameMode::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+
+	// 게임이 시작되지 않았거나, GameState가 없으면 무시
+	if (!bGameStarted) return;
+
+	AMyGameState* MyGameState = GetGameState<AMyGameState>();
+	if (!MyGameState) return;
+
+	// [핵심 로직] 현재 서버 시간이 웨이브 종료 시간을 지났는지 확인
+	// bIsWaveInProgress 체크를 통해 중복 실행을 방지할 수도 있지만,
+	// StartNextWave 내부에서 WaveEndTime을 미래로 밀어버리므로 자연스럽게 해결됩니다.
+	float ServerTime = GetWorld()->GetTimeSeconds();
+
+	if (ServerTime >= MyGameState->GetWaveEndTime())
+	{
+		// 시간이 다 되었으면 다음 웨이브 시작
+		StartNextWave();
+	}
 }
 
 void ARamdomItemDefenseGameMode::BeginPlay()
@@ -92,9 +114,13 @@ void ARamdomItemDefenseGameMode::CheckPlayerCountAndStart()
 			}
 		}
 
-		// 3초 뒤 웨이브 시작
-		FTimerHandle StartTimer;
-		GetWorld()->GetTimerManager().SetTimer(StartTimer, this, &ARamdomItemDefenseGameMode::StartNextWave, 3.0f, false);
+		AMyGameState* MyGameState = GetGameState<AMyGameState>();
+		if (MyGameState)
+		{
+			// 현재 시간 + 3초 뒤에 첫 웨이브가 시작되도록 설정
+			MyGameState->WaveEndTime = GetWorld()->GetTimeSeconds() + 3.0f;
+			MyGameState->OnRep_WaveEndTime(); // 클라이언트 UI 업데이트
+		}
 	}
 }
 
@@ -119,42 +145,36 @@ void ARamdomItemDefenseGameMode::Logout(AController* Exiting)
 			}
 		}
 		bGameStarted = false;
-		GetWorldTimerManager().ClearTimer(StageTimerHandle);
 	}
 }
 
 void ARamdomItemDefenseGameMode::StartNextWave()
 {
-	// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
+	// [수정] 로그 매크로 사용
 	RID_LOG(FColor::Yellow, TEXT("StartNextWave called."));
-	// -----------------------------------------
 
 	AMyGameState* MyGameState = GetGameState<AMyGameState>();
 	if (!MyGameState)
 	{
-		// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
 		RID_LOG(FColor::Red, TEXT("ERROR: GameState is NOT valid!"));
-		// -----------------------------------------
-		return; // GameState 없으면 함수 종료
+		return;
 	}
 
-	// --- [코드 추가] 보스 타임아웃 체크 ---
-	// 현재 웨이브가 1 이상이고(첫 웨이브 시작 시점 제외), 이전 웨이브가 보스 웨이브였는지 확인
+	// -----------------------------------------------------------------
+	// 1. 보스 타임아웃 체크 (이전 웨이브가 보스전이었을 경우)
+	// -----------------------------------------------------------------
+	// CurrentWave가 증가하기 전이므로, 여기서 GetCurrentWave()는 '방금 끝난 웨이브'입니다.
 	if (MyGameState->GetCurrentWave() > 0 && (MyGameState->GetCurrentWave() % 10 == 0))
 	{
-		// TODO: 현재 맵에 보스 몬스터가 아직 살아있는지 확인하는 로직 구현 필요
-		// 예시: GameState에 보스 몬스터 액터 참조를 저장하고 IsValid 체크
-		bool bBossIsAlive = false; // <<--- 이 부분을 실제 보스 생존 확인 로직으로 교체해야 합니다.
-		// 예: TObjectPtr<AMonsterBaseCharacter> CurrentBoss; 를 GameState에 추가하고 관리
+		// TODO: 실제 보스 생존 여부 확인 로직 필요
+		// 현재는 예시로 false(보스 죽음) 처리되어 있습니다.
+		bool bBossIsAlive = false;
 
 		if (bBossIsAlive)
 		{
-			// 보스가 아직 살아있다면 -> 보스 타임 아웃 게임오버
-			// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
 			RID_LOG(FColor::Red, TEXT("GAME OVER: Boss Time Out!"));
-			// -----------------------------------------
 
-			// 모든 플레이어 컨트롤러를 가져와 게임오버 UI 표시 함수 호출
+			// 모든 플레이어에게 패배 UI 표시
 			for (APlayerState* PS : MyGameState->PlayerArray)
 			{
 				ARamdomItemDefensePlayerController* PC = Cast<ARamdomItemDefensePlayerController>(PS->GetPlayerController());
@@ -163,101 +183,79 @@ void ARamdomItemDefenseGameMode::StartNextWave()
 					PC->ShowGameOverUI();
 				}
 			}
-			// 다음 웨이브 진행 및 게임오버 체크 타이머 중지
-			GetWorldTimerManager().ClearTimer(StageTimerHandle);
+
+			// 게임 종료 상태로 전환
+			bGameStarted = false;
+			// Tick에서의 감지를 막기 위해 웨이브 종료 시간을 무한대(혹은 과거)로 설정하거나 상태 플래그 변경
+			// 여기서는 bGameStarted = false로 Tick이 멈추므로 충분합니다.
+
 			GetWorldTimerManager().ClearTimer(GameOverCheckTimerHandle);
-			return; // 게임오버 처리 후 함수 종료
+			return;
 		}
-		// 보스가 죽었다면 정상적으로 다음 웨이브 진행
 	}
-	// --- 보스 타임아웃 체크 끝 ---
 
-
-	// 다음 웨이브 번호 설정
+	// -----------------------------------------------------------------
+	// 2. 웨이브 번호 갱신 및 플레이어 보상
+	// -----------------------------------------------------------------
 	MyGameState->CurrentWave++;
-	MyGameState->OnRep_CurrentWave(); // RepNotify 호출 (서버 UI 즉시 업데이트 및 클라이언트 복제)
+	MyGameState->OnRep_CurrentWave(); // 클라이언트 동기화
 
-	// 모든 플레이어에게 라운드 선택 횟수 2회 부여 (변경 없음)
+	// 플레이어들에게 선택권 부여 및 상태 리셋
 	for (APlayerState* PS : MyGameState->PlayerArray)
 	{
 		AMyPlayerState* MyPS = Cast<AMyPlayerState>(PS);
 		if (MyPS)
 		{
-			// AddChoiceCount 함수 이름 확인 필요 (이전 코드에서는 AddChoiceCount로 되어 있었음)
-			MyPS->AddChoiceCount(2); // 서버 전용 함수 호출
-			// 이 플레이어의 스킬 부스트 상태를 "새 웨이브"로 리셋
+			MyPS->AddChoiceCount(2);
 			MyPS->OnWaveStarted();
 		}
 	}
 
-	// --- [코드 수정] 보스 웨이브 분기 로직 ---
+	// -----------------------------------------------------------------
+	// 3. 다음 웨이브 시간 설정 (핵심: 타이머 대신 EndTime 설정)
+	// -----------------------------------------------------------------
 	const int32 CurrentWave = MyGameState->GetCurrentWave();
-	// 현재 웨이브가 1 이상이고 10의 배수이면 보스 웨이브로 간주
 	const bool bIsBossWave = (CurrentWave > 0 && CurrentWave % 10 == 0);
-	// 보스 웨이브는 120초, 일반 웨이브는 60초
 	const float TimeLimitForThisWave = bIsBossWave ? BossStageTimeLimit : StageTimeLimit;
 
-	// GameState에 이번 웨이브의 종료 시간 기록 (변경 없음)
+	// [중요] 현재 시간 + 웨이브 지속 시간을 더해 '종료 시점'을 설정합니다.
+	// 이제 GameMode의 Tick 함수가 이 시간을 감시하다가, 시간이 되면 StartNextWave를 다시 호출할 것입니다.
 	MyGameState->WaveEndTime = GetWorld()->GetTimeSeconds() + TimeLimitForThisWave;
-	MyGameState->OnRep_WaveEndTime();
+	MyGameState->OnRep_WaveEndTime(); // 클라이언트 타이머 동기화
 
-	// 보스 웨이브는 1마리, 일반 웨이브는 설정값(MonstersPerWave)만큼 스폰
+	// -----------------------------------------------------------------
+	// 4. 몬스터 스폰
+	// -----------------------------------------------------------------
 	const int32 NumToSpawn = bIsBossWave ? 1 : MonstersPerWave;
-	// --- 보스 웨이브 분기 끝 ---
 
-	// 로그 출력 (변경 없음)
-	// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
-	// [수정] FString 변수를 만들지 않고 매크로에 직접 전달합니다.
 	RID_LOG(FColor::White, TEXT("Wave %d Info: bIsBoss=%s, TimeLimit=%.1f, NumToSpawn=%d"),
 		CurrentWave, bIsBossWave ? TEXT("true") : TEXT("false"), TimeLimitForThisWave, NumToSpawn);
-	// -----------------------------------------
 
-	// 몬스터 데이터 테이블 로드 및 스폰 명령 (변경 없음)
 	if (MonsterWaveDataTable)
 	{
-		// 보스 웨이브와 일반 웨이브에 다른 Row Name 규칙이 필요할 수 있음 (예: "Boss1", "Boss2")
-		// 여기서는 일단 "Wave10", "Wave20" 등으로 동일하게 사용
 		FString RowName = FString::Printf(TEXT("Wave%d"), CurrentWave);
 		FMonsterWaveData* WaveData = MonsterWaveDataTable->FindRow<FMonsterWaveData>(*RowName, TEXT(""));
 
 		if (WaveData && WaveData->MonstersToSpawn.Num() > 0)
 		{
-			// TODO: 보스 웨이브일 경우 WaveData->MonstersToSpawn[0]이 실제 보스 몬스터 클래스인지 확인 필요
 			TSubclassOf<AMonsterBaseCharacter> MonsterClass = WaveData->MonstersToSpawn[0];
 
-			// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
-			// [수정] FString 변수를 만들지 않고 매크로에 직접 전달합니다.
 			RID_LOG(FColor::Cyan, TEXT("Found %d Spawners. Issuing spawn command..."), MonsterSpawners.Num());
-			// -----------------------------------------
 
-			// 모든 스포너에게 스폰 명령 전달
 			for (AMonsterSpawner* Spawner : MonsterSpawners)
 			{
 				if (Spawner)
 				{
-					// 스포너가 게임오버 상태가 아닐 때만 스폰하도록 추가 체크 가능
-					// if (!Spawner->IsGameOver())
-					// {
 					Spawner->BeginSpawning(MonsterClass, NumToSpawn);
-					// }
 				}
 			}
-
-			// TODO: 보스 스폰 시 GameState 등에 보스 액터 참조 저장하는 로직 필요 (타임아웃 체크용)
-
 		}
 		else
 		{
-			// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
 			RID_LOG(FColor::Red, TEXT("ERROR: WaveData for '%s' not found or no monsters assigned in DataTable!"), *RowName);
-			// -----------------------------------------
-			// 웨이브 데이터가 없으면 다음 웨이브로 넘어가지 않도록 타이머 설정 중단 (선택 사항)
-			// return;
 		}
 	}
 
-	// 다음 웨이브 시작 타이머 설정 (변경 없음)
-	GetWorld()->GetTimerManager().SetTimer(StageTimerHandle, this, &ARamdomItemDefenseGameMode::StartNextWave, TimeLimitForThisWave, false);
 }
 
 void ARamdomItemDefenseGameMode::CheckGameOver()
@@ -307,7 +305,6 @@ void ARamdomItemDefenseGameMode::CheckGameOver()
 			}
 
 			// 게임 종료 처리
-			GetWorldTimerManager().ClearTimer(StageTimerHandle);
 			bGameStarted = false;
 		}
 	}

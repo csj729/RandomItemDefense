@@ -28,6 +28,7 @@ public:
 	virtual UClass* GetDefaultPawnClassForController_Implementation(AController* InController) override;
 
 protected:
+	virtual void Tick(float DeltaSeconds) override;
 	virtual void BeginPlay() override;
 
 	/** 플레이어가 성공적으로 로그인했을 때 서버에서 호출됩니다. (PIE, Listen, Dedicated 모두) */
@@ -59,9 +60,9 @@ private:
 	float BossStageTimeLimit;
 
 	TArray<TObjectPtr<AMonsterSpawner>> MonsterSpawners;
-
-	FTimerHandle StageTimerHandle;
 	FTimerHandle GameOverCheckTimerHandle;
+
+	bool bIsWaveInProgress = false;
 
 	/** 스포너와 연결된 플레이어 컨트롤러를 찾아 반환하는 헬퍼 함수 */
 	APlayerController* GetControllerForSpawner(AMonsterSpawner* Spawner) const;

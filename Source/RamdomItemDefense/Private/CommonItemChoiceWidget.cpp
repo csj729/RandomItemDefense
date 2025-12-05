@@ -11,11 +11,10 @@
 void UCommonItemChoiceWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
-	// [수정] 바인딩 함수 호출
 	BindDataSources();
 }
 
-// [추가] 재귀적 바인딩 함수
+// [수정] 재귀적 바인딩 함수
 void UCommonItemChoiceWidget::BindDataSources()
 {
 	// 1. PlayerState 바인딩 시도
@@ -28,7 +27,7 @@ void UCommonItemChoiceWidget::BindDataSources()
 			{
 				MyPlayerState->OnCommonItemChoiceCountChangedDelegate.AddDynamic(this, &UCommonItemChoiceWidget::HandleCommonItemChoiceCountChanged);
 			}
-			// 초기값 업데이트
+			// [1차 시도] 텍스트 갱신 (만약 인벤토리가 아직 없으면 슬롯 생성은 실패함)
 			HandleCommonItemChoiceCountChanged(MyPlayerState->GetCommonItemChoiceCount());
 		}
 	}
@@ -50,27 +49,30 @@ void UCommonItemChoiceWidget::BindDataSources()
 	else
 	{
 		UE_LOG(LogRamdomItemDefense, Log, TEXT("CommonItemChoiceWidget: All Data Sources Bound Successfully!"));
+
+		// 모든 데이터 소스가 연결된 시점에 UI를 강제로 다시 갱신합니다.
+		// (1차 시도에서 InventoryComp가 없어 슬롯 생성이 실패했을 경우를 복구)
+		if (MyPlayerState)
+		{
+			HandleCommonItemChoiceCountChanged(MyPlayerState->GetCommonItemChoiceCount());
+		}
 	}
 }
 
-/** 위젯이 뷰포트에서 제거될 때 (델리게이트 해제) */
 void UCommonItemChoiceWidget::NativeDestruct()
 {
 	Super::NativeDestruct();
 
-	// 델리게이트 바인딩 해제
 	if (MyPlayerState)
 	{
 		MyPlayerState->OnCommonItemChoiceCountChangedDelegate.RemoveDynamic(this, &UCommonItemChoiceWidget::HandleCommonItemChoiceCountChanged);
 	}
 }
 
-/** PlayerState의 '흔함 아이템 선택권' 횟수가 변경될 때 호출됩니다. */
 void UCommonItemChoiceWidget::HandleCommonItemChoiceCountChanged(int32 NewCount)
 {
 	if (ChoiceCountText)
 	{
-		// 텍스트 포맷 설정 (예: "남은 선택 횟수: 1")
 		FFormatNamedArguments Args;
 		Args.Add(TEXT("Count"), FText::AsNumber(NewCount));
 		ChoiceCountText->SetText(FText::Format(FText::FromString(TEXT("남은 선택 횟수: {Count}")), Args));
@@ -78,38 +80,34 @@ void UCommonItemChoiceWidget::HandleCommonItemChoiceCountChanged(int32 NewCount)
 
 	if (NewCount > 0)
 	{
-		// 선택권이 1개 이상 생겼으므로, 아이템 목록을 새로고침하여 BP에 표시 요청
 		PopulateChoices();
 	}
 	else
 	{
-		// 선택권이 0개가 되었으므로, BP에게 아이템 슬롯 숨김 요청
 		OnHideChoices();
 	}
 }
 
-/**
- * @brief (C++ 내부용) 선택권이 생겼을 때, BP에게 표시할 아이템 목록을 요청합니다.
- */
 void UCommonItemChoiceWidget::PopulateChoices()
 {
-	// 인벤토리 컴포넌트가 유효한지 확인
+	// 인벤토리 컴포넌트 유효성 체크
 	if (!InventoryComp.IsValid())
 	{
+		// 이 로그가 뜨면 바인딩 순서 문제임 (위의 수정으로 해결됨)
 		RID_LOG(FColor::Red, TEXT("CommonItemChoiceWidget: InventoryComp is invalid!"));
 		return;
 	}
 
-	// 1. 인벤토리 컴포넌트로부터 '모든' 흔함 아이템 ID를 가져옵니다.
+	// 1. 모든 흔함 아이템 ID 가져오기
 	TArray<FName> ItemIDs = InventoryComp->GetAllCommonItemIDs();
 
 	if (ItemIDs.Num() == 0)
 	{
-		RID_LOG(FColor::Yellow, TEXT("CommonItemChoiceWidget: No common items found to populate choices."));
+		RID_LOG(FColor::Yellow, TEXT("CommonItemChoiceWidget: No common items found in DataTable."));
 		return;
 	}
 
-	// 2. ID 배열을 실제 FItemData 배열로 변환합니다. (UI에 아이콘/이름 표시용)
+	// 2. FItemData로 변환
 	TArray<FItemData> ItemChoices;
 	for (const FName& ID : ItemIDs)
 	{
@@ -121,20 +119,14 @@ void UCommonItemChoiceWidget::PopulateChoices()
 		}
 	}
 
-	// 3. 블루프린트(WBP)의 OnShowChoices 이벤트를 호출하여 UI를 채우도록 합니다.
+	// 3. BP에 UI 표시 요청
 	OnShowChoices(ItemChoices);
 }
 
-
-/**
- * @brief (블루프린트 호출용) WBP의 아이템 버튼 클릭 시 이 함수를 호출해야 합니다.
- */
 void UCommonItemChoiceWidget::MakeChoice(FName ChosenItemID)
 {
 	if (MyPlayerState)
 	{
-		// 1. 서버에 이 아이템을 선택했다고 알림 (선택권 1개 소모)
 		MyPlayerState->Server_UseCommonItemChoice(ChosenItemID);
-
 	}
 }
