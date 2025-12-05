@@ -33,9 +33,14 @@ void AMonsterAIController::SetPatrolPath(AActor* PathActor)
 {
     if (BlackboardComponent && PathActor)
     {
-        // 블랙보드에 경로 액터 입력
+        // 1. 블랙보드 값 설정
         BlackboardComponent->SetValueAsObject(TEXT("PathToFollow"), PathActor);
-        // 시작 인덱스 초기화
         BlackboardComponent->SetValueAsInt(TEXT("CurrentSplinePointIndex"), 0);
+
+        // [추가] 경로가 들어왔으므로 비헤이비어 트리를 (재)실행하여 즉시 이동 시작
+        if (BehaviorTree)
+        {
+            RunBehaviorTree(BehaviorTree);
+        }
     }
 }

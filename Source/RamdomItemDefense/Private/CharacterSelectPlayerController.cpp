@@ -5,6 +5,12 @@
 #include "SelectableCharacter.h"
 #include "Camera/CameraActor.h"
 #include "Kismet/GameplayStatics.h"
+#include "OnlineSubsystem.h"
+#include "Interfaces/OnlineSessionInterface.h"
+#include "EnhancedInputComponent.h"
+#include "EnhancedInputSubsystems.h"
+#include "InputMappingContext.h"
+#include "InputAction.h"
 
 ACharacterSelectPlayerController::ACharacterSelectPlayerController()
 {
@@ -66,6 +72,29 @@ void ACharacterSelectPlayerController::BeginPlay()
 			InitialCameraLocation = MainCamera->GetActorLocation();
 			InitialCameraRotation = MainCamera->GetActorRotation();
 		}
+
+		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
+		{
+			if (CharacterSelectMappingContext)
+			{
+				Subsystem->AddMappingContext(CharacterSelectMappingContext, 0);
+			}
+		}
+	}
+}
+
+void ACharacterSelectPlayerController::SetupInputComponent()
+{
+	Super::SetupInputComponent();
+
+	// [Enhanced Input] 액션 바인딩
+	if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(InputComponent))
+	{
+		if (BackToMenuAction)
+		{
+			// Started: 키를 누르는 순간 발생
+			EnhancedInputComponent->BindAction(BackToMenuAction, ETriggerEvent::Started, this, &ACharacterSelectPlayerController::OnBackToMainMenu);
+		}
 	}
 }
 
@@ -107,4 +136,22 @@ void ACharacterSelectPlayerController::SetTargetCharacter(ASelectableCharacter* 
 	CurrentTarget = NewTarget;
 
 	ToggleCharacterInfo(true);
+}
+
+void ACharacterSelectPlayerController::OnBackToMainMenu(const FInputActionValue& Value)
+{
+	IOnlineSubsystem* Subsystem = IOnlineSubsystem::Get();
+	if (Subsystem)
+	{
+		IOnlineSessionPtr SessionInterface = Subsystem->GetSessionInterface();
+		if (SessionInterface.IsValid())
+		{
+			if (SessionInterface->GetNamedSession(NAME_GameSession))
+			{
+				SessionInterface->DestroySession(NAME_GameSession);
+			}
+		}
+	}
+
+	UGameplayStatics::OpenLevel(this, FName("Map_MainMenu"));
 }

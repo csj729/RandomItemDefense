@@ -2,6 +2,7 @@
 // csj729/randomitemdefense/RandomItemDefense-78a128504f0127dc02646504d4a1e1c677a0e811/Source/RamdomItemDefense/Private/MonsterSpawner.cpp
 #include "MonsterSpawner.h"
 #include "MonsterBaseCharacter.h"
+#include "MonsterAIController.h"
 #include "Engine/World.h"
 #include "DrawDebugHelpers.h"
 #include "Engine/Engine.h"
@@ -18,6 +19,12 @@ AMonsterSpawner::AMonsterSpawner()
 {
 	PrimaryActorTick.bCanEverTick = false;
 	bReplicates = true;
+	
+	// 게임 로직에 필수적인 관리자 액터이므로 Culling되면 안 됩니다.
+	bAlwaysRelevant = true;
+
+	// 스포너 상태가 자주 바뀌지 않는다면 기본값도 괜찮지만, 디버깅을 위해 명시합니다.
+	NetUpdateFrequency = 100.0f;
 
 	TotalToSpawn = 0;
 	SpawnCounter = 0;
@@ -196,7 +203,7 @@ void AMonsterSpawner::SetGameOver()
 void AMonsterSpawner::SpawnCounterAttackMonster(TSubclassOf<AMonsterBaseCharacter> MonsterClass, int32 MonsterWaveIndex)
 {
 	if (!HasAuthority() || !MonsterClass) return;
-	if (bIsGameOver) return; // 게임오버 상태면 무시
+	if (bIsGameOver) return;
 
 	UWorld* World = GetWorld();
 	if (World)
@@ -205,26 +212,36 @@ void AMonsterSpawner::SpawnCounterAttackMonster(TSubclassOf<AMonsterBaseCharacte
 		SpawnParams.Owner = this;
 		SpawnParams.Instigator = GetInstigator();
 
-		// 현재 스포너 위치에서 즉시 스폰
-		AMonsterBaseCharacter* SpawnedMonster = World->SpawnActor<AMonsterBaseCharacter>(MonsterClass, GetActorLocation(), GetActorRotation(), SpawnParams);
+		// [핵심 해결] 충돌이 있어도 강제로 스폰하도록 설정 (일반 웨이브와 동일하게 맞춤)
+		SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+
+		// 즉시 스폰 시도
+		AMonsterBaseCharacter* SpawnedMonster = World->SpawnActor<AMonsterBaseCharacter>(
+			MonsterClass, GetActorLocation(), GetActorRotation(), SpawnParams);
 
 		if (SpawnedMonster)
 		{
+			// 1. 반격 몬스터 설정 및 웨이브 인덱스 주입
+			SpawnedMonster->SetIsCounterAttackMonster(true);
+			int32 TargetWaveIndex = (MonsterWaveIndex <= 0) ? 1 : MonsterWaveIndex;
+			SpawnedMonster->SetSpawnWaveIndex(TargetWaveIndex);
+
+			// 2. 스포너 지정 (이때 AI에게 경로가 전달됨)
 			SpawnedMonster->SetSpawner(this);
-			SpawnedMonster->SetIsCounterAttackMonster(true); // [중요] 반격 몬스터 플래그
+
+			// 3. [AI 보정] 즉시 스폰의 경우, AI가 먼저 빙의된 후 SetSpawner가 호출되므로
+			// 이미 실행된 비헤이비어 트리가 경로(PathToFollow)를 못 찾았을 수 있습니다.
+			// 따라서 컨트롤러를 가져와 경로를 확실하게 다시 설정해줍니다.
+			if (AMonsterAIController* AI = Cast<AMonsterAIController>(SpawnedMonster->GetController()))
+			{
+				AI->SetPatrolPath(PatrolPathActor);
+			}
+
+			// 4. 카운트 증가 및 UI 갱신
 			CurrentMonsterCount++;
 			OnRep_CurrentMonsterCount();
 
-			// [ ★★★ 핵심 수정 ★★★ ]
-			// GameState->GetCurrentWave() 대신, 인자로 받은 'MonsterWaveIndex'를 사용합니다.
-			int32 TargetWaveIndex = MonsterWaveIndex;
-
-			// (안전 장치: 혹시 0 이하가 들어오면 1로 보정)
-			if (TargetWaveIndex <= 0) TargetWaveIndex = 1;
-
-			SpawnedMonster->SetSpawnWaveIndex(TargetWaveIndex);
-
-			// 스탯 적용 로직에도 TargetWaveIndex를 사용
+			// 5. 스탯(GAS) 적용
 			UAbilitySystemComponent* MonsterASC = SpawnedMonster->GetAbilitySystemComponent();
 			if (MonsterASC)
 			{
@@ -237,7 +254,7 @@ void AMonsterSpawner::SpawnCounterAttackMonster(TSubclassOf<AMonsterBaseCharacte
 
 					if (SpecHandle.IsValid())
 					{
-						// [수정] TargetWaveIndex 기준 스탯 계산
+						// 체력/방어력 계산
 						float BaseHP = MONSTER_BASE_HP;
 						float FinalHP = BaseHP + FMath::Max(0.f, (float)(TargetWaveIndex - 1) * 50.f);
 						SpecHandle.Data.Get()->SetSetByCallerMagnitude(FGameplayTag::RequestGameplayTag(FName("Data.Wave.BonusHP")), FinalHP);
@@ -254,9 +271,13 @@ void AMonsterSpawner::SpawnCounterAttackMonster(TSubclassOf<AMonsterBaseCharacte
 				}
 			}
 
-			// 로그 확인
-			RID_LOG(FColor::Red, TEXT("Spawner: Counter-Attack Monster Spawned! Class: %s (Wave: %d)"),
-				*GetNameSafe(MonsterClass), TargetWaveIndex);
+			// 성공 로그
+			RID_LOG(FColor::Green, TEXT("Counter Monster Spawned Success! (Wave: %d)"), TargetWaveIndex);
+		}
+		else
+		{
+			// 스폰 실패 로그 (만약 이 로그가 뜬다면 여전히 충돌이나 다른 이유가 있음)
+			RID_LOG(FColor::Red, TEXT("Counter Monster Spawn FAILED! (SpawnActor returned null)"));
 		}
 	}
 }

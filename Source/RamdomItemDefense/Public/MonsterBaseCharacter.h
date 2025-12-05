@@ -78,8 +78,7 @@ public:
 	void SetSpawnWaveIndex(int32 InWaveIndex) { SpawnWaveIndex = InWaveIndex; }
 	int32 GetSpawnWaveIndex() const { return SpawnWaveIndex; }
 
-	UFUNCTION(NetMulticast, Reliable)
-	void Multicast_SetStatusEffectState(FGameplayTag StatusTag, bool bIsActive, UNiagaraSystem* EffectTemplate);
+	void SetStatusEffectState(FGameplayTag StatusTag, bool bIsActive, UNiagaraSystem* EffectTemplate);
 
 	/** 이 몬스터가 PVP 반격으로 생성된 몬스터인지 설정합니다. */
 	void SetIsCounterAttackMonster(bool bInValue) { bIsCounterAttackMonster = bInValue; }

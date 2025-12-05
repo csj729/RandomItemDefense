@@ -46,6 +46,24 @@ AMonsterBaseCharacter::AMonsterBaseCharacter()
 	SpawnWaveIndex = 1;
 
 	bIsCounterAttackMonster = false;
+
+	bUseControllerRotationYaw = false;
+	GetCharacterMovement()->bOrientRotationToMovement = true;
+
+	bReplicates = true;
+	SetReplicateMovement(true);
+
+	// [수정] True로 설정했던 것을 다시 False로 끕니다! (대역폭 폭발 방지)
+	bAlwaysRelevant = false;
+
+	// [대안] 대신 "네트워크 컬링 거리"를 크게 늘립니다. 
+	// 기본값은 약 15,000인데, 이를 22,500,000 (거리 4500의 제곱) 정도로 늘려줍니다.
+	// 맵 끝에서 끝까지 보일 정도로 충분히 크면 됩니다. (필요 시 더 늘리세요)
+	NetCullDistanceSquared = 4500000000.0f; // 예: 맵이 매우 크다면 더 큰 값 입력
+
+	// [유지] 중요하므로 업데이트 빈도는 높게 유지
+	NetUpdateFrequency = 100.0f;
+	MinNetUpdateFrequency = 33.0f;
 }
 
 // ... (GetLifetimeReplicatedProps, GetAbilitySystemComponent, PossessedBy, BeginPlay, HandleHealthChanged, HandleMoveSpeedChanged, SetSpawner 함수는 모두 동일) ...
@@ -75,21 +93,6 @@ void AMonsterBaseCharacter::PossessedBy(AController* NewController)
 	{
 		AbilitySystemComponent->InitAbilityActorInfo(this, this);
 
-		AbilitySystemComponent->RegisterGameplayTagEvent(
-			FGameplayTag::RequestGameplayTag(FName("State.Stun")),
-			EGameplayTagEventType::NewOrRemoved
-		).AddUObject(this, &AMonsterBaseCharacter::OnStunTagChanged);
-
-		AbilitySystemComponent->RegisterGameplayTagEvent(
-			FGameplayTag::RequestGameplayTag(FName("State.Slow")),
-			EGameplayTagEventType::NewOrRemoved
-		).AddUObject(this, &AMonsterBaseCharacter::OnSlowTagChanged);
-
-		AbilitySystemComponent->RegisterGameplayTagEvent(
-			FGameplayTag::RequestGameplayTag(FName("State.ArmorShred")),
-			EGameplayTagEventType::NewOrRemoved
-		).AddUObject(this, &AMonsterBaseCharacter::OnArmorShredTagChanged);
-
 		if (AttributeSet)
 		{
 			AbilitySystemComponent->GetGameplayAttributeValueChangeDelegate(AttributeSet->GetHealthAttribute()).AddUObject(this, &AMonsterBaseCharacter::HandleHealthChanged);
@@ -116,10 +119,49 @@ void AMonsterBaseCharacter::BeginPlay()
 	if (AbilitySystemComponent)
 	{
 		AbilitySystemComponent->InitAbilityActorInfo(this, this);
+
+		AbilitySystemComponent->RegisterGameplayTagEvent(
+			FGameplayTag::RequestGameplayTag(FName("State.Stun")),
+			EGameplayTagEventType::NewOrRemoved
+		).AddUObject(this, &AMonsterBaseCharacter::OnStunTagChanged);
+
+		AbilitySystemComponent->RegisterGameplayTagEvent(
+			FGameplayTag::RequestGameplayTag(FName("State.Slow")),
+			EGameplayTagEventType::NewOrRemoved
+		).AddUObject(this, &AMonsterBaseCharacter::OnSlowTagChanged);
+
+		AbilitySystemComponent->RegisterGameplayTagEvent(
+			FGameplayTag::RequestGameplayTag(FName("State.ArmorShred")),
+			EGameplayTagEventType::NewOrRemoved
+		).AddUObject(this, &AMonsterBaseCharacter::OnArmorShredTagChanged);
 	}
+
+	FGameplayTag SlowTag = FGameplayTag::RequestGameplayTag(FName("State.Slow"));
+	if (AbilitySystemComponent->GetTagCount(SlowTag) > 0)
+	{
+		OnSlowTagChanged(SlowTag, 1);
+	}
+
+	FGameplayTag ArmorTag = FGameplayTag::RequestGameplayTag(FName("State.ArmorShred"));
+	if (AbilitySystemComponent->GetTagCount(ArmorTag) > 0)
+	{
+		OnArmorShredTagChanged(ArmorTag, 1);
+	}
+
 	if (!HasAuthority() && CurrentWaveMaterial)
 	{
 		OnRep_WaveMaterial();
+	}
+
+	if (HasAuthority())
+	{
+		// 서버가 생성함
+		// RID_LOG(FColor::Red, TEXT("[Server] Monster Spawned at: %s"), *GetActorLocation().ToString());
+	}
+	else
+	{
+		// 클라이언트가 서버로부터 몬스터 정보를 받음! (이 로그가 안 뜨면 컬링/네트워크 문제)
+		RID_LOG(FColor::Green, TEXT("[Client] Monster Replicated at: %s"), *GetActorLocation().ToString());
 	}
 }
 
@@ -192,8 +234,8 @@ void AMonsterBaseCharacter::Die(AActor* Killer)
 	if (HasAuthority())
 	{
 		// 파티클 템플릿 인자는 제거 시 필요 없으므로 nullptr 전달
-		Multicast_SetStatusEffectState(FGameplayTag::RequestGameplayTag(FName("State.Slow")), false, nullptr);
-		Multicast_SetStatusEffectState(FGameplayTag::RequestGameplayTag(FName("State.ArmorShred")), false, nullptr);
+		SetStatusEffectState(FGameplayTag::RequestGameplayTag(FName("State.Slow")), false, nullptr);
+		SetStatusEffectState(FGameplayTag::RequestGameplayTag(FName("State.ArmorShred")), false, nullptr);
 	}
 
 	// 캡슐 콜리전 비활성화 (트레이스, 물리 모두)
@@ -370,7 +412,7 @@ void AMonsterBaseCharacter::OnCritDamageOccurred(AActor* TargetActor, float Crit
 }
 
 // 1. 멀티캐스트 함수 구현 (나이아가라 버전)
-void AMonsterBaseCharacter::Multicast_SetStatusEffectState_Implementation(FGameplayTag StatusTag, bool bIsActive, UNiagaraSystem* EffectTemplate)
+void AMonsterBaseCharacter::SetStatusEffectState(FGameplayTag StatusTag, bool bIsActive, UNiagaraSystem* EffectTemplate)
 {
 	if (bIsActive)
 	{
@@ -420,7 +462,7 @@ void AMonsterBaseCharacter::OnSlowTagChanged(const FGameplayTag Tag, int32 NewCo
 	// [서버] 멀티캐스트 호출
 	if (HasAuthority())
 	{
-		Multicast_SetStatusEffectState(Tag, bIsSlowed, SlowEffectTemplate);
+		SetStatusEffectState(Tag, bIsSlowed, SlowEffectTemplate);
 	}
 
 	OnSlowStateChanged(bIsSlowed);
@@ -436,7 +478,7 @@ void AMonsterBaseCharacter::OnArmorShredTagChanged(const FGameplayTag Tag, int32
 	// [서버] 멀티캐스트 호출
 	if (HasAuthority())
 	{
-		Multicast_SetStatusEffectState(Tag, bIsShredded, ArmorShredEffectTemplate);
+		SetStatusEffectState(Tag, bIsShredded, ArmorShredEffectTemplate);
 	}
 
 	OnArmorShredStateChanged(bIsShredded);

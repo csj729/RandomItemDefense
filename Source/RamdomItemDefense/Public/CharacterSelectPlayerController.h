@@ -4,10 +4,13 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
+#include "InputActionValue.h"
 #include "CharacterSelectPlayerController.generated.h"
 
 class ASelectableCharacter;
 class ACameraActor;
+class UInputMappingContext;
+class UInputAction;
 
 /**
  * 캐릭터 선택 레벨(로비) 전용 플레이어 컨트롤러입니다.
@@ -24,6 +27,7 @@ public:
 protected:
 	virtual void Tick(float DeltaTime) override;
 	virtual void BeginPlay() override;
+	virtual void SetupInputComponent() override;
 
 	// [추가] 씬에 배치하거나 스폰할 실제 카메라 액터
 	UPROPERTY()
@@ -39,6 +43,8 @@ protected:
 
 	FVector InitialCameraLocation;
 	FRotator InitialCameraRotation;
+
+	void OnBackToMainMenu(const FInputActionValue& Value);
 
 public:
 	/** * (에디터 설정용) 생성할 캐릭터 선택 위젯 클래스 (WBP_CharacterSelect)
@@ -59,4 +65,10 @@ public:
 	void SetTargetCharacter(ASelectableCharacter* NewTarget);
 
 	void ResetView();
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input")
+	TObjectPtr<UInputMappingContext> CharacterSelectMappingContext;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input")
+	TObjectPtr<UInputAction> BackToMenuAction;
 };
