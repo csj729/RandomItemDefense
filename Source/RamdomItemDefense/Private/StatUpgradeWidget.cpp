@@ -2,29 +2,25 @@
 #include "Components/TextBlock.h"
 #include "Components/Button.h"
 #include "MyPlayerState.h"
-#include "MyAttributeSet.h" // Attribute 정의 포함
-#include "AbilitySystemComponent.h" // ASC 사용
-#include "RamdomItemDefenseCharacter.h" // 캐릭터 클래스 (ASC 가져오기 위함)
+#include "MyAttributeSet.h"
+#include "AbilitySystemComponent.h"
+#include "RamdomItemDefenseCharacter.h" 
 #include "GameplayEffectTypes.h"
-#include "Engine/Engine.h" // GEngine 디버그 메시지 (선택 사항)
-#include "RamdomItemDefense.h" // RID_LOG 매크로용 (디버깅 없으면 불필요)
+#include "Engine/Engine.h"
+#include "RamdomItemDefense.h"
+#include "MyGameState.h" 
 
-// --- [ ★★★ 코드 추가 ★★★ ] ---
-/** 위젯 생성 시 '단 한 번' 호출됩니다. (버튼 바인딩용) */
 void UStatUpgradeWidget::NativeOnInitialized()
 {
 	Super::NativeOnInitialized();
 
-	// 버튼 클릭 이벤트는 위젯이 생성될 때 단 한 번만 바인딩합니다.
 	if (AtkDmg_UpgradeButton) AtkDmg_UpgradeButton->OnClicked.AddDynamic(this, &UStatUpgradeWidget::HandleUpgradeAtkDmg);
 	if (AtkSpd_UpgradeButton) AtkSpd_UpgradeButton->OnClicked.AddDynamic(this, &UStatUpgradeWidget::HandleUpgradeAtkSpd);
 	if (CritDmg_UpgradeButton) CritDmg_UpgradeButton->OnClicked.AddDynamic(this, &UStatUpgradeWidget::HandleUpgradeCritDmg);
 	if (ArmorReduction_UpgradeButton) ArmorReduction_UpgradeButton->OnClicked.AddDynamic(this, &UStatUpgradeWidget::HandleUpgradeArmorReduction);
 	if (SkillChance_UpgradeButton) SkillChance_UpgradeButton->OnClicked.AddDynamic(this, &UStatUpgradeWidget::HandleUpgradeSkillChance);
 }
-// --- [ 코드 추가 끝 ] ---
 
-/** 위젯이 뷰포트에 '추가될 때마다' 호출됩니다. (델리게이트 바인딩용) */
 void UStatUpgradeWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
@@ -125,6 +121,9 @@ void UStatUpgradeWidget::UpdateStatLineUI(EItemStatType StatType)
 {
 	if (!MyPlayerState) return;
 
+	AMyGameState* GameState = GetWorld()->GetGameState<AMyGameState>();
+	if (!GameState) return; // 아직 GameState 동기화 전이면 중단
+
 	int32 CurrentLevel = MyPlayerState->GetStatLevel(StatType);
 	int32 CurrentGold = MyPlayerState->GetGold();
 
@@ -133,9 +132,9 @@ void UStatUpgradeWidget::UpdateStatLineUI(EItemStatType StatType)
 	const bool bIsSpecialStat = (StatType == EItemStatType::ArmorReduction || StatType == EItemStatType::SkillActivationChance);
 
 	// --- [코드 수정] 매직 넘버를 매크로로 대체 ---
-	int32 MaxLevel = bIsBasicStat ? MAX_NORMAL_STAT_LEVEL : MAX_SPECIAL_STAT_LEVEL;
-	int32 BaseCost = BASE_LEVELUP_COST;
-	int32 CostIncreaseFactor = INCREASING_COST_PER_LEVEL;
+	int32 MaxLevel = bIsBasicStat ? GameState->MaxNormalStatLevel : GameState->MaxSpecialStatLevel;
+	int32 BaseCost = GameState->BaseLevelUpCost;
+	int32 CostIncreaseFactor = GameState->IncreasingCostPerLevel;
 	// ---------------------------------------------
 
 	float SuccessChance = 1.0f;
@@ -151,13 +150,14 @@ void UStatUpgradeWidget::UpdateStatLineUI(EItemStatType StatType)
 	// 특수 스탯 성공 확률 계산 (표시용)
 	if (bIsSpecialStat)
 	{
-		// --- [코드 수정] 매직 넘버를 매크로로 대체 ---
-		switch (CurrentLevel)
+		// --- [수정] 매크로 대신 GameState 배열 사용 ---
+		if (GameState->SpecialStatUpgradeChances.IsValidIndex(CurrentLevel))
 		{
-		case 0: SuccessChance = SPECIAL_STAT_UPGRADE_CHANCE_LVL0; break; // 50%
-		case 1: SuccessChance = SPECIAL_STAT_UPGRADE_CHANCE_LVL1; break; // 40%
-		case 2: SuccessChance = SPECIAL_STAT_UPGRADE_CHANCE_LVL2; break; // 30%
-		default: SuccessChance = 0.0f; break; // 최대 레벨 도달
+			SuccessChance = GameState->SpecialStatUpgradeChances[CurrentLevel];
+		}
+		else
+		{
+			SuccessChance = 0.0f; // 범위 밖(최대 레벨 등)
 		}
 		// ---------------------------------------------
 	}

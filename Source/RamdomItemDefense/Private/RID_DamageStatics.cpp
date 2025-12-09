@@ -4,10 +4,10 @@
 #include "AbilitySystemComponent.h"
 #include "MyAttributeSet.h" 
 #include "RamdomItemDefense.h"
-#include "GameFramework/Actor.h" 
-// 캐릭터의 GetAttributeSet()에 접근하기 위해 2개의 헤더 추가
+#include "GameFramework/Actor.h"
 #include "AbilitySystemInterface.h"
 #include "RamdomItemDefenseCharacter.h" 
+#include "RamdomItemDefensePlayerController.h"
 
 
 // Static 델리게이트 변수 정의
@@ -89,33 +89,40 @@ bool URID_DamageStatics::CheckForCrit(UAbilitySystemComponent* SourceASC, bool b
 /** (단일 대상용) 치명타 계산/적용/방송 */
 float URID_DamageStatics::ApplyCritDamage(float BaseDamage, UAbilitySystemComponent* SourceASC, AActor* TargetActor, bool bIsSkillAttack)
 {
-	if (!SourceASC || BaseDamage <= 0.f)
-	{
-		return BaseDamage;
-	}
+	if (!SourceASC || BaseDamage <= 0.f) return BaseDamage;
 
-	// 굴림과 계산을 분리된 함수로 수행
 	if (CheckForCrit(SourceASC, bIsSkillAttack))
 	{
-		// --- 치명타 성공 ---
-		const float TotalCritMultiplier = GetCritMultiplier(SourceASC); // 수정된 함수 호출
+		const float TotalCritMultiplier = GetCritMultiplier(SourceASC);
 		const float CritDamageAmount = BaseDamage * TotalCritMultiplier;
 
-		// 델리게이트 방송 (TargetActor가 유효할 때만)
+		// [기존 코드] 델리게이트 방송
 		if (TargetActor)
 		{
 			OnCritDamageOccurred.Broadcast(TargetActor, CritDamageAmount);
 		}
 
-		// --- [ ★★★ 수정 ★★★ ] ---
-		// (치명타는 에러가 아니므로 Log로 변경)
+		// --- [ ★★★ 추가: UI 출력을 위해 컨트롤러 호출 ★★★ ] ---
+		// 1. 공격자(SourceASC의 주인)를 찾는다
+		AActor* Attacker = SourceASC->GetAvatarActor();
+		if (APawn* AttackerPawn = Cast<APawn>(Attacker))
+		{
+			// 2. 공격자의 컨트롤러를 가져온다
+			if (ARamdomItemDefensePlayerController* PC = Cast<ARamdomItemDefensePlayerController>(AttackerPawn->GetController()))
+			{
+				RID_LOG(FColor::Yellow, TEXT("ApplyCritDamage"));
+				// 3. 타겟의 위치(머리 위)를 구한다
+				FVector SpawnLoc = TargetActor ? TargetActor->GetActorLocation() + FVector(0, 0, 50.f) : FVector::ZeroVector;
+
+				// 4. 클라이언트 RPC 호출 (UI 띄워라!)
+				PC->Client_ShowDamageText(CritDamageAmount, SpawnLoc, true); // true = Critical
+			}
+		}
+		// -------------------------------------------------------
+
 		UE_LOG(LogRamdomItemDefense, Log, TEXT("CRITICAL HIT! (%.1f * %.2fx) -> %.1f"), BaseDamage, TotalCritMultiplier, CritDamageAmount);
-		// --- [ ★★★ 수정 끝 ★★★ ] ---
 		return CritDamageAmount;
 	}
-	else
-	{
-		// --- 치명타 실패 ---
-		return BaseDamage;
-	}
+
+	return BaseDamage;
 }

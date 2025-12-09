@@ -8,9 +8,12 @@
 #include "RamdomItemDefensePlayerController.h"
 #include "AbilitySystemComponent.h"
 #include "InventoryComponent.h"
-#include "RamdomItemDefense.h" // RID_LOG 매크로용
-#include "MyGameState.h"       // GetCurrentWave() 사용
-#include "Engine/World.h"      // GetWorld() 사용
+#include "RamdomItemDefense.h"
+#include "MyGameState.h"
+#include "Engine/World.h"
+#include "Kismet/GameplayStatics.h"
+#include "Sound/SoundBase.h"
+#include "RamdomItemDefenseGameMode.h"
 
 DEFINE_LOG_CATEGORY(LogRID_PlayerState);
 
@@ -284,12 +287,16 @@ void AMyPlayerState::Server_RequestStatUpgrade_Implementation(EItemStatType Stat
 }
 
 /** (서버 전용) 실제 강화 로직 */
-/** (서버 전용) 실제 강화 로직 */
 bool AMyPlayerState::TryUpgradeStat(EItemStatType StatToUpgrade)
 {
 	if (!HasAuthority()) return false;
 
-	// 강화 가능 스탯 확인 (변경 없음)
+	// [수정] GameState 가져오기 (강화 규칙 참조용)
+	// (GameMode 대신 GameState를 참조하여 클라이언트 UI와 동일한 값을 보장합니다)
+	AMyGameState* GameState = GetWorld()->GetGameState<AMyGameState>();
+	if (!GameState) return false;
+
+	// 강화 가능 스탯 확인 (기존 로직 유지)
 	const bool bIsGoldUpgradableBasicStat = (StatToUpgrade == EItemStatType::AttackDamage ||
 		StatToUpgrade == EItemStatType::AttackSpeed ||
 		StatToUpgrade == EItemStatType::CritDamage);
@@ -299,68 +306,58 @@ bool AMyPlayerState::TryUpgradeStat(EItemStatType StatToUpgrade)
 
 	if (!bIsGoldUpgradableBasicStat && !bIsGoldUpgradableSpecialStat)
 	{
-		//RID_LOG(FColor::Red, TEXT("TryUpgradeStat: %s cannot be upgraded with gold."), *UEnum::GetValueAsString(StatToUpgrade));
 		return false;
 	}
 
 	int32 CurrentLevel = GetStatLevel(StatToUpgrade);
 
-	// --- 강화 규칙 (변경 없음) ---
-	int32 MaxLevel = bIsGoldUpgradableBasicStat ? MAX_NORMAL_STAT_LEVEL : MAX_SPECIAL_STAT_LEVEL; // 특수 스탯 최대 3레벨
-	int32 BaseCost = BASE_LEVELUP_COST;
-	int32 CostIncreaseFactor = INCREASING_COST_PER_LEVEL;
-	// ---------------------------
+	// --- [수정] 매크로 대신 GameState의 변수 사용 ---
+	int32 MaxLevel = bIsGoldUpgradableBasicStat ? GameState->MaxNormalStatLevel : GameState->MaxSpecialStatLevel;
+	int32 BaseCost = GameState->BaseLevelUpCost;
+	int32 CostIncreaseFactor = GameState->IncreasingCostPerLevel;
+	// ---------------------------------------------
 
-	// 레벨 제한 확인 (변경 없음)
+	// 레벨 제한 확인
 	if (CurrentLevel >= MaxLevel)
 	{
-		//RID_LOG(FColor::Yellow, TEXT("TryUpgradeStat: Max level reached"));
 		return false;
 	}
 
-	// 비용 계산 (변경 없음)
+	// 비용 계산
 	int32 UpgradeCost = BaseCost + (CurrentLevel * CostIncreaseFactor);
 
-	// 골드 확인 및 소모 (변경 없음)
+	// 골드 확인 및 소모
 	if (!SpendGold(UpgradeCost))
 	{
-		//RID_LOG(FColor::Yellow, TEXT("TryUpgradeStat: Not enough gold"));
 		return false;
 	}
 
-	// --- [코드 수정] 성공 확률 계산 (새로운 규칙 적용) ---
+	// --- [수정] 성공 확률 계산 (GameState 배열 사용) ---
 	bool bUpgradeSuccess = true; // 기본 스탯은 항상 성공
-	float SuccessChance = 1.0f; // 성공 확률 기록용 변수
+	float SuccessChance = 1.0f;
 
 	if (bIsGoldUpgradableSpecialStat) // 특수 스탯일 경우 확률 적용
 	{
-		// CurrentLevel 기준으로 다음 레벨로 갈 확률 설정
-		switch (CurrentLevel)
+		// GameState의 배열 범위 확인 후 확률 가져오기
+		if (GameState->SpecialStatUpgradeChances.IsValidIndex(CurrentLevel))
 		{
-			// --- [코드 수정] 매직 넘버를 매크로로 대체 ---
-		case 0: // 0 -> 1 레벨 강화 시도
-			SuccessChance = SPECIAL_STAT_UPGRADE_CHANCE_LVL0; // 50%
-			break;
-		case 1: // 1 -> 2 레벨 강화 시도
-			SuccessChance = SPECIAL_STAT_UPGRADE_CHANCE_LVL1; // 40%
-			break;
-		case 2: // 2 -> 3 레벨 강화 시도
-			SuccessChance = SPECIAL_STAT_UPGRADE_CHANCE_LVL2; // 30%
-			break;
-			// ------------------------------------------
-		default: // 이미 최대 레벨이거나 예외 상황 (이론상 여기에 도달하면 안 됨)
-			SuccessChance = 0.0f;
-			break;
+			SuccessChance = GameState->SpecialStatUpgradeChances[CurrentLevel];
 		}
-		// 0.0 ~ 1.0 사이 난수 생성하여 성공 여부 판정
+		else
+		{
+			// 설정된 범위 밖이면 실패 처리 (혹은 0%)
+			SuccessChance = 0.0f;
+		}
+
+		// 난수 생성하여 성공 여부 판정
 		bUpgradeSuccess = (FMath::FRand() < SuccessChance);
 	}
 	// ----------------------------------------------------
 
-	// 강화 성공 시 (변경 없음)
+	// 강화 성공 시
 	if (bUpgradeSuccess)
 	{
-		// 1. 레벨 증가 및 변수 업데이트 (switch 사용)
+		// 1. 레벨 증가 및 변수 업데이트
 		int32 NewLevel = CurrentLevel + 1;
 		bool bLevelUpdated = false;
 		switch (StatToUpgrade)
@@ -375,7 +372,7 @@ bool AMyPlayerState::TryUpgradeStat(EItemStatType StatToUpgrade)
 		// 레벨 업데이트 성공 시 서버 UI 즉시 업데이트 및 클라이언트 복제 트리거
 		if (bLevelUpdated)
 		{
-			// 변경된 변수의 OnRep 함수 직접 호출 (변경 없음)
+			// 변경된 변수의 OnRep 함수 직접 호출
 			switch (StatToUpgrade)
 			{
 			case EItemStatType::AttackDamage: OnRep_AttackDamageLevel(); break;
@@ -385,15 +382,11 @@ bool AMyPlayerState::TryUpgradeStat(EItemStatType StatToUpgrade)
 			case EItemStatType::SkillActivationChance: OnRep_SkillActivationChanceLevel(); break;
 			}
 
-			// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
-			FString StatName = UEnum::GetValueAsString(StatToUpgrade);
-			// 특수 스탯 성공 시 확률도 함께 표시 (선택 사항)
-			FString ChanceString = bIsGoldUpgradableSpecialStat ? FString::Printf(TEXT(" (Chance: %.0f%%)"), SuccessChance * 100) : TEXT("");
-			//RID_LOG(FColor::Green, TEXT("Upgrade Success: %s to Level %d (Cost: %d)%s"), *StatName, NewLevel, UpgradeCost, *ChanceString);
-			// -----------------------------------------
+			// 로그 출력
+			// RID_LOG(FColor::Green, TEXT("Upgrade Success: ..."));
 		}
 
-		// 2. 실제 스탯 적용 요청 (캐릭터 ASC에) (변경 없음)
+		// 2. 실제 스탯 적용 요청 (캐릭터 ASC에)
 		ARamdomItemDefenseCharacter* Character = GetPawn<ARamdomItemDefenseCharacter>();
 		if (Character)
 		{
@@ -401,12 +394,11 @@ bool AMyPlayerState::TryUpgradeStat(EItemStatType StatToUpgrade)
 		}
 		return true;
 	}
-	else // 강화 실패 시 (특수 스탯 - 로그 변경 없음)
+	else // 강화 실패 시
 	{
-		// --- [코드 수정] GEngine을 RID_LOG로 대체 ---
+		// 로그 출력
 		RID_LOG(FColor::Orange, TEXT("Upgrade Failed: %s (Level %d -> %d, Cost: %d, Chance: %.0f%%)"),
 			*UEnum::GetValueAsString(StatToUpgrade), CurrentLevel, CurrentLevel + 1, UpgradeCost, SuccessChance * 100);
-		// -----------------------------------------
 		return false;
 	}
 }
@@ -416,13 +408,17 @@ bool AMyPlayerState::TryUpgradeStat(EItemStatType StatToUpgrade)
  */
 void AMyPlayerState::AddUltimateCharge(int32 Amount)
 {
-	if (HasAuthority() && UltimateCharge < MAX_ULTIMATE_CHARGE)
+	if (HasAuthority())
 	{
-		// 최대치를 넘지 않도록 FMath::Min 사용
-		UltimateCharge = FMath::Min(UltimateCharge + Amount, MAX_ULTIMATE_CHARGE);
+		// 1. 현재 최대 충전량 가져오기
+		int32 CurrentMaxCharge = GetMaxUltimateCharge();
 
-		// 서버에서도 델리게이트 즉시 호출 (서버 UI 반영용)
-		OnRep_UltimateCharge();
+		// 2. 최대치를 넘지 않도록 로직 수정
+		if (UltimateCharge < CurrentMaxCharge)
+		{
+			UltimateCharge = FMath::Min(UltimateCharge + Amount, CurrentMaxCharge);
+			OnRep_UltimateCharge();
+		}
 	}
 }
 
@@ -443,13 +439,42 @@ void AMyPlayerState::ResetUltimateCharge()
  */
 void AMyPlayerState::OnRep_UltimateCharge()
 {
-	// UI(WBP_MainHUD)에 스택이 변경되었음을 알립니다.
+	// 1. UI 갱신 알림
 	OnUltimateChargeChangedDelegate.Broadcast(UltimateCharge);
+
+	int32 CurrentMaxCharge = GetMaxUltimateCharge();
+
+	// 2. 궁극기 게이지 가득 참?
+	if (UltimateCharge >= CurrentMaxCharge)
+	{
+		// 내(로컬) 컨트롤러인지 확인
+		APlayerController* PC = GetPlayerController();
+		if (PC && PC->IsLocalController())
+		{
+			// [핵심 변경] PlayerState의 소리가 아니라, '현재 캐릭터'의 소리를 재생
+			ARamdomItemDefenseCharacter* MyCharacter = GetPawn<ARamdomItemDefenseCharacter>();
+
+			if (MyCharacter && MyCharacter->UltimateReadySound)
+			{
+				UGameplayStatics::PlaySound2D(this, MyCharacter->UltimateReadySound);
+			}
+		}
+	}
 }
 
 int32 AMyPlayerState::GetMaxUltimateCharge() const
 {
-	return MAX_ULTIMATE_CHARGE;
+	// 1. 현재 조종 중인 캐릭터를 가져옴
+	const ARamdomItemDefenseCharacter* MyCharacter = GetPawn<ARamdomItemDefenseCharacter>();
+
+	// 2. 캐릭터가 유효하면 캐릭터의 설정값을 반환
+	if (MyCharacter)
+	{
+		return MyCharacter->GetMaxUltimateCharge();
+	}
+
+	// 3. 캐릭터가 없는 경우(로비 등) 기본값 반환 (안전장치)
+	return 100;
 }
 
 /** 버튼 액션 레벨 변경 시 UI 갱신용 RepNotify */

@@ -94,7 +94,8 @@ void UCommonItemChoiceWidget::PopulateChoices()
 	if (!InventoryComp.IsValid())
 	{
 		// 이 로그가 뜨면 바인딩 순서 문제임 (위의 수정으로 해결됨)
-		RID_LOG(FColor::Red, TEXT("CommonItemChoiceWidget: InventoryComp is invalid!"));
+		
+		(FColor::Red, TEXT("CommonItemChoiceWidget: InventoryComp is invalid!"));
 		return;
 	}
 

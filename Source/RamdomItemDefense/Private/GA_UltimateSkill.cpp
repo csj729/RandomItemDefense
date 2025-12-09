@@ -2,6 +2,7 @@
 #include "GA_UltimateSkill.h" 
 #include "RamdomItemDefense.h" 
 #include "RamdomItemDefenseCharacter.h"
+#include "Kismet/GameplayStatics.h"
 #include "MyPlayerState.h"
 
 UGA_UltimateSkill::UGA_UltimateSkill()
@@ -44,8 +45,6 @@ bool UGA_UltimateSkill::CanActivateAbility(const FGameplayAbilitySpecHandle Hand
 	return (PS->GetUltimateCharge() >= PS->GetMaxUltimateCharge());
 }
 
-
-// (★★★) ActivateAbility 함수 수정 (스택 확인 로직 제거)
 void UGA_UltimateSkill::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
 {
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
@@ -55,22 +54,32 @@ void UGA_UltimateSkill::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 		return;
 	}
 
-	// 0. 스택 리셋을 위해 PlayerState 가져오기
-	// (CanActivateAbility에서 이미 검사했지만, 스택 리셋을 위해 다시 가져옵니다)
+	// 0. 캐릭터 및 PlayerState 가져오기
 	AMyPlayerState* PS = nullptr;
-	if (ARamdomItemDefenseCharacter* OwnerCharacter = Cast<ARamdomItemDefenseCharacter>(ActorInfo->AvatarActor.Get())) {
+
+	// 캐릭터로 캐스팅
+	if (ARamdomItemDefenseCharacter* OwnerCharacter = Cast<ARamdomItemDefenseCharacter>(ActorInfo->AvatarActor.Get()))
+	{
+		// [추가] 1. 궁극기 시전 사운드 재생
+		// 캐릭터마다 설정된(전사, 궁수 등) 고유 소리를 재생합니다.
+		if (OwnerCharacter->UltimateActivateSound)
+		{
+			UGameplayStatics::PlaySoundAtLocation(this, OwnerCharacter->UltimateActivateSound, OwnerCharacter->GetActorLocation());
+		}
+
+		// PlayerState 가져오기
 		PS = OwnerCharacter->GetPlayerState<AMyPlayerState>();
 	}
 
+	// PlayerState가 없으면 종료
 	if (!PS) {
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
-	// 2. (C++ 역할 2) 스택 리셋
+
+	// 2. (C++ 역할 2) 스택 리셋 (코스트 소모)
 	PS->ResetUltimateCharge();
 
-	// 3. (C++ 역할 3) 몽타주 재생 -> [제거됨]
-	// 몽타주 재생 및 실제 로직은 이제 BP의 ActivateAbility에서 이어서 실행됩니다.
 }
 
 /** 몽타주가 어떤 이유로든 종료되었을 때 (파라미터 없음) */

@@ -86,6 +86,9 @@ public:
 	/** 이 몬스터가 PVP 반격 몬스터인지 여부를 반환합니다. */
 	bool IsCounterAttackMonster() const { return bIsCounterAttackMonster; }
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Stats")
+	float MaxHealth = 100.0f;
+
 protected:
 	virtual void BeginPlay() override;
 

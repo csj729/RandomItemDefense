@@ -111,6 +111,10 @@ public:
 	UFUNCTION(Client, Reliable)
 	void Client_OnShowButtonActionUI(float TimingWindow, EButtonActionKey KeyToPress);
 
+	// [추가] 클라이언트 화면에 데미지 텍스트를 띄우는 함수 (서버 -> 클라)
+	UFUNCTION(Client, Unreliable)
+	void Client_ShowDamageText(float DamageAmount, const FVector& Location, bool bIsCritical);
+
 	// [ ★★★ 추가 ★★★ ]
 	/** (Called by PlayerState) 서버로부터 받은 최종 결과를 HUD에 표시합니다. */
 	void OnButtonActionResult(bool bWasSuccess, int32 RewardIndex);
@@ -216,6 +220,10 @@ protected:
 	/** 생성된 게임오버 위젯 인스턴스 */
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "UI")
 	TObjectPtr<UUserWidget> GameOverInstance;
+
+	// [추가] 데미지 텍스트 위젯 클래스 (에디터 할당용)
+	UPROPERTY(EditDefaultsOnly, Category = "UI")
+	TSubclassOf<class UUserWidget> DamageTextWidgetClass;
 
 	/** (수정) Input handlers for ButtonAction actions. */
 	void OnButtonAction_Q();

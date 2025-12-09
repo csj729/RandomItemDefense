@@ -19,10 +19,12 @@
 #include "MainHUDWidget.h"
 #include "RoundChoiceWidget.h"
 #include "MyPlayerState.h"
+#include "Components/WidgetComponent.h"
 #include "Engine/LocalPlayer.h"
 #include "CommonItemChoiceWidget.h" // [코드 추가] 새 위젯 헤더 포함
 #include "AbilitySystemBlueprintLibrary.h" // [ ★★★ 코드 추가 ★★★ ]
 #include "GameplayTagContainer.h"
+#include "DamageTextWidget.h"
 
 
 DEFINE_LOG_CATEGORY(LogTemplateCharacter);
@@ -556,5 +558,33 @@ void ARamdomItemDefensePlayerController::Client_ShowDefeatUI_Implementation()
 		HideMainHUD();
 		DefeatWidgetInstance->AddToViewport(20);
 
+	}
+}
+
+void ARamdomItemDefensePlayerController::Client_ShowDamageText_Implementation(float DamageAmount, const FVector& Location, bool bIsCritical)
+{
+	// 1. 로컬 플레이어 체크 및 위젯 클래스 확인
+	if (!IsLocalPlayerController() || !DamageTextWidgetClass) return;
+
+	// 2. 위젯 생성
+	UDamageTextWidget* DamageWidget = CreateWidget<UDamageTextWidget>(this, DamageTextWidgetClass);
+
+	if (DamageWidget)
+	{
+		// 3. [수정] 무조건 크리티컬 포맷("123!")으로 텍스트 가공
+		int32 IntDamage = FMath::RoundToInt(DamageAmount);
+		FString StringDamage = FString::FromInt(IntDamage) + TEXT("!"); // 항상 '!' 추가
+
+		// 4. 위젯에 텍스트 설정 (SetData 없이 직접 호출)
+		DamageWidget->SetDamageText(FText::FromString(StringDamage));
+
+		// 5. 위치 설정 및 출력
+		FVector2D ScreenPosition;
+		if (ProjectWorldLocationToScreen(Location, ScreenPosition))
+		{
+			DamageWidget->SetPositionInViewport(ScreenPosition);
+			DamageWidget->AddToViewport();
+			DamageWidget->PlayRiseAndFade();
+		}
 	}
 }

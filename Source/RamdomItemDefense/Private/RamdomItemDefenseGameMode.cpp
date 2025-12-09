@@ -25,7 +25,7 @@ ARamdomItemDefenseGameMode::ARamdomItemDefenseGameMode()
 
 	MonstersPerWave = 40;
 	StageTimeLimit = 60.0f;
-	GameoverMonsterNum = 60;
+	GameoverMonsterNum = 80;
 	BossStageTimeLimit = 120.0f;
 }
 
@@ -60,7 +60,7 @@ void ARamdomItemDefenseGameMode::BeginPlay()
 	GetWorld()->GetTimerManager().SetTimer(GameOverCheckTimerHandle, this, &ARamdomItemDefenseGameMode::CheckGameOver, 0.5f, true);
 }
 
-void ARamdomItemDefenseGameMode::OnPostLogin(AController* NewPlayer)
+void ARamdomItemDefenseGameMode::OnPostLogin(AController* NewPlayer)	
 {
 	RID_LOG(FColor::Green, TEXT("PostLogin"));
 	URIDGameInstance* RIDGI = Cast<URIDGameInstance>(GetGameInstance());
@@ -75,6 +75,8 @@ void ARamdomItemDefenseGameMode::OnPostLogin(AController* NewPlayer)
 			UE_LOG(LogTemp, Warning, TEXT("Player Name Updated to: %s"), *RIDGI->PlayerName);
 		}
 	}
+
+	AssignSpawnerToPlayer(NewPlayer);
 
 	// 4. [스폰 실행] 이제 부모 로직을 호출합니다. (내부에서 ChoosePlayerStart가 실행됨)
 	Super::OnPostLogin(NewPlayer);
@@ -117,6 +119,8 @@ void ARamdomItemDefenseGameMode::CheckPlayerCountAndStart()
 		AMyGameState* MyGameState = GetGameState<AMyGameState>();
 		if (MyGameState)
 		{
+			MyGameState->MaxMonsterLimit = GameoverMonsterNum;
+
 			// 현재 시간 + 3초 뒤에 첫 웨이브가 시작되도록 설정
 			MyGameState->WaveEndTime = GetWorld()->GetTimeSeconds() + 3.0f;
 			MyGameState->OnRep_WaveEndTime(); // 클라이언트 UI 업데이트
@@ -487,12 +491,70 @@ UClass* ARamdomItemDefenseGameMode::GetDefaultPawnClassForController_Implementat
 
 void ARamdomItemDefenseGameMode::HandleSeamlessTravelPlayer(AController*& C)
 {
-	// 1. 부모 로직 실행 (필수: PlayerState 복사 등 기본 처리)
 	Super::HandleSeamlessTravelPlayer(C);
 
-	// 2. 로그 확인
 	RID_LOG(FColor::Cyan, TEXT("HandleSeamlessTravelPlayer: Player '%s' arrived via Seamless Travel."), *C->GetName());
 
-	// 3. [핵심] 여기서도 인원수를 체크하고 게임을 시작해야 합니다!
+	// [추가] 심리스 여행으로 넘어온 플레이어에게도 스포너 재할당 시도
+	AssignSpawnerToPlayer(C);
+
 	CheckPlayerCountAndStart();
+}
+
+// [신규 구현] 스포너 할당 함수
+void ARamdomItemDefenseGameMode::AssignSpawnerToPlayer(AController* NewPlayer)
+{
+	AMyPlayerState* PS = NewPlayer->GetPlayerState<AMyPlayerState>();
+	if (!PS) return;
+
+	// 이미 스포너가 있다면 패스 (중복 할당 방지)
+	if (PS->MySpawner) return;
+
+	// 태그 결정 (Host = Player1, Client = Player2)
+	// IsLocalPlayerController(): 서버 입장에서 로컬이면 호스트, 아니면 접속한 클라이언트
+	FName TargetSpawnerTag = FName("Player1");
+	if (!NewPlayer->IsLocalPlayerController())
+	{
+		TargetSpawnerTag = FName("Player2");
+	}
+
+	// 월드에서 해당 태그를 가진 스포너 찾기
+	TArray<AActor*> FoundActors;
+	UGameplayStatics::GetAllActorsOfClassWithTag(GetWorld(), AMonsterSpawner::StaticClass(), TargetSpawnerTag, FoundActors);
+
+	if (FoundActors.Num() > 0)
+	{
+		AMonsterSpawner* FoundSpawner = Cast<AMonsterSpawner>(FoundActors[0]);
+		if (FoundSpawner)
+		{
+			// 1. PlayerState에 할당
+			PS->MySpawner = FoundSpawner;
+
+			// 2. 소유권 설정 (Replication을 위해 매우 중요!)
+			FoundSpawner->SetOwner(NewPlayer);
+
+			// 3. GameMode의 배열(MonsterSpawners) 관리
+			int32 Index = (TargetSpawnerTag == "Player1") ? 0 : 1;
+
+			// 배열 크기가 작다면 늘려줍니다.
+			if (MonsterSpawners.Num() <= Index)
+			{
+				MonsterSpawners.SetNum(2);
+			}
+
+			if (MonsterSpawners.IsValidIndex(Index))
+			{
+				MonsterSpawners[Index] = FoundSpawner;
+			}
+
+			// 4. 델리게이트 호출 (서버측 로직 발동용)
+			PS->OnSpawnerAssignedDelegate.Broadcast(0);
+
+			UE_LOG(LogTemp, Log, TEXT("AssignSpawnerToPlayer: Assigned %s to %s"), *TargetSpawnerTag.ToString(), *NewPlayer->GetName());
+		}
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("AssignSpawnerToPlayer: Failed to find Spawner with tag %s"), *TargetSpawnerTag.ToString());
+	}
 }

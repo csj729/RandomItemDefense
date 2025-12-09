@@ -66,8 +66,6 @@ AMonsterBaseCharacter::AMonsterBaseCharacter()
 	MinNetUpdateFrequency = 33.0f;
 }
 
-// ... (GetLifetimeReplicatedProps, GetAbilitySystemComponent, PossessedBy, BeginPlay, HandleHealthChanged, HandleMoveSpeedChanged, SetSpawner 함수는 모두 동일) ...
-
 void AMonsterBaseCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
@@ -161,7 +159,7 @@ void AMonsterBaseCharacter::BeginPlay()
 	else
 	{
 		// 클라이언트가 서버로부터 몬스터 정보를 받음! (이 로그가 안 뜨면 컬링/네트워크 문제)
-		RID_LOG(FColor::Green, TEXT("[Client] Monster Replicated at: %s"), *GetActorLocation().ToString());
+		//RID_LOG(FColor::Green, TEXT("[Client] Monster Replicated at: %s"), *GetActorLocation().ToString());
 	}
 }
 

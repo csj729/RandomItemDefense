@@ -27,7 +27,11 @@ void ASelectableCharacter::BeginPlay()
 void ASelectableCharacter::NotifyActorBeginCursorOver()
 {
 	Super::NotifyActorBeginCursorOver();
-
+	
+	if (bIsSelected)
+	{
+		return;
+	}
 	// [하이라이트 기능] CustomDepth를 켜서 외곽선(PostProcess) 효과를 받게 함
 	if (Mesh)
 	{
@@ -53,9 +57,11 @@ void ASelectableCharacter::NotifyActorOnClicked(FKey ButtonPressed)
 
 	APlayerController* PC = UGameplayStatics::GetPlayerController(GetWorld(), 0);
 	ACharacterSelectPlayerController* SelectPC = Cast<ACharacterSelectPlayerController>(PC);
+	APlayerState* PS = UGameplayStatics::GetPlayerState(GetWorld(), 0);
+	AMyPlayerState* SelectPS = Cast<AMyPlayerState>(PS);
 
 	// --- [Case 1] 이미 선택된 나를 '다시' 클릭함 -> 선택 해제 (초기화) ---
-	if (bIsSelected)
+	if (bIsSelected && !SelectPS->IsReady())
 	{
 		// 1. 카메라 줌 아웃 (원래 위치로)
 		if (SelectPC) SelectPC->ResetView();
@@ -95,8 +101,7 @@ void ASelectableCharacter::NotifyActorOnClicked(FKey ButtonPressed)
 
 			if (Char->Mesh)
 			{
-				Char->Mesh->SetRenderCustomDepth(true);
-				Char->Mesh->SetCustomDepthStencilValue(2);
+				Char->Mesh->SetRenderCustomDepth(false);
 			}
 			Char->PlaySelectionAnimation();
 		}

@@ -69,6 +69,18 @@ public:
 	UFUNCTION(NetMulticast, Reliable)
 	void Multicast_RemoveBuffEffect(FGameplayTag BuffTag);
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sound")
+	TObjectPtr<class USoundBase> UltimateReadySound;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sound")
+	TObjectPtr<class USoundBase> UltimateActivateSound;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Ultimate")
+	int32 MaxUltimateCharge = 100;
+
+	UFUNCTION(BlueprintPure, Category = "Ultimate")
+	int32 GetMaxUltimateCharge() const { return MaxUltimateCharge; }
+
 protected:
 	virtual void BeginPlay() override;
 

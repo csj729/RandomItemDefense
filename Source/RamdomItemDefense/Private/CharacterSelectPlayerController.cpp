@@ -19,6 +19,8 @@ ACharacterSelectPlayerController::ACharacterSelectPlayerController()
 	bEnableClickEvents = true;
 	bEnableMouseOverEvents = true;
 	PrimaryActorTick.bCanEverTick = true;
+
+	bIsPlayerReady = false;
 }
 
 void ACharacterSelectPlayerController::BeginPlay()
@@ -123,18 +125,32 @@ void ACharacterSelectPlayerController::Tick(float DeltaTime)
 	}
 }
 
-// [추가] 구현
+void ACharacterSelectPlayerController::SetPlayerReady(bool bReady)
+{
+	bIsPlayerReady = bReady;
+
+	UE_LOG(LogTemp, Log, TEXT("Player Ready State Changed: %s"), bReady ? TEXT("READY") : TEXT("NOT READY"));
+}
+
 void ACharacterSelectPlayerController::ResetView()
 {
-	CurrentTarget = nullptr; // 타겟을 비워서 Tick에서 초기 위치로 돌아가게 함
+	if (bIsPlayerReady)
+	{
+		return;
+	}
 
+	CurrentTarget = nullptr;
 	ToggleCharacterInfo(false);
 }
 
 void ACharacterSelectPlayerController::SetTargetCharacter(ASelectableCharacter* NewTarget)
 {
-	CurrentTarget = NewTarget;
+	if (bIsPlayerReady)
+	{
+		return;
+	}
 
+	CurrentTarget = NewTarget;
 	ToggleCharacterInfo(true);
 }
 

@@ -33,7 +33,26 @@ public:
     /** UI 바인딩용 델리게이트 */
     UPROPERTY(BlueprintAssignable, Category = "Events")
     FOnFloatChangedDelegate OnWaveEndTimeChangedDelegate;
-    // ------------------
+
+    UPROPERTY(Replicated, BlueprintReadOnly, Category = "Game Rule")
+    int32 MaxMonsterLimit;
+
+    // --- [추가] 스탯 강화 규칙 (UI 표시를 위해 GameState에서 관리) ---
+    UPROPERTY(Replicated, EditDefaultsOnly, BlueprintReadOnly, Category = "Game Rules|Upgrade")
+    int32 MaxNormalStatLevel = 100;
+
+    UPROPERTY(Replicated, EditDefaultsOnly, BlueprintReadOnly, Category = "Game Rules|Upgrade")
+    int32 MaxSpecialStatLevel = 3;
+
+    UPROPERTY(Replicated, EditDefaultsOnly, BlueprintReadOnly, Category = "Game Rules|Upgrade")
+    int32 BaseLevelUpCost = 100;
+
+    UPROPERTY(Replicated, EditDefaultsOnly, BlueprintReadOnly, Category = "Game Rules|Upgrade")
+    int32 IncreasingCostPerLevel = 50;
+
+    /** 특수 스탯 강화 성공 확률 (0레벨->1, 1->2, 2->3 ...) */
+    UPROPERTY(Replicated, EditDefaultsOnly, BlueprintReadOnly, Category = "Game Rules|Upgrade")
+    TArray<float> SpecialStatUpgradeChances = { 0.5f, 0.4f, 0.3f };
 
 protected:
     // 서버에서 클라이언트로 복제될 때 호출되는 함수

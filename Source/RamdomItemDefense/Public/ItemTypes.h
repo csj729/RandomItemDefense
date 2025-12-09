@@ -8,20 +8,6 @@
 #include "Abilities/GameplayAbility.h"
 #include "ItemTypes.generated.h"
 
-#define GAMEOVER_MONSTER_NUM 60
-#define MAX_NORMAL_STAT_LEVEL 100
-#define MAX_SPECIAL_STAT_LEVEL 3
-#define BASE_LEVELUP_COST 100
-#define INCREASING_COST_PER_LEVEL 50
-
-#define MAX_ULTIMATE_CHARGE 300 // 궁극기 최대 스택
-
-#define SPECIAL_STAT_UPGRADE_CHANCE_LVL0 0.5f // 0 -> 1
-#define SPECIAL_STAT_UPGRADE_CHANCE_LVL1 0.4f // 1 -> 2
-#define SPECIAL_STAT_UPGRADE_CHANCE_LVL2 0.3f // 2 -> 3
-
-#define MONSTER_BASE_HP 100
-
 // 델리게이트 선언
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnIntChangedDelegate, int32, NewValue);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnFloatChangedDelegate, float, NewValue);

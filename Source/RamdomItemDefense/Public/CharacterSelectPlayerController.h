@@ -24,6 +24,14 @@ class RAMDOMITEMDEFENSE_API ACharacterSelectPlayerController : public APlayerCon
 public:
 	ACharacterSelectPlayerController();
 
+	// [추가] 준비 상태 설정 함수 (UI의 준비/취소 버튼에서 호출)
+	UFUNCTION(BlueprintCallable, Category = "Game")
+	void SetPlayerReady(bool bReady);
+
+	// [추가] 현재 준비 상태인지 확인하는 함수
+	UFUNCTION(BlueprintPure, Category = "Game")
+	bool GetIsPlayerReady() const { return bIsPlayerReady; }
+
 protected:
 	virtual void Tick(float DeltaTime) override;
 	virtual void BeginPlay() override;
@@ -45,6 +53,8 @@ protected:
 	FRotator InitialCameraRotation;
 
 	void OnBackToMainMenu(const FInputActionValue& Value);
+
+	bool bIsPlayerReady = false;
 
 public:
 	/** * (에디터 설정용) 생성할 캐릭터 선택 위젯 클래스 (WBP_CharacterSelect)

@@ -136,7 +136,7 @@ void AMonsterSpawner::SpawnMonster()
 							// (여기서는 안전하게 다시 가져오거나 위 변수를 활용)
 							int32 CurrentWave = SpawnedMonster->GetSpawnWaveIndex(); // 방금 설정했으므로 가져올 수 있음
 
-							float BaseHP = MONSTER_BASE_HP;
+							float BaseHP = SpawnedMonster->MaxHealth;
 							float FinalHP = BaseHP + FMath::Max(0.f, (float)(CurrentWave - 1) * 50.f);
 							SpecHandle.Data.Get()->SetSetByCallerMagnitude(FGameplayTag::RequestGameplayTag(FName("Data.Wave.BonusHP")), FinalHP);
 
@@ -248,7 +248,7 @@ void AMonsterSpawner::SpawnCounterAttackMonster(TSubclassOf<AMonsterBaseCharacte
 
 					if (SpecHandle.IsValid())
 					{
-						float BaseHP = MONSTER_BASE_HP;
+						float BaseHP = SpawnedMonster->MaxHealth;
 						float FinalHP = BaseHP + FMath::Max(0.f, (float)(TargetWaveIndex - 1) * 50.f);
 						SpecHandle.Data.Get()->SetSetByCallerMagnitude(FGameplayTag::RequestGameplayTag(FName("Data.Wave.BonusHP")), FinalHP);
 
@@ -287,7 +287,6 @@ void AMonsterSpawner::SpawnCounterAttackMonster(TSubclassOf<AMonsterBaseCharacte
 				}
 			}
 
-			RID_LOG(FColor::Green, TEXT("Counter Monster Spawned Success! (Wave: %d)"), TargetWaveIndex);
 		}
 		else
 		{

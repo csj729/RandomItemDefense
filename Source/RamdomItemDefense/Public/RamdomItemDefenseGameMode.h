@@ -30,15 +30,16 @@ public:
 protected:
 	virtual void Tick(float DeltaSeconds) override;
 	virtual void BeginPlay() override;
+	virtual void HandleSeamlessTravelPlayer(AController*& C) override;
 
 	/** 플레이어가 성공적으로 로그인했을 때 서버에서 호출됩니다. (PIE, Listen, Dedicated 모두) */
 	virtual void OnPostLogin(AController* NewPlayer) override;
 
-	virtual void HandleSeamlessTravelPlayer(AController*& C) override;
-
 	void CheckPlayerCountAndStart();
 
 	virtual void Logout(AController* Exiting) override;
+
+	void AssignSpawnerToPlayer(AController* NewPlayer);
 
 private:
 	void StartNextWave();

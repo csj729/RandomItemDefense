@@ -5,8 +5,9 @@
 #include "RamdomItemDefensePlayerController.h"
 #include "MonsterSpawner.h"
 #include "Kismet/GameplayStatics.h"
-#include "MyGameState.h"       // [헤더 추가] GameState 접근용
-#include "Components/TextBlock.h" // [헤더 추가] 텍스트 설정용
+#include "MyGameState.h"
+#include "Components/TextBlock.h"
+#include "RamdomItemDefenseGameMode.h"
 
 bool UMainHUDWidget::Initialize()
 {
@@ -49,6 +50,8 @@ void UMainHUDWidget::UpdatePVPMonsterCounts()
 	AMyGameState* GS = GetWorld()->GetGameState<AMyGameState>();
 	if (!GS) return;
 
+	int32 MaxLimit = (GS->MaxMonsterLimit > 0) ? GS->MaxMonsterLimit : 60;
+
 	// 2. 모든 플레이어 순회
 	for (APlayerState* PS : GS->PlayerArray)
 	{
@@ -58,9 +61,7 @@ void UMainHUDWidget::UpdatePVPMonsterCounts()
 		if (MyPS && MyPS->MySpawner)
 		{
 			int32 CurrentCount = MyPS->MySpawner->GetCurrentMonsterCount();
-			// GAMEOVER_MONSTER_NUM(60) 매크로 사용 (ItemTypes.h에 정의됨)
-			FString StatusText = FString::Printf(TEXT("%d / %d"), CurrentCount, GAMEOVER_MONSTER_NUM);
-
+			FString StatusText = FString::Printf(TEXT("%d / %d"), CurrentCount, MaxLimit);
 			// [★★★ 코드 추가: 플레이어 이름 가져오기 ★★★]
 			FString PlayerName = MyPS->GetPlayerName();
 
@@ -158,11 +159,22 @@ void UMainHUDWidget::HandleSpawnerAssigned(int32 Dummy)
 
 void UMainHUDWidget::HandleMonsterCountChanged(int32 NewCount)
 {
-	const int32 MaxCount = GAMEOVER_MONSTER_NUM;
+	int32 MaxCount = 80;
+	if (AMyGameState* GS = GetWorld()->GetGameState<AMyGameState>())
+	{
+		MaxCount = GS->MaxMonsterLimit;
+	}
 	OnMonsterCountChanged(NewCount, MaxCount);
 }
 
 void UMainHUDWidget::HandleUltimateChargeChanged(int32 NewValue)
 {
-	OnUltimateChargeChanged(NewValue, MAX_ULTIMATE_CHARGE);
+	int32 CurrentMax = 100;
+
+	if (MyPlayerState)
+	{
+		CurrentMax = MyPlayerState->GetMaxUltimateCharge();
+	}
+
+	OnUltimateChargeChanged(NewValue, CurrentMax);
 }
