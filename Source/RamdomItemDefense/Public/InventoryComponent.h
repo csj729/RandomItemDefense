@@ -132,6 +132,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Inventory")
 	UDataTable* GetRecipeDataTable() const { return RecipeDataTable; }
 
+	UPROPERTY(VisibleInstanceOnly, Category = "Inventory", ReplicatedUsing = OnRep_InventoryItems)
+	TArray<FName> InventoryItems;
+
 	UPROPERTY(BlueprintAssignable, Category = "Events")
 	FOnInventoryUpdatedDelegate OnInventoryUpdated;
 
@@ -154,9 +157,6 @@ private:
 
 	UPROPERTY()
 	TWeakObjectPtr<UAbilitySystemComponent> AbilitySystemComponent;
-
-	UPROPERTY(VisibleInstanceOnly, Category = "Inventory", ReplicatedUsing = OnRep_InventoryItems)
-	TArray<FName> InventoryItems;
 
 	UFUNCTION()
 	void OnRep_InventoryItems();

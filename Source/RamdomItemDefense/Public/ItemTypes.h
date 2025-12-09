@@ -73,6 +73,38 @@ struct FItemStatData
     float Value;
 };
 
+// 효과 타입을 정의 (필요에 따라 추가)
+UENUM(BlueprintType)
+enum class EOnHitEffectType : uint8
+{
+    None,
+    Slow,           // 이속 감소
+    Stun,           // 스턴
+    Damage          // 추가 데미지 (예: 10% 확률로 100 데미지)
+};
+
+// 타격 시 효과 구조체 (확률 + 수치)
+USTRUCT(BlueprintType)
+struct FItemOnHitEffect
+{
+    GENERATED_BODY()
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite)
+    EOnHitEffectType EffectType = EOnHitEffectType::None;
+
+    // 발동 확률 (0.0 ~ 1.0, 예: 0.15 = 15%)
+    UPROPERTY(EditAnywhere, BlueprintReadWrite)
+    float Chance = 0.0f;
+
+    // 적용 수치 (예: 슬로우 20% -> 0.2, 방깎 10 -> 10.0)
+    UPROPERTY(EditAnywhere, BlueprintReadWrite)
+    float Magnitude = 0.0f;
+
+    // 지속 시간 (0이면 즉시 적용)
+    UPROPERTY(EditAnywhere, BlueprintReadWrite)
+    float Duration = 3.0f;
+};
+
 // 아이템 데이터 구조체
 USTRUCT(BlueprintType)
 struct RAMDOMITEMDEFENSE_API FItemData : public FTableRowBase
@@ -100,6 +132,9 @@ struct RAMDOMITEMDEFENSE_API FItemData : public FTableRowBase
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Item Data")
     FText ItemDescription;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stats")
+    TArray<FItemOnHitEffect> OnHitEffects;
 };
 
 // 조합법 데이터 구조체

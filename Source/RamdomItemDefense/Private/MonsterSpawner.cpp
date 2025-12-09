@@ -116,62 +116,8 @@ void AMonsterSpawner::SpawnMonster()
 				// --- [기존 로직 유지] ---
 				CurrentMonsterCount++;
 				OnRep_CurrentMonsterCount(); // 서버 UI 즉시 업데이트
-
-				// ASC(Ability System Component) 초기화 및 스탯 적용
-				// (FinishSpawningActor 이후에 해야 안전합니다)
-				UAbilitySystemComponent* MonsterASC = SpawnedMonster->GetAbilitySystemComponent();
-				if (MonsterASC)
-				{
-					MonsterASC->InitAbilityActorInfo(SpawnedMonster, SpawnedMonster);
-
-					if (MonsterStatInitEffect)
-					{
-						FGameplayEffectContextHandle ContextHandle = MonsterASC->MakeEffectContext();
-						ContextHandle.AddSourceObject(this);
-						FGameplayEffectSpecHandle SpecHandle = MonsterASC->MakeOutgoingSpec(MonsterStatInitEffect, 1.0f, ContextHandle);
-
-						if (SpecHandle.IsValid())
-						{
-							// GameState를 다시 가져오거나 위에서 저장한 CurrentWave 사용
-							// (여기서는 안전하게 다시 가져오거나 위 변수를 활용)
-							int32 CurrentWave = SpawnedMonster->GetSpawnWaveIndex(); // 방금 설정했으므로 가져올 수 있음
-
-							float BaseHP = SpawnedMonster->MaxHealth;
-							float FinalHP = BaseHP + FMath::Max(0.f, (float)(CurrentWave - 1) * 50.f);
-							SpecHandle.Data.Get()->SetSetByCallerMagnitude(FGameplayTag::RequestGameplayTag(FName("Data.Wave.BonusHP")), FinalHP);
-
-							int FinalArmor = 0;
-							const int32 BossStage = CurrentWave / 10;
-							const float BaseArmor = BossStage * 20.0f;
-							const int32 WaveNumInBlock = (CurrentWave % 10);
-							FinalArmor = BaseArmor + WaveNumInBlock;
-							SpecHandle.Data.Get()->SetSetByCallerMagnitude(FGameplayTag::RequestGameplayTag(FName("Data.Wave.BonusArmor")), FinalArmor);
-
-							MonsterASC->ApplyGameplayEffectSpecToSelf(*SpecHandle.Data.Get());
-						}
-					}
-				}
-
-				// --- 머티리얼 적용 로직 ---
-				// (FinishSpawningActor 이후에 실행되어야 머티리얼이 정상 적용됨)
-				int32 CurrentWave = SpawnedMonster->GetSpawnWaveIndex();
-				const bool bIsBossWave = (CurrentWave > 0 && CurrentWave % 10 == 0);
-				if (!bIsBossWave)
-				{
-					const TArray<TObjectPtr<UMaterialInterface>>& WaveMaterials = SpawnedMonster->GetWaveMaterials();
-					if (WaveMaterials.Num() == 9)
-					{
-						int32 MaterialIndex = (CurrentWave % 10) - 1;
-						if (MaterialIndex >= 0 && MaterialIndex < WaveMaterials.Num())
-						{
-							UMaterialInterface* MaterialToApply = WaveMaterials[MaterialIndex];
-							if (MaterialToApply)
-							{
-								SpawnedMonster->SetWaveMaterial(MaterialToApply);
-							}
-						}
-					}
-				}
+				
+				ApplyMonsterStatsByWave(SpawnedMonster, SpawnedMonster->GetSpawnWaveIndex());
 			}
 
 			// 스폰 카운트 증가
@@ -235,62 +181,83 @@ void AMonsterSpawner::SpawnCounterAttackMonster(TSubclassOf<AMonsterBaseCharacte
 			CurrentMonsterCount++;
 			OnRep_CurrentMonsterCount();
 
-			// 4. 스탯(GAS) 적용
-			UAbilitySystemComponent* MonsterASC = SpawnedMonster->GetAbilitySystemComponent();
-			if (MonsterASC)
-			{
-				MonsterASC->InitAbilityActorInfo(SpawnedMonster, SpawnedMonster);
-				if (MonsterStatInitEffect)
-				{
-					FGameplayEffectContextHandle ContextHandle = MonsterASC->MakeEffectContext();
-					ContextHandle.AddSourceObject(this);
-					FGameplayEffectSpecHandle SpecHandle = MonsterASC->MakeOutgoingSpec(MonsterStatInitEffect, 1.0f, ContextHandle);
-
-					if (SpecHandle.IsValid())
-					{
-						float BaseHP = SpawnedMonster->MaxHealth;
-						float FinalHP = BaseHP + FMath::Max(0.f, (float)(TargetWaveIndex - 1) * 50.f);
-						SpecHandle.Data.Get()->SetSetByCallerMagnitude(FGameplayTag::RequestGameplayTag(FName("Data.Wave.BonusHP")), FinalHP);
-
-						int FinalArmor = 0;
-						const int32 BossStage = TargetWaveIndex / 10;
-						const float BaseArmor = BossStage * 20.0f;
-						const int32 WaveNumInBlock = (TargetWaveIndex % 10);
-						FinalArmor = BaseArmor + WaveNumInBlock;
-						SpecHandle.Data.Get()->SetSetByCallerMagnitude(FGameplayTag::RequestGameplayTag(FName("Data.Wave.BonusArmor")), FinalArmor);
-
-						MonsterASC->ApplyGameplayEffectSpecToSelf(*SpecHandle.Data.Get());
-					}
-				}
-			}
-
-			// 5. [추가됨] 머티리얼 적용 로직
-			// (보내진 몬스터의 웨이브 인덱스에 맞춰 색상을 변경합니다)
-			const bool bIsBossWave = (TargetWaveIndex > 0 && TargetWaveIndex % 10 == 0);
-			if (!bIsBossWave)
-			{
-				const TArray<TObjectPtr<UMaterialInterface>>& WaveMaterials = SpawnedMonster->GetWaveMaterials();
-
-				// 웨이브 1~9는 인덱스 0~8에 매핑 (10단위 웨이브는 보스)
-				// 예: 1웨이브 -> index 0, 9웨이브 -> index 8, 11웨이브 -> index 0
-				int32 MaterialIndex = (TargetWaveIndex % 10) - 1;
-
-				// MaterialIndex가 -1인 경우(10, 20 등)는 보스 웨이브이므로 위에서 걸러짐
-				// 하지만 안전을 위해 범위 체크
-				if (WaveMaterials.Num() > 0 && MaterialIndex >= 0 && MaterialIndex < WaveMaterials.Num())
-				{
-					UMaterialInterface* MaterialToApply = WaveMaterials[MaterialIndex];
-					if (MaterialToApply)
-					{
-						SpawnedMonster->SetWaveMaterial(MaterialToApply);
-					}
-				}
-			}
+			ApplyMonsterStatsByWave(SpawnedMonster, SpawnedMonster->GetSpawnWaveIndex());
 
 		}
 		else
 		{
 			RID_LOG(FColor::Red, TEXT("Counter Monster Spawn FAILED! (SpawnActor returned null)"));
+		}
+	}
+}
+
+void AMonsterSpawner::ApplyMonsterStatsByWave(AMonsterBaseCharacter* Monster, int32 WaveIndex)
+{
+	if (!Monster) return;
+
+	// -------------------------------------------------------
+	// 1. GAS 스탯 (체력, 방어력) 적용
+	// -------------------------------------------------------
+	if (MonsterStatInitEffect)
+	{
+		UAbilitySystemComponent* MonsterASC = Monster->GetAbilitySystemComponent();
+		if (MonsterASC)
+		{
+			MonsterASC->InitAbilityActorInfo(Monster, Monster);
+
+			FGameplayEffectContextHandle ContextHandle = MonsterASC->MakeEffectContext();
+			ContextHandle.AddSourceObject(this);
+			FGameplayEffectSpecHandle SpecHandle = MonsterASC->MakeOutgoingSpec(MonsterStatInitEffect, 1.0f, ContextHandle);
+
+			if (SpecHandle.IsValid())
+			{
+				const int32 BossStage = WaveIndex / 10;
+
+				// [체력]
+				float HP_Multiplier = 1.0f + (BossStage * 0.5f);
+				float FinalHP = Monster->MaxHealth + (FMath::Max(0.f, (float)(WaveIndex - 1) * 50.f) * HP_Multiplier);
+
+				// 보스 웨이브 추가 보정
+				if (WaveIndex > 0 && WaveIndex % 10 == 0)
+				{
+					FinalHP *= 2.0f;
+				}
+				SpecHandle.Data.Get()->SetSetByCallerMagnitude(FGameplayTag::RequestGameplayTag(FName("Data.Wave.BonusHP")), FinalHP);
+
+				// [방어력]
+				const float BaseArmor = BossStage * 30.0f;
+				const int32 WaveNumInBlock = (WaveIndex % 10);
+				int FinalArmor = BaseArmor + (WaveNumInBlock * 2);
+
+				SpecHandle.Data.Get()->SetSetByCallerMagnitude(FGameplayTag::RequestGameplayTag(FName("Data.Wave.BonusArmor")), FinalArmor);
+
+				MonsterASC->ApplyGameplayEffectSpecToSelf(*SpecHandle.Data.Get());
+			}
+		}
+	}
+
+	// -------------------------------------------------------
+	// 2. 머티리얼 (외형) 적용
+	// -------------------------------------------------------
+	// 보스 웨이브(10, 20...)가 아닐 때만 웨이브 색상 적용
+	const bool bIsBossWave = (WaveIndex > 0 && WaveIndex % 10 == 0);
+
+	if (!bIsBossWave)
+	{
+		const TArray<TObjectPtr<UMaterialInterface>>& WaveMaterials = Monster->GetWaveMaterials();
+
+		// 웨이브 1~9는 인덱스 0~8에 매핑
+		// 예: 1웨이브 -> index 0, 11웨이브 -> index 0
+		int32 MaterialIndex = (WaveIndex % 10) - 1;
+
+		// 인덱스 유효성 검사 (배열 범위 내에 있는지)
+		if (WaveMaterials.Num() > 0 && MaterialIndex >= 0 && MaterialIndex < WaveMaterials.Num())
+		{
+			UMaterialInterface* MaterialToApply = WaveMaterials[MaterialIndex];
+			if (MaterialToApply)
+			{
+				Monster->SetWaveMaterial(MaterialToApply);
+			}
 		}
 	}
 }

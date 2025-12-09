@@ -11,8 +11,7 @@
 class UGameplayEffect;
 
 UCLASS()
-class RAMDOMITEMDEFENSE_API UGA_BasicAttack : public UGA_BaseSkill // 부모 클래스 변경
-	// --- [ ★★★ 수정 끝 ★★★ ] ---
+class RAMDOMITEMDEFENSE_API UGA_BasicAttack : public UGA_BaseSkill
 {
 	GENERATED_BODY()
 
@@ -20,10 +19,42 @@ public:
 	UGA_BasicAttack();
 
 protected:
-	/** 어빌리티 활성화 시 (Event.Attack.Execute.Basic 수신 시) */
+	/** 어빌리티 활성화 시 실행 (공격 및 디버프 적용) */
 	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
 
-	/** (블루프린트에서 설정) SetByCaller로 데미지 값을 전달할 때 사용할 태그 */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Config")
+	/** 슬로우 효과 적용 (Percent: 0.2 -> 20%) */
+	void ApplySlowEffect(UAbilitySystemComponent* SourceASC, UAbilitySystemComponent* TargetASC, float SlowPercent, float Duration);
+
+	/** 스턴 효과 적용 */
+	void ApplyStunEffect(UAbilitySystemComponent* SourceASC, UAbilitySystemComponent* TargetASC, float Duration);
+
+	/** 방어력 감소 효과 적용 (ArmorAmount: 깎을 수치) */
+	void ApplyArmorShredEffect(UAbilitySystemComponent* SourceASC, UAbilitySystemComponent* TargetASC, float ArmorAmount, float Duration);
+
+	/** (기존) 데미지 수치 전달용 태그 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Config|Tags")
 	FGameplayTag DamageDataTag;
+
+	/** 적용할 스턴 이펙트 클래스 (GE_Stun 등) */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Config|Effects")
+	TSubclassOf<UGameplayEffect> StunEffectClass;
+
+	/** 적용할 슬로우 이펙트 클래스 (GE_Slow 등) */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Config|Effects")
+	TSubclassOf<UGameplayEffect> SlowEffectClass;
+
+	/** 적용할 방어력 감소 이펙트 클래스 (GE_ArmorShred 등) */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Config|Effects")
+	TSubclassOf<UGameplayEffect> ArmorReductionEffectClass;
+
+	/** 슬로우 수치를 전달할 SetByCaller 태그 (기본값: Debuff.Slow.Amount) */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Config|Tags")
+	FGameplayTag SlowAmountTag;
+
+	/** 방어력 감소 수치를 전달할 SetByCaller 태그 (기본값: Debuff.ArmorShred.Amount) */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Config|Tags")
+	FGameplayTag ArmorShredAmountTag;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Config|Tags")
+	FGameplayTag DurationTag;
 };

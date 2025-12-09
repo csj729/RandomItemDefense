@@ -54,6 +54,8 @@ private:
 	// 몬스터를 실제로 스폰하는 함수
 	void SpawnMonster();
 
+	void ApplyMonsterStatsByWave(AMonsterBaseCharacter* Monster, int32 WaveIndex);
+
 	// 스폰할 몬스터의 클래스
 	UPROPERTY()
 	TSubclassOf<AMonsterBaseCharacter> MonsterClassToSpawn;
