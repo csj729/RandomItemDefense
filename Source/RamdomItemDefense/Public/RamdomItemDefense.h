@@ -9,7 +9,7 @@ DECLARE_LOG_CATEGORY_EXTERN(LogRamdomItemDefense, Log, All);
 // --- [디버그 매크로 정의] ---
 
 // [ ★★★ 1. 마스터 스위치 ★★★ ]
-#define ENABLE_RID_DEBUG 1
+#define ENABLE_RID_DEBUG 0
 
 
 // [ ★★★ 2. 범용(General) 로그 매크로 ★★★ ]
