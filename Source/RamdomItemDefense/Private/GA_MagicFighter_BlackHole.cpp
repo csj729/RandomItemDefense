@@ -65,7 +65,7 @@ void UGA_MagicFighter_BlackHole::ActivateAbility(const FGameplayAbilitySpecHandl
 
 	// 3. 블랙홀 위치 = 스포너의 (X, Y) + 시전자의 (Z)
 	FVector SpawnerLocation = PS->MySpawner->GetActorLocation();
-	CasterLocation = OwnerCharacter->GetActorLocation(); // (★★★) 시전자 위치 멤버 변수에 캐시
+	CasterLocation = OwnerCharacter->GetActorLocation();
 	BlackHoleLocation = FVector(SpawnerLocation.X, SpawnerLocation.Y, CasterLocation.Z);
 
 	// 4. 캐릭터가 블랙홀 위치(0번 방향)를 바라보도록 즉시 회전

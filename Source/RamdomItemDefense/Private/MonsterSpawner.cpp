@@ -1,5 +1,5 @@
+// Source/RamdomItemDefense/Private/MonsterSpawner.cpp
 
-// csj729/randomitemdefense/RandomItemDefense-78a128504f0127dc02646504d4a1e1c677a0e811/Source/RamdomItemDefense/Private/MonsterSpawner.cpp
 #include "MonsterSpawner.h"
 #include "MonsterBaseCharacter.h"
 #include "MonsterAIController.h"
@@ -7,7 +7,7 @@
 #include "DrawDebugHelpers.h"
 #include "Engine/Engine.h"
 #include "Net/UnrealNetwork.h"
-#include "RamdomItemDefense.h" // RID_LOG 매크로용
+#include "RamdomItemDefense.h"
 #include "MyGameState.h"
 #include "Materials/MaterialInterface.h"
 #include "AbilitySystemComponent.h" 
@@ -19,7 +19,7 @@ AMonsterSpawner::AMonsterSpawner()
 {
 	PrimaryActorTick.bCanEverTick = false;
 	bReplicates = true;
-	
+
 	// 게임 로직에 필수적인 관리자 액터이므로 Culling되면 안 됩니다.
 	bAlwaysRelevant = true;
 
@@ -86,7 +86,8 @@ void AMonsterSpawner::SpawnMonster()
 		if (World)
 		{
 			FTransform SpawnTransform(GetActorRotation(), GetActorLocation());
-			// 1. [핵심 수정] SpawnActorDeferred를 사용하여 '지연 스폰' 시작
+
+			// 1. 지연 스폰 시작
 			// 이 시점에는 아직 BeginPlay와 AIController 빙의(Possess)가 실행되지 않습니다.
 			AMonsterBaseCharacter* SpawnedMonster = World->SpawnActorDeferred<AMonsterBaseCharacter>(
 				MonsterClassToSpawn,
@@ -98,26 +99,18 @@ void AMonsterSpawner::SpawnMonster()
 
 			if (SpawnedMonster)
 			{
-				// 2. [데이터 주입] AI가 켜지기 전에 필수 데이터를 먼저 넣어줍니다.
-				// 이렇게 하면 AIController가 BeginPlay에서 블랙보드 값을 읽을 때 null이 아닙니다.
-				SpawnedMonster->SetSpawner(this);
-
 				// GameState에서 현재 웨이브 정보를 가져와 몬스터에게 설정
+				int32 CurrentWave = 1;
 				if (AMyGameState* MyGameState = World->GetGameState<AMyGameState>())
 				{
-					int32 CurrentWave = MyGameState->GetCurrentWave();
-					SpawnedMonster->SetSpawnWaveIndex(CurrentWave);
+					CurrentWave = MyGameState->GetCurrentWave();
 				}
 
-				// 3. [스폰 마무리] 이제 스폰을 완료합니다.
-				// 이때 비로소 BeginPlay -> OnPossess -> AI Behavior Tree가 실행됩니다.
+				// 2. 지연 스폰 마무리 (BeginPlay 실행됨)
 				UGameplayStatics::FinishSpawningActor(SpawnedMonster, SpawnTransform);
 
-				// --- [기존 로직 유지] ---
-				CurrentMonsterCount++;
-				OnRep_CurrentMonsterCount(); // 서버 UI 즉시 업데이트
-				
-				ApplyMonsterStatsByWave(SpawnedMonster, SpawnedMonster->GetSpawnWaveIndex());
+				// 3. [리팩토링] 공통 초기화 로직 호출
+				InitSpawnedMonster(SpawnedMonster, CurrentWave);
 			}
 
 			// 스폰 카운트 증가
@@ -129,21 +122,6 @@ void AMonsterSpawner::SpawnMonster()
 		// 스폰 할당량을 다 채웠으면 타이머 정지
 		GetWorld()->GetTimerManager().ClearTimer(SpawnTimerHandle);
 	}
-}
-
-void AMonsterSpawner::OnMonsterKilled()
-{
-	if (CurrentMonsterCount > 0)
-	{
-		CurrentMonsterCount--;
-		if (HasAuthority()) OnRep_CurrentMonsterCount();
-	}
-}
-
-void AMonsterSpawner::SetGameOver()
-{
-	bIsGameOver = true;
-	GetWorld()->GetTimerManager().ClearTimer(SpawnTimerHandle);
 }
 
 void AMonsterSpawner::SpawnCounterAttackMonster(TSubclassOf<AMonsterBaseCharacter> MonsterClass, int32 MonsterWaveIndex)
@@ -164,31 +142,52 @@ void AMonsterSpawner::SpawnCounterAttackMonster(TSubclassOf<AMonsterBaseCharacte
 
 		if (SpawnedMonster)
 		{
-			// 1. 반격 몬스터 설정
+			// 반격 몬스터 설정
 			SpawnedMonster->SetIsCounterAttackMonster(true);
+
 			// 0 이하의 웨이브가 들어올 경우 1로 보정
 			int32 TargetWaveIndex = (MonsterWaveIndex <= 0) ? 1 : MonsterWaveIndex;
-			SpawnedMonster->SetSpawnWaveIndex(TargetWaveIndex);
 
-			// 2. 스포너 및 AI 설정
-			SpawnedMonster->SetSpawner(this);
-			if (AMonsterAIController* AI = Cast<AMonsterAIController>(SpawnedMonster->GetController()))
-			{
-				AI->SetPatrolPath(PatrolPathActor);
-			}
-
-			// 3. 카운트 증가 및 UI 갱신
-			CurrentMonsterCount++;
-			OnRep_CurrentMonsterCount();
-
-			ApplyMonsterStatsByWave(SpawnedMonster, SpawnedMonster->GetSpawnWaveIndex());
-
+			// [리팩토링] 공통 초기화 로직 호출 (SetSpawner, 스탯 적용 등 포함)
+			InitSpawnedMonster(SpawnedMonster, TargetWaveIndex);
 		}
 		else
 		{
 			RID_LOG(FColor::Red, TEXT("Counter Monster Spawn FAILED! (SpawnActor returned null)"));
 		}
 	}
+}
+
+void AMonsterSpawner::InitSpawnedMonster(AMonsterBaseCharacter* SpawnedMonster, int32 WaveIndex)
+{
+	if (!SpawnedMonster) return;
+
+	// 1. 스포너 및 웨이브 정보 설정
+	// (SetSpawner 내부에서 AIController에게 PatrolPath도 같이 전달합니다)
+	SpawnedMonster->SetSpawner(this);
+	SpawnedMonster->SetSpawnWaveIndex(WaveIndex);
+
+	// 2. 관리 카운트 증가 및 UI 갱신
+	CurrentMonsterCount++;
+	OnRep_CurrentMonsterCount();
+
+	// 3. 스탯 및 외형 적용
+	ApplyMonsterStatsByWave(SpawnedMonster, WaveIndex);
+}
+
+void AMonsterSpawner::OnMonsterKilled()
+{
+	if (CurrentMonsterCount > 0)
+	{
+		CurrentMonsterCount--;
+		if (HasAuthority()) OnRep_CurrentMonsterCount();
+	}
+}
+
+void AMonsterSpawner::SetGameOver()
+{
+	bIsGameOver = true;
+	GetWorld()->GetTimerManager().ClearTimer(SpawnTimerHandle);
 }
 
 void AMonsterSpawner::ApplyMonsterStatsByWave(AMonsterBaseCharacter* Monster, int32 WaveIndex)
@@ -212,16 +211,23 @@ void AMonsterSpawner::ApplyMonsterStatsByWave(AMonsterBaseCharacter* Monster, in
 			if (SpecHandle.IsValid())
 			{
 				const int32 BossStage = WaveIndex / 10;
+				float FinalHP = 0.f;
 
-				// [체력]
-				float HP_Multiplier = 1.0f + (BossStage * 0.5f);
-				float FinalHP = Monster->MaxHealth + (FMath::Max(0.f, (float)(WaveIndex - 1) * 50.f) * HP_Multiplier);
-
-				// 보스 웨이브 추가 보정
+				// [체력 계산] 보스 웨이브인지 확인 (10, 20, 30...)
 				if (WaveIndex > 0 && WaveIndex % 10 == 0)
 				{
-					FinalHP *= 2.0f;
+					float BaseBossHP = 50000.0f;
+					float AddedHP = 100000.0f * (float)BossStage * (float)(BossStage - 1);
+
+					FinalHP = BaseBossHP + AddedHP;
 				}
+				else
+				{
+					// 일반 몬스터 (기존 로직 유지)
+					float HP_Multiplier = 1.0f + (BossStage * 0.5f);
+					FinalHP = Monster->MaxHealth + (FMath::Max(0.f, (float)(WaveIndex - 1) * 50.f) * HP_Multiplier);
+				}
+
 				SpecHandle.Data.Get()->SetSetByCallerMagnitude(FGameplayTag::RequestGameplayTag(FName("Data.Wave.BonusHP")), FinalHP);
 
 				// [방어력]
@@ -247,10 +253,8 @@ void AMonsterSpawner::ApplyMonsterStatsByWave(AMonsterBaseCharacter* Monster, in
 		const TArray<TObjectPtr<UMaterialInterface>>& WaveMaterials = Monster->GetWaveMaterials();
 
 		// 웨이브 1~9는 인덱스 0~8에 매핑
-		// 예: 1웨이브 -> index 0, 11웨이브 -> index 0
 		int32 MaterialIndex = (WaveIndex % 10) - 1;
 
-		// 인덱스 유효성 검사 (배열 범위 내에 있는지)
 		if (WaveMaterials.Num() > 0 && MaterialIndex >= 0 && MaterialIndex < WaveMaterials.Num())
 		{
 			UMaterialInterface* MaterialToApply = WaveMaterials[MaterialIndex];

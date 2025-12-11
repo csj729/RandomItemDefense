@@ -1,4 +1,3 @@
-// Source/RamdomItemDefense/Public/GA_BaseSkill.h (수정)
 #pragma once
 
 #include "CoreMinimal.h"
@@ -7,13 +6,13 @@
 #include "GA_BaseSkill.generated.h"
 
 class UGameplayEffect;
-class UParticleSystem; // 캐스케이드 전방 선언
+class UParticleSystem;
 
 /**
  * @brief 모든 확률 발동형 스킬의 부모 클래스.
- * 공통 속성(발동 확률, 데미지 GE 등)을 정의합니다.
+ * 공통 속성(발동 확률, 데미지 GE 등) 및 유틸리티 함수를 정의합니다.
  */
-UCLASS(Abstract) // 이 클래스로 직접 BP를 만들지 못하도록 '추상' 클래스로 선언
+UCLASS(Abstract)
 class RAMDOMITEMDEFENSE_API UGA_BaseSkill : public UGameplayAbility
 {
 	GENERATED_BODY()
@@ -21,53 +20,48 @@ class RAMDOMITEMDEFENSE_API UGA_BaseSkill : public UGameplayAbility
 public:
 	UGA_BaseSkill();
 
-	// --- [ ★★★ 코드 추가 ★★★ ] ---
-	/** * 어빌리티 활성화 시 (자식 클래스의 ActivateAbility보다 먼저) 호출됩니다.
-	 * MuzzleFlash 이펙트를 스폰하는 공통 로직을 처리합니다.
-	 */
+	// --- [ Override Functions ] ---
+	/** 어빌리티 활성화 시 공통 처리(MuzzleFlash 등) */
 	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
-	// --- [ ★★★ 코드 추가 끝 ★★★ ] ---
 
-	/**
-	 * @brief 이 스킬의 기본 발동 확률 (0.0 ~ 1.0)
-	 * GA_AttackSelecter가 이 값을 읽어와서 확률 계산에 사용합니다.
-	 */
+	// --- [ Configuration ] ---
+	/** 기본 발동 확률 (0.0 ~ 1.0) */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Skill Config")
 	float BaseActivationChance;
 
-	/**
-	 * @brief 이 스킬이 적용할 데미지 GE
-	 * (SetByCaller를 사용할 수도 있고, 아닐 수도 있으므로 Base에서는 TSubclassOf만 제공)
-	 */
+	/** 데미지 적용용 GE 클래스 */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Skill Config|GAS")
 	TSubclassOf<UGameplayEffect> DamageEffectClass;
 
-	/**
-	 * @brief 데미지 GE에 SetByCaller로 값을 전달할 때 사용할 태그
-	 * (필요 없는 스킬은 비워두면 됨)
-	 */
+	/** SetByCaller 태그 */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Skill Config|GAS")
 	FGameplayTag DamageByCallerTag;
 
-	/**
-	 * @brief (BP Class Default에서 설정) 이 스킬의 기본 데미지
-	 * (예: 100)
-	 */
+	/** 기본 데미지 */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Skill Config|Damage")
 	float DamageBase;
 
-	/**
-	 * @brief (BP Class Default에서 설정) 이 스킬의 공격력 계수
-	 * (예: 1.5 = 공격력의 150%)
-	 */
+	/** 공격력 계수 */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Skill Config|Damage")
 	float DamageCoefficient;
 
-	/** (BP 설정) 스킬 시전 시 스폰할 총구 화염 이펙트 (캐스케이드) */
+	/** 총구 화염 이펙트 */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Skill Config|FX")
 	TObjectPtr<UParticleSystem> MuzzleFlashEffect;
 
-	/** (BP 설정) 이펙트를 부착할 소켓 이름 (예: "MuzzlePoint") */
+	/** 소켓 이름 */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Skill Config|FX")
 	FName MuzzleSocketName;
+
+protected:
+	// --- [ Helper Functions (Refactored) ] ---
+
+	/** 캐릭터/드론의 소켓 위치와 타겟 회전을 계산 */
+	void GetMuzzleTransform(AActor* AvatarActor, FVector& OutLocation, FRotator& OutRotation, AActor* TargetActor = nullptr);
+
+	/** (범위 공격용) 데미지 Spec과 치명타 여부를 미리 계산 */
+	FGameplayEffectSpecHandle MakeDamageEffectSpec(const FGameplayAbilityActorInfo* ActorInfo, float InBaseDmg, float InCoeff, float& OutFinalDamage, bool& OutDidCrit);
+
+	/** (단일 타겟용) 타겟에게 즉시 데미지 계산 및 적용 */
+	bool ApplyDamageToTarget(const FGameplayAbilityActorInfo* ActorInfo, AActor* Target, float InBaseDmg, float InCoeff);
 };

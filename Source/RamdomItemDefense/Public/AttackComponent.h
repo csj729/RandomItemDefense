@@ -1,4 +1,4 @@
-// Public/AttackComponent.h (수정)
+// Source/RamdomItemDefense/Public/AttackComponent.h
 
 #pragma once
 
@@ -20,56 +20,67 @@ class RAMDOMITEMDEFENSE_API UAttackComponent : public UActorComponent
 public:
 	UAttackComponent();
 
-	/** 수동으로 대상을 공격하도록 명령합니다. */
-	UFUNCTION(Server, Reliable)
-	void OrderAttack(AActor* Target);
-
-	/** 수동 및 자동 타겟을 모두 해제합니다. */
-	void ClearAllTargets();
-
-	/**
-	 * @brief (수정) ASC와 AttributeSet을 받아 컴포넌트를 초기화하고 타이머를 시작합니다.
-	 * Character의 BeginPlay와 Drone의 BeginPlay에서 호출됩니다.
+	// --- [ Initialization ] ---
+	/** * 컴포넌트 초기화 및 타이머 시작.
+	 * Character나 Drone의 BeginPlay에서 호출됩니다.
 	 */
 	virtual void Initialize(UAbilitySystemComponent* InASC, const UMyAttributeSet* InAttributeSet);
 
-	/** (수정) 소유자가 캐릭터일 경우에만 이 변수가 설정됩니다. 드론의 경우 nullptr입니다. */
-	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Attack")
+	// --- [ Public API : Command ] ---
+	/** (RPC) 서버에게 특정 대상을 공격하도록 명령 */
+	UFUNCTION(Server, Reliable)
+	void OrderAttack(AActor* Target);
+
+	/** 모든 타겟(수동/자동) 해제 및 공격 중지 */
+	void ClearAllTargets();
+
+	// --- [ References ] ---
+	/** 소유자 캐릭터 (드론인 경우 nullptr일 수 있음) */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Attack|Reference")
 	TObjectPtr<ARamdomItemDefenseCharacter> OwnerCharacter;
 
 protected:
-	/** (수정) BeginPlay는 이제 오너가 캐릭터일 경우에만 Initialize를 자동 호출합니다. */
+	// --- [ Lifecycle ] ---
 	virtual void BeginPlay() override;
 
 private:
-	/** 자동으로 가장 가까운 적을 찾습니다. */
+	// --- [ Internal Logic : AI & Execution ] ---
+	/** 사거리 내 가장 가까운 적을 탐색 (자동 공격용) */
 	void FindTarget();
 
-	/** 현재 타겟을 향해 공격을 수행합니다. */
+	/** 현재 타겟(수동 우선, 없으면 자동)을 향해 공격 시도 (이동 or 공격) */
 	void PerformAttack();
 
-	/** 공격 속성 변경 시 타이머를 재설정하기 위한 콜백 함수 */
+	/** 실제 공격 실행 (회전, 몽타주 재생, GAS 이벤트 전송) */
+	void ExecuteAttackLogic(AActor* TargetActor);
+
+	// --- [ Event Handlers ] ---
+	/** 공격 속도 변경 시 타이머 주기를 갱신하는 콜백 */
 	void OnAttackSpeedChanged(const FOnAttributeChangeData& Data);
 
-	/** 수동 지정 타겟 */
+	// --- [ Internal State : Targeting ] ---
+	/** 플레이어가 직접 지정한 타겟 */
 	UPROPERTY()
 	TObjectPtr<AActor> ManualTarget;
 
-	/** 자동 감지 타겟 */
+	/** AI가 감지한 타겟 */
 	UPROPERTY()
 	TObjectPtr<AActor> AutoTarget;
 
+	/** (네트워크 동기화용) 대기 중인 수동 타겟 */
 	UPROPERTY()
 	TObjectPtr<AActor> PendingManualTarget;
 
+	// --- [ System : Timers ] ---
 	FTimerHandle FindTargetTimerHandle;
 	FTimerHandle PerformAttackTimerHandle;
 
-	/** 캐시된 AbilitySystemComponent (캐릭터 또는 드론의 ASC) */
+	// --- [ Cached Dependencies ] ---
+	/** GAS 컴포넌트 캐싱 */
 	UPROPERTY()
 	TObjectPtr<UAbilitySystemComponent> AbilitySystemComponent;
 
-	/** 캐시된 AttributeSet (캐릭터 또는 드론의 AttributeSet) */
+	/** 속성 세트 캐싱 */
 	UPROPERTY()
 	TObjectPtr<const UMyAttributeSet> AttributeSet;
 };

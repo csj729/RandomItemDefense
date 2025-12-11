@@ -1,5 +1,3 @@
-// Source/RamdomItemDefense/Public/MonsterBaseCharacter.h
-
 #pragma once
 
 #include "RamdomItemDefense.h"
@@ -11,6 +9,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "MonsterBaseCharacter.generated.h"
 
+// 전방 선언
 class UMonsterAttributeSet;
 class AMonsterSpawner;
 class UAnimMontage;
@@ -20,25 +19,21 @@ class UNiagaraSystem;
 class UNiagaraComponent;
 class USoundBase;
 class AMonsterAIController;
-struct FOnAttributeChangeData;
 class UDamageTextWidget;
+struct FOnAttributeChangeData;
 
-
-/** @brief 태그별 피격 효과(파티클, 사운드)를 정의하는 구조체 */
+/** 태그별 피격 효과(파티클, 사운드)를 정의하는 구조체 */
 USTRUCT(BlueprintType)
 struct FHitEffectData
 {
 	GENERATED_BODY()
 
-	/** 피격 시 스폰할 파티클 이펙트 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	TObjectPtr<UParticleSystem> HitEffect;
 
-	/** 피격 시 재생할 사운드 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	TObjectPtr<USoundBase> HitSound;
 };
-
 
 UCLASS()
 class RAMDOMITEMDEFENSE_API AMonsterBaseCharacter : public ACharacter, public IAbilitySystemInterface
@@ -47,95 +42,79 @@ class RAMDOMITEMDEFENSE_API AMonsterBaseCharacter : public ACharacter, public IA
 
 public:
 	AMonsterBaseCharacter();
-	virtual class UAbilitySystemComponent* GetAbilitySystemComponent() const override;
+
+	// --- [ Override Functions ] ---
+	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	virtual void PossessedBy(AController* NewController) override;
 
+	// --- [ Public API : Spawning & Setup ] ---
 	void SetSpawner(AMonsterSpawner* InSpawner);
+	void SetSpawnWaveIndex(int32 InWaveIndex) { SpawnWaveIndex = InWaveIndex; }
+	int32 GetSpawnWaveIndex() const { return SpawnWaveIndex; }
 
-	UFUNCTION(BlueprintPure, Category = "Stats")
-	FORCEINLINE int32 GetGoldOnDeath() const { return GoldOnDeath; }
+	/** PVP 반격 몬스터 설정 */
+	void SetIsCounterAttackMonster(bool bInValue) { bIsCounterAttackMonster = bInValue; }
+	bool IsCounterAttackMonster() const { return bIsCounterAttackMonster; }
 
-	virtual void Die(AActor* Killer);
+	// --- [ Public API : State ] ---
+	void Die(AActor* Killer);
+	bool IsDying() const { return bIsDying; }
+	bool IsBoss() const { return bIsBoss; }
+	int32 GetGoldOnDeath() const { return GoldOnDeath; }
+
+	// --- [ Public API : Visuals ] ---
+	void SetWaveMaterial(UMaterialInterface* WaveMaterial);
+	const TArray<TObjectPtr<UMaterialInterface>>& GetWaveMaterials() const { return WaveMaterials; }
+
+	virtual void PlayHitEffect(const FGameplayTagContainer& EffectTags);
+
+	/** 상태 이상(슬로우 등) 이펙트 켜기/끄기 (서버->멀티캐스트) */
+	void SetStatusEffectState(FGameplayTag StatusTag, bool bIsActive, UNiagaraSystem* EffectTemplate);
 
 	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlayMontage(UAnimMontage* MontageToPlay);
 
-	UFUNCTION(BlueprintPure, Category = "Stats")
-	bool IsDying() const { return bIsDying; }
-
-	/** 이 몬스터가 보스 몬스터인지 여부를 반환합니다. */
-	UFUNCTION(BlueprintPure, Category = "Stats")
-	bool IsBoss() const { return bIsBoss; }
-
-	void SetWaveMaterial(UMaterialInterface* WaveMaterial);
-	const TArray<TObjectPtr<UMaterialInterface>>& GetWaveMaterials() const { return WaveMaterials; }
-	virtual void PlayHitEffect(const FGameplayTagContainer& EffectTags);
-
-
-	/** (AIController가 폰에 빙의될 때 호출됨) AI 관련 초기화 수행 */
-	virtual void PossessedBy(AController* NewController) override;
-
-	void SetSpawnWaveIndex(int32 InWaveIndex) { SpawnWaveIndex = InWaveIndex; }
-	int32 GetSpawnWaveIndex() const { return SpawnWaveIndex; }
-
-	void SetStatusEffectState(FGameplayTag StatusTag, bool bIsActive, UNiagaraSystem* EffectTemplate);
-
-	/** 이 몬스터가 PVP 반격으로 생성된 몬스터인지 설정합니다. */
-	void SetIsCounterAttackMonster(bool bInValue) { bIsCounterAttackMonster = bInValue; }
-
-	/** 이 몬스터가 PVP 반격 몬스터인지 여부를 반환합니다. */
-	bool IsCounterAttackMonster() const { return bIsCounterAttackMonster; }
-
+	// --- [ Public Config ] ---
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Stats")
 	float MaxHealth = 100.0f;
 
 protected:
 	virtual void BeginPlay() override;
 
+	// --- [ GAS Components ] ---
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "GAS")
-	TObjectPtr<class UAbilitySystemComponent> AbilitySystemComponent;
+	TObjectPtr<UAbilitySystemComponent> AbilitySystemComponent;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "GAS")
-	TObjectPtr<class UMonsterAttributeSet> AttributeSet;
+	TObjectPtr<UMonsterAttributeSet> AttributeSet;
 
-	/** (블루프린트 디폴트에서 설정) 이 몬스터가 보스 몬스터로 취급되는지 여부 */
+	// --- [ Configuration ] ---
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Stats")
 	bool bIsBoss;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Stats")
 	int32 GoldOnDeath;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation")
-	TObjectPtr<UAnimMontage> DeathMontage;
-
-	/** Health 속성 변경 콜백 */
-	virtual void HandleHealthChanged(const FOnAttributeChangeData& Data);
-
-	/** MoveSpeed 속성 변경 콜백 */
-	virtual void HandleMoveSpeedChanged(const FOnAttributeChangeData& Data);
-
-	/** (BP 설정) 슬로우 상태일 때 몬스터에게 붙일 지속 이펙트 (Niagara) */
-	UPROPERTY(EditDefaultsOnly, Category = "Visuals|Status")
-	TObjectPtr<UNiagaraSystem> SlowEffectTemplate;
-
-	/** (BP 설정) 방어력 감소 상태일 때 몬스터에게 붙일 지속 이펙트 (Niagara) */
-	UPROPERTY(EditDefaultsOnly, Category = "Visuals|Status")
-	TObjectPtr<UNiagaraSystem> ArmorShredEffectTemplate;
-
-	/** 현재 활성화된 상태 이펙트들을 관리하는 맵 (NiagaraComponent) */
-	UPROPERTY()
-	TMap<FGameplayTag, TObjectPtr<UNiagaraComponent>> ActiveStatusParticles;
-
 	UPROPERTY(EditDefaultsOnly, Category = "Stats")
 	float BaseMoveSpeed;
 
-	UPROPERTY()
-	TObjectPtr<AMonsterSpawner> MySpawner;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation")
+	TObjectPtr<UAnimMontage> DeathMontage;
 
-	UPROPERTY(VisibleAnywhere, Category = "Stats")
-	bool bIsDying;
+	// --- [ GAS Callbacks ] ---
+	virtual void HandleHealthChanged(const FOnAttributeChangeData& Data);
+	virtual void HandleMoveSpeedChanged(const FOnAttributeChangeData& Data);
 
-protected:
+	void OnStunTagChanged(const FGameplayTag Tag, int32 NewCount);
+	void OnSlowTagChanged(const FGameplayTag Tag, int32 NewCount);
+	void OnArmorShredTagChanged(const FGameplayTag Tag, int32 NewCount);
+
+	/** 치명타 발생 시 호출되는 콜백 */
+	UFUNCTION()
+	void OnCritDamageOccurred(AActor* TargetActor, float CritDamageAmount);
+
+	// --- [ Visuals : Materials ] ---
 	UPROPERTY(ReplicatedUsing = OnRep_WaveMaterial)
 	TObjectPtr<UMaterialInterface> CurrentWaveMaterial;
 
@@ -145,61 +124,55 @@ protected:
 	UFUNCTION()
 	void OnRep_WaveMaterial();
 
-	/** 이 몬스터가 스폰된 웨이브 번호 */
-	UPROPERTY(VisibleAnywhere, Category = "Stats")
-	int32 SpawnWaveIndex;
-
-protected:
+	// --- [ Visuals : Hit Effects ] ---
 	UPROPERTY(EditDefaultsOnly, Category = "Effects")
 	TMap<FGameplayTag, FHitEffectData> HitEffectsMap;
 
 	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlayHitEffect(const FGameplayTag& HitTag);
 
-protected:
-	/** State.Stun 태그가 변경될 때 호출될 콜백 함수 */
-	void OnStunTagChanged(const FGameplayTag Tag, int32 NewCount);
+	// --- [ Visuals : Status Effects ] ---
+	UPROPERTY(EditDefaultsOnly, Category = "Visuals|Status")
+	TObjectPtr<UNiagaraSystem> SlowEffectTemplate;
 
-	/** State.Slow 태그가 변경될 때 호출될 콜백 함수 */
-	void OnSlowTagChanged(const FGameplayTag Tag, int32 NewCount);
+	UPROPERTY(EditDefaultsOnly, Category = "Visuals|Status")
+	TObjectPtr<UNiagaraSystem> ArmorShredEffectTemplate;
 
-	/** State.ArmorShred 태그가 변경될 때 호출될 콜백 함수 */
-	void OnArmorShredTagChanged(const FGameplayTag Tag, int32 NewCount);
-	/** 이 몬스터를 제어하는 AI 컨트롤러 캐시 */
+	UPROPERTY()
+	TMap<FGameplayTag, TObjectPtr<UNiagaraComponent>> ActiveStatusParticles;
+
+	// --- [ UI ] ---
+	UPROPERTY(EditDefaultsOnly, Category = "Config|UI")
+	TSubclassOf<UDamageTextWidget> DamageTextWidgetClass;
+
+	// --- [ Internal State ] ---
+	UPROPERTY()
+	TObjectPtr<AMonsterSpawner> MySpawner;
+
+	UPROPERTY(VisibleAnywhere, Category = "Stats")
+	bool bIsDying;
+
+	UPROPERTY(VisibleAnywhere, Category = "Stats")
+	int32 SpawnWaveIndex;
+
 	UPROPERTY()
 	TWeakObjectPtr<AMonsterAIController> MonsterAIController;
 
-	/** (블루프린트 구현용) 스턴 상태가 변경될 때 호출됩니다. */
+	bool bIsCounterAttackMonster;
+
+	// --- [ Blueprint Events ] ---
 	UFUNCTION(BlueprintImplementableEvent, Category = "Animation")
 	void OnStunStateChanged(bool bIsStunned);
 
-	/** (블루프린트 구현용) 슬로우 상태가 변경될 때 호출됩니다. */
 	UFUNCTION(BlueprintImplementableEvent, Category = "Animation")
 	void OnSlowStateChanged(bool bIsSlowed);
 
 	UFUNCTION(BlueprintImplementableEvent, Category = "Animation")
 	void OnArmorShredStateChanged(bool bIsShredded);
-	/**
-	 * @brief (블루프린트에서 설정) 몬스터 머리 위에 띄울 데미지 텍스트 위젯
-	 * (WBP_DamageText로 설정, 부모는 UDamageTextWidget이어야 함)
-	 */
-	UPROPERTY(EditDefaultsOnly, Category = "Config|UI")
-	TSubclassOf<UDamageTextWidget> DamageTextWidgetClass;
 
-	/**
-	 * @brief URID_DamageStatics의 치명타 델리게이트에 바인딩될 함수
-	 */
-	UFUNCTION()
-	void OnCritDamageOccurred(AActor* TargetActor, float CritDamageAmount);
-
-	bool bIsCounterAttackMonster;
-
-	// --- [ ★★★ 코드 추가 ★★★ ] ---
 private:
-	/** 랙돌 상태로 전환하기 위한 타이머 핸들 */
+	// --- [ Ragdoll Logic ] ---
 	FTimerHandle RagdollTimerHandle;
-
-	/** 몽타주 종료 후 랙돌로 전환하는 함수 */
 	void GoRagdoll();
 
 	UFUNCTION(NetMulticast, Reliable)

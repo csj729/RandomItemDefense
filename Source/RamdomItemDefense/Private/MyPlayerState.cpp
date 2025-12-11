@@ -15,8 +15,6 @@
 #include "Sound/SoundBase.h"
 #include "RamdomItemDefenseGameMode.h"
 
-DEFINE_LOG_CATEGORY(LogRID_PlayerState);
-
 AMyPlayerState::AMyPlayerState()
 {
 	Gold = 0;
@@ -170,7 +168,6 @@ void AMyPlayerState::Server_UseRoundChoice_Implementation(bool bChoseItemGacha)
 			Character->GetInventoryComponent()->AddRandomItem();
 		}
 
-		LOG_PLAYERSTATE(FColor::Cyan, TEXT("Player chose: Item Gacha (Common)"));
 	}
 	else
 	{
@@ -190,7 +187,6 @@ void AMyPlayerState::Server_UseRoundChoice_Implementation(bool bChoseItemGacha)
 		const int32 GambleAmount = FMath::Max(1, BaseAmount + RandomBonus); // 최소 1골드
 
 		AddGold(GambleAmount);
-		LOG_PLAYERSTATE(FColor::Cyan, TEXT("Player chose: Gold Gamble (Wave: %d, Base: %d, Final: +%d)"), CurrentWave, BaseAmount, GambleAmount);
 	}
 }
 
@@ -236,11 +232,6 @@ void AMyPlayerState::Server_UseCommonItemChoice_Implementation(FName ChosenItemI
 		// 캐릭터의 인벤토리 컴포넌트에게 '선택한' 아이템을 추가하라고 명령합니다.
 		Character->GetInventoryComponent()->AddItem(ChosenItemID);
 
-		LOG_PLAYERSTATE(FColor::Green, TEXT("Player used Common Item Choice: Added %s"), *ChosenItemID.ToString());
-	}
-	else
-	{
-		LOG_PLAYERSTATE(FColor::Red, TEXT("Server_UseCommonItemChoice: Invalid ItemID %s or not Common grade."), *ChosenItemID.ToString());
 	}
 }
 
@@ -505,7 +496,6 @@ void AMyPlayerState::OnWaveStarted()
 		false
 	);
 
-	LOG_PLAYERSTATE(FColor::Cyan, TEXT("Wave Started. Scheduling first ButtonAction in 15s."));
 }
 
 /** (서버 전용) 15초 또는 3~5초 타이머 만료 시 호출 */
@@ -523,8 +513,6 @@ void AMyPlayerState::TriggerButtonActionUI()
 	// 2. 랜덤 키 선택 (0=Q ~ 7=F)
 	const int32 RandomIndex = FMath::RandRange(0, 7);
 	CurrentRequiredButtonActionKey = static_cast<EButtonActionKey>(RandomIndex);
-
-	LOG_PLAYERSTATE(FColor::Cyan, TEXT("TriggerButtonActionUI: Showing QTE (Level: %d, KeyIndex: %d, Window: %.1fs)"), ButtonActionLevel, RandomIndex, CurrentWindow);
 	
 	// 3. 입력 대기 상태로 전환
 	bIsWaitingForButtonActionInput = true;
@@ -556,8 +544,6 @@ void AMyPlayerState::OnButtonActionTimeout()
 
 	bIsWaitingForButtonActionInput = false; // 상태 해제
 
-	LOG_PLAYERSTATE(FColor::Red, TEXT("Button Action FAILED (Timeout). Level reset to 0."));
-
 	Client_NotifyButtonActionResult(false, -1);
 	// (요구사항) 실패 기록 (이번 스테이지 끝날 때까지)
 	bIsButtonActionSequenceFinishedThisStage = true;
@@ -581,7 +567,6 @@ void AMyPlayerState::Server_ReportButtonActionSuccess_Implementation()
 
 	// 1. 부스트 레벨 1단계 올리기 (최대 5)
 	ButtonActionLevel = FMath::Min(ButtonActionLevel + 1, 5);
-	LOG_PLAYERSTATE(FColor::Green, TEXT("Button Action SUCCESS. Level up to %d."), ButtonActionLevel);
 
 	// 2. (5단계 보상)
 	if (ButtonActionLevel == 5)
@@ -645,11 +630,6 @@ void AMyPlayerState::Server_ReportButtonActionFailure_Implementation()
 
 	// 2. 클라이언트에게 실패 알림 (UI 갱신)
 	Client_NotifyButtonActionResult(false);
-
-	// --- [ ★★★ 수정: OnButtonActionTimeout() 호출 대신 직접 로직 수행 ★★★ ] ---
-
-	// 3. 로그 출력
-	LOG_PLAYERSTATE(FColor::Orange, TEXT("Button Action FAILED (Wrong Key). Level reset to 0."));
 
 	// 4. 이번 스테이지 실패 기록
 	bIsButtonActionSequenceFinishedThisStage = true;

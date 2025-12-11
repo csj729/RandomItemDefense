@@ -1,5 +1,3 @@
-// Source/RamdomItemDefense/Public/BTTask_IncrementPatrolIndex.h (새 파일)
-
 #pragma once
 
 #include "CoreMinimal.h"
@@ -14,15 +12,16 @@ class RAMDOMITEMDEFENSE_API UBTTask_IncrementPatrolIndex : public UBTTaskNode
 public:
 	UBTTask_IncrementPatrolIndex();
 
-protected:
-	virtual EBTNodeResult::Type ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory) override;
-
-public:
-	// 'PathToFollow' 키 (스플라인 총 개수 확인용)
+	// --- [ Configuration : Blackboard Keys ] ---
+	/** 'PathToFollow' 키 (총 포인트 수 확인용) */
 	UPROPERTY(EditAnywhere, Category = "Blackboard")
 	FBlackboardKeySelector PathActorKey;
 
-	// 'CurrentSplinePointIndex' 키 (증가시킬 키)
+	/** 'CurrentSplinePointIndex' 키 (증가 대상) */
 	UPROPERTY(EditAnywhere, Category = "Blackboard")
 	FBlackboardKeySelector PointIndexKey;
+
+protected:
+	// --- [ Overrides ] ---
+	virtual EBTNodeResult::Type ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory) override;
 };

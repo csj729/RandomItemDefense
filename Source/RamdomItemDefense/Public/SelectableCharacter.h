@@ -15,48 +15,45 @@ class RAMDOMITEMDEFENSE_API ASelectableCharacter : public AActor
 public:
 	ASelectableCharacter();
 
-protected:
-	virtual void BeginPlay() override;
+	// --- [ Public API ] ---
+	/** 선택되었을 때 호출 (애니메이션 등) */
+	void PlaySelectionAnimation();
 
-	// 마우스 오버/클릭 델리게이트 바인딩
-	virtual void NotifyActorOnClicked(FKey ButtonPressed = EKeys::LeftMouseButton) override;
-	virtual void NotifyActorBeginCursorOver() override;
-	virtual void NotifyActorEndCursorOver() override;
+	/** 선택 해제되었을 때 (Idle 복귀) */
+	void ResetSelection();
 
-public:
-	// --- 컴포넌트 ---
+	USceneComponent* GetCameraViewPoint() const { return CameraViewPoint; }
+
+	// --- [ Components ] ---
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Visual")
 	TObjectPtr<USkeletalMeshComponent> Mesh;
-
-	// --- 설정 변수 ---
-	/** 이 액터를 선택했을 때 실제 게임에서 스폰될 클래스 */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Config") // <-- 변경됨
-    TSubclassOf<APawn> CharacterClassToSpawn;
-
-    /** 선택 시 재생할 애니메이션 (함성, 인사 등) */
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Config") // <-- 변경됨
-    TObjectPtr<UAnimationAsset> SelectAnimation;
-
-    /** 캐릭터 이름 (UI 표시용) */
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Config") // <-- 변경됨
-    FText CharacterName;
-
-    /** 캐릭터 설명 (툴팁용) */
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Config", meta = (MultiLine = true)) // <-- 변경됨
-    FText CharacterDescription;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera")
 	TObjectPtr<USceneComponent> CameraViewPoint;
 
-	USceneComponent* GetCameraViewPoint() const { return CameraViewPoint; }
+	// --- [ Configuration ] ---
+	/** 실제 게임에서 스폰될 클래스 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Config")
+	TSubclassOf<APawn> CharacterClassToSpawn;
 
-	/** 선택 여부 상태 */
+	/** 선택 시 재생할 애니메이션 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Config")
+	TObjectPtr<UAnimationAsset> SelectAnimation;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Config")
+	FText CharacterName;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Config", meta = (MultiLine = true))
+	FText CharacterDescription;
+
+	// --- [ State ] ---
 	bool bIsSelected;
 
-	// --- 함수 ---
-	/** 선택되었을 때 호출 (애니메이션 재생 등) */
-	void PlaySelectionAnimation();
+protected:
+	virtual void BeginPlay() override;
 
-	/** 선택 해제되었을 때 (Idle로 복귀 등) */
-	void ResetSelection();
+	// --- [ Input Events ] ---
+	virtual void NotifyActorOnClicked(FKey ButtonPressed = EKeys::LeftMouseButton) override;
+	virtual void NotifyActorBeginCursorOver() override;
+	virtual void NotifyActorEndCursorOver() override;
 };

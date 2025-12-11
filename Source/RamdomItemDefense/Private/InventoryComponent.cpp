@@ -9,12 +9,6 @@
 #include "RamdomItemDefense.h" // RID_LOG 매크로용 (이제 LOG_INVENTORY가 대체)
 #include "Net/UnrealNetwork.h"
 
-// --- [ ★★★ 로그 카테고리 정의 ★★★ ] ---
-// .h 파일에서 선언한 로그 카테고리를 여기서 정의(구현)합니다.
-DEFINE_LOG_CATEGORY(LogRID_Inventory);
-// --- [ ★★★ 로그 카테고리 정의 끝 ★★★ ] ---
-
-
 UInventoryComponent::UInventoryComponent()
 {
 	// 이 컴포넌트는 서버에만 존재하므로 Tick은 필요 없습니다.
@@ -57,10 +51,6 @@ FItemData UInventoryComponent::GetItemData(FName ItemID, bool& bSuccess) const
 	bSuccess = false; // 기본적으로 실패로 설정
 	if (!ItemDataTable)
 	{
-		// --- [ ★★★ 로그 매크로 교체 ★★★ ] ---
-		// RID_LOG(FColor::Red, TEXT("InventoryComponent: ItemDataTable is NOT set!"));
-		LOG_INVENTORY(FColor::Red, TEXT("ItemDataTable is NOT set!"));
-		// ---------------------------------
 		return FItemData(); // 빈 구조체 반환
 	}
 
@@ -140,15 +130,9 @@ void UInventoryComponent::AddItem(FName ItemID)
 				// --- [코드 수정] TMap::Add -> TArray::Add ---
 				ActiveStatEffects.Add({ ItemID, ActiveHandle });
 				// -----------------------------------------
-				// --- [ ★★★ 로그 매크로 교체 ★★★ ] ---
-				LOG_INVENTORY(FColor::Cyan, TEXT("AddItem: Stored GE Handle for %s"), *ItemID.ToString());
-				// ---------------------------------
 			}
 			else
 			{
-				// --- [ ★★★ 로그 매크로 교체 ★★★ ] ---
-				LOG_INVENTORY(FColor::Red, TEXT("AddItem: Applied GE Handle for %s is INVALID!"), *ItemID.ToString());
-				// ---------------------------------
 			}
 		}
 	}
@@ -163,24 +147,14 @@ void UInventoryComponent::AddItem(FName ItemID)
 		if (AbilityHandle.IsValid())
 		{
 			ActiveGrantedAbilities.Add({ ItemID, AbilityHandle });
-			// --- [ ★★★ 로그 매크로 교체 ★★★ ] ---
-			LOG_INVENTORY(FColor::Cyan, TEXT("AddItem: Stored GA Handle for %s"), *ItemID.ToString());
-			// ---------------------------------
 		}
 		else
 		{
-			// --- [ ★★★ 로그 매크로 교체 ★★★ ] ---
-			LOG_INVENTORY(FColor::Red, TEXT("AddItem: Applied GA Handle for %s is INVALID!"), *ItemID.ToString());
-			// ---------------------------------
 		}
-		// --- [코드 수정 끝] ---
 	}
 
 	InventoryItems.Add(ItemID);
 	OnRep_InventoryItems();
-	// --- [ ★★★ 로그 매크로 교체 ★★★ ] ---
-	LOG_INVENTORY(FColor::Green, TEXT("Item Added (SBC): %s"), *ItemID.ToString());
-	// ---------------------------------
 }
 
 /** (서버 전용) 아이템 제거 */
@@ -206,39 +180,12 @@ void UInventoryComponent::RemoveItem(FName ItemID)
 		{
 			// ASC에서 GE를 제거합니다.
 			bool bRemoved = AbilitySystemComponent->RemoveActiveGameplayEffect(HandleToRemove);
-			if (bRemoved)
-			{
-				// --- [ ★★★ 로그 매크로 교체 ★★★ ] ---
-				LOG_INVENTORY(FColor::Orange, TEXT("RemoveItem: Removed GE Handle for %s (Success)"), *ItemID.ToString());
-				// ---------------------------------
-			}
-			else
-			{
-				// --- [ ★★★ 로그 매크로 교체 ★★★ ] ---
-				LOG_INVENTORY(FColor::Red, TEXT("RemoveItem: Failed to remove GE Handle for %s"), *ItemID.ToString());
-				// ---------------------------------
-			}
-		}
-		else
-		{
-			// --- [ ★★★ 로그 매크로 교체 ★★★ ] ---
-			LOG_INVENTORY(FColor::Red, TEXT("RemoveItem: Found INVALID GE Handle in array for %s"), *ItemID.ToString());
-			// ---------------------------------
+
 		}
 
 		// '반드시' 추적 배열에서 이 항목을 제거합니다. (다음 RemoveItem 호출 시 그 다음 항목을 찾도록)
 		ActiveStatEffects.RemoveAt(StatEffectIndex);
 	}
-	else
-	{
-		// 스탯이 없는 아이템일 수 있으므로 경고만 출력
-		// --- [ ★★★ 로그 매크로 교체 ★★★ ] ---
-		LOG_INVENTORY(FColor::Yellow, TEXT("RemoveItem: No GE Handle found in array for %s"), *ItemID.ToString());
-		// ---------------------------------
-	}
-	// --- [코드 수정 끝] ---
-
-
 	// 2. 고유 능력(GA) 제거
 	// --- [코드 수정] TMap::Contains -> TArray::IndexOfByPredicate ---
 
@@ -256,45 +203,24 @@ void UInventoryComponent::RemoveItem(FName ItemID)
 		{
 			// ASC에서 어빌리티를 제거합니다.
 			AbilitySystemComponent->ClearAbility(HandleToRemove);
-			// --- [ ★★★ 로그 매크로 교체 ★★★ ] ---
-			LOG_INVENTORY(FColor::Orange, TEXT("RemoveItem: Removed GA Handle for %s (Success)"), *ItemID.ToString());
-			// ---------------------------------
 		}
 		else
 		{
-			// --- [ ★★★ 로그 매크로 교체 ★★★ ] ---
-			LOG_INVENTORY(FColor::Red, TEXT("RemoveItem: Found INVALID GA Handle in array for %s"), *ItemID.ToString());
-			// ---------------------------------
 		}
 
 		// '반드시' 추적 배열에서 이 항목을 제거합니다.
 		ActiveGrantedAbilities.RemoveAt(AbilityIndex);
 	}
-	else
-	{
-		// 어빌리티가 없는 아이템일 수 있으므로 경고만 출력
-		// --- [ ★★★ 로그 매크로 교체 ★★★ ] ---
-		LOG_INVENTORY(FColor::Yellow, TEXT("RemoveItem: No GA Handle found in array for %s"), *ItemID.ToString());
-		// ---------------------------------
-	}
-	// --- [코드 수정 끝] ---
-
 
 	// 3. 실제 인벤토리 배열에서 제거 (가장 마지막에 수행)
 	bool bRemovedFromArray = InventoryItems.RemoveSingle(ItemID) > 0;
 	if (!bRemovedFromArray) // 아이템이 배열에 없는데 제거 시도된 경우
 	{
-		// --- [ ★★★ 로그 매크로 교체 ★★★ ] ---
-		LOG_INVENTORY(FColor::Red, TEXT("RemoveItem: ItemID %s was not found in InventoryItems array!"), *ItemID.ToString());
-		// ---------------------------------
 		return; // 아이템이 없었으므로 UI 업데이트 불필
 	}
 	// --------------------------------------------------------
 
 	OnRep_InventoryItems(); // UI 갱신 알림
-	// --- [ ★★★ 로그 매크로 교체 ★★★ ] ---
-	LOG_INVENTORY(FColor::Yellow, TEXT("Item Removed: %s"), *ItemID.ToString());
-	// ---------------------------------
 }
 
 /**
@@ -306,9 +232,6 @@ void UInventoryComponent::AddRandomItem()
 	// ItemDataTable 유효성 검사
 	if (!ItemDataTable)
 	{
-		// --- [ ★★★ 로그 매크로 교체 ★★★ ] ---
-		LOG_INVENTORY(FColor::Red, TEXT("ItemDataTable is NOT set! Cannot add random item."));
-		// ---------------------------------
 		return;
 	}
 
@@ -344,17 +267,8 @@ void UInventoryComponent::AddRandomItem()
 		// 선택된 흔함 등급 아이템 ID로 AddItem 함수를 호출합니다.
 		AddItem(RandomCommonItemID);
 	}
-	else
-	{
-		// 데이터 테이블에 흔함 등급 아이템이 하나도 없을 경우 로그 출력
-		// --- [ ★★★ 로그 매크로 교체 ★★★ ] ---
-		LOG_INVENTORY(FColor::Yellow, TEXT("No Common grade items found in ItemDataTable!"));
-		// ---------------------------------
-	}
-	// ------------------
 }
 
-// --- [ ★★★ 코드 추가 ★★★ ] ---
 /**
  * @brief 데이터 테이블에서 '흔함' 등급 아이템 ID를 '모두' 찾아 배열로 반환합니다.
  */
@@ -384,8 +298,6 @@ TArray<FName> UInventoryComponent::GetAllCommonItemIDs() const
 	// 2. '흔함' 등급 아이템 전체 목록을 반환합니다.
 	return CommonItemIDs;
 }
-// --- [ ★★★ 코드 추가 끝 ★★★ ] ---
-
 
 /**
  * @brief (서버 전용 / UI 호출용) 결과 아이템 ID를 기반으로 아이템 조합을 시도합니다.
@@ -397,17 +309,11 @@ bool UInventoryComponent::CombineItemByResultID(FName ResultItemID)
 	// 서버에서만 실행되도록 합니다.
 	if (!GetOwner()->HasAuthority())
 	{
-		// --- [ ★★★ 로그 매크로 교체 ★★★ ] ---
-		LOG_INVENTORY(FColor::Red, TEXT("CombineItemByResultID called on Client!"));
-		// ---------------------------------
 		return false;
 	}
 	// RecipeDataTable이 설정되어 있는지 확인합니다.
 	if (!RecipeDataTable)
 	{
-		// --- [ ★★★ 로그 매크로 교체 ★★★ ] ---
-		LOG_INVENTORY(FColor::Red, TEXT("RecipeDataTable is NOT set!"));
-		// ---------------------------------
 		return false;
 	}
 
@@ -434,9 +340,6 @@ bool UInventoryComponent::CombineItemByResultID(FName ResultItemID)
 	// 최종적으로 조합법을 찾지 못했다면 실패를 반환합니다.
 	if (!RecipeData)
 	{
-		// --- [ ★★★ 로그 매크로 교체 ★★★ ] ---
-		LOG_INVENTORY(FColor::Yellow, TEXT("No recipe found for ResultItemID: %s"), *ResultItemID.ToString());
-		// ---------------------------------
 		return false;
 	}
 
@@ -445,9 +348,6 @@ bool UInventoryComponent::CombineItemByResultID(FName ResultItemID)
 	// 여기서는 임시로 ResultItemID를 RecipeID처럼 사용합니다. 필요시 수정 필요)
 	if (!CanCombine(ResultItemID)) // TODO: RecipeData->GetRowName() 같은 함수가 있다면 그것을 사용
 	{
-		// --- [ ★★★ 로그 매크로 교체 ★★★ ] ---
-		LOG_INVENTORY(FColor::Yellow, TEXT("Cannot combine %s: Ingredients missing."), *ResultItemID.ToString());
-		// ---------------------------------
 		return false;
 	}
 
@@ -467,9 +367,6 @@ bool UInventoryComponent::CombineItemByResultID(FName ResultItemID)
 		{
 			// 이 경우는 CanCombine() 로직이 잘못되었거나, 그 사이에 아이템이 사라진 경우입니다.
 			bFailedToRemoveIngredient = true;
-			// --- [ ★★★ 로그 매크로 교체 ★★★ ] ---
-			LOG_INVENTORY(FColor::Red, TEXT("CRITICAL ERROR in CombineItem: Ingredient %s vanished AFTER CanCombine passed!"), *IngredientID.ToString());
-			// ---------------------------------
 			break; // 재료 소모 중단
 		}
 	}
@@ -478,9 +375,6 @@ bool UInventoryComponent::CombineItemByResultID(FName ResultItemID)
 	if (!bFailedToRemoveIngredient)
 	{
 		AddItem(RecipeData->ResultItemID); // 결과 아이템 추가 및 효과 적용
-		// --- [ ★★★ 로그 매크로 교체 ★★★ ] ---
-		LOG_INVENTORY(FColor::Green, TEXT("Successfully combined: %s"), *RecipeData->ResultItemID.ToString());
-		// ---------------------------------
 		return true; // 조합 성공
 	}
 

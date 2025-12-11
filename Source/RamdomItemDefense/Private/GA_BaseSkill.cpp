@@ -1,64 +1,145 @@
-// Source/RamdomItemDefense/Private/GA_BaseSkill.cpp (수정)
+// Source/RamdomItemDefense/Private/GA_BaseSkill.cpp
 #include "GA_BaseSkill.h"
 #include "Kismet/GameplayStatics.h"
 #include "RamdomItemDefenseCharacter.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "AbilitySystemComponent.h"
-#include "RamdomItemDefenseCharacter.h"
-#include "SoldierDrone.h" // 드론 헤더
+#include "SoldierDrone.h"
 #include "Components/SceneComponent.h"
+#include "MyAttributeSet.h"
+#include "RID_DamageStatics.h"
+#include "AbilitySystemBlueprintLibrary.h"
+#include "Kismet/KismetMathLibrary.h"
 
 UGA_BaseSkill::UGA_BaseSkill()
 {
-	// 모든 스킬은 기본적으로 InstancedPerActor로 설정 (타이머 등 사용 가능)
 	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
 	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::ServerOnly;
 
-	// 기본값 설정 (자식 클래스에서 덮어쓸 수 있음)
 	BaseActivationChance = 0.f;
-
 	DamageBase = 0.f;
 	DamageCoefficient = 0.f;
 
-	MuzzleSocketName = FName("MuzzlePoint"); // 기본 소켓 이름
+	MuzzleSocketName = FName("MuzzlePoint");
 	MuzzleFlashEffect = nullptr;
 }
 
-/** * 어빌리티 활성화 시 (자식 클래스의 ActivateAbility보다 먼저) 호출됩니다.
- * MuzzleFlash 이펙트를 스폰하는 공통 로직을 처리합니다.
- */
 void UGA_BaseSkill::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
 {
-	// 1. (최우선) MuzzleFlashEffect가 유효하면 스폰합니다.
 	if (MuzzleFlashEffect)
 	{
 		AActor* AvatarActor = ActorInfo->AvatarActor.Get();
 
-		// 1. 캐릭터인 경우: 멀티캐스트로 모든 클라이언트 동기화 (부착)
 		if (ARamdomItemDefenseCharacter* OwnerCharacter = Cast<ARamdomItemDefenseCharacter>(AvatarActor))
 		{
 			OwnerCharacter->Multicast_SpawnParticleAttached(
-				MuzzleFlashEffect,
-				MuzzleSocketName,
-				FVector::ZeroVector,
-				FRotator::ZeroRotator,
-				FVector(1.0f)
-			);
+				MuzzleFlashEffect, MuzzleSocketName, FVector::ZeroVector, FRotator::ZeroRotator, FVector(1.0f));
 		}
-		// 2. 드론인 경우: (드론 클래스에 멀티캐스트가 없다면) 서버에서만이라도 재생
 		else if (ASoldierDrone* OwnerDrone = Cast<ASoldierDrone>(AvatarActor))
 		{
-			// 이제 드론도 멀티캐스트 함수를 가집니다.
 			OwnerDrone->Multicast_SpawnParticleAttached(
-				MuzzleFlashEffect,
-				MuzzleSocketName,
-				FVector::ZeroVector,
-				FRotator::ZeroRotator,
-				FVector(1.0f)
-			);
+				MuzzleFlashEffect, MuzzleSocketName, FVector::ZeroVector, FRotator::ZeroRotator, FVector(1.0f));
 		}
 	}
 
-	// 2. (필수) 부모(UGameplayAbility)의 ActivateAbility를 호출합니다.
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
+}
+
+// --- [ ★★★ 리팩토링 구현부 ★★★ ] ---
+
+void UGA_BaseSkill::GetMuzzleTransform(AActor* AvatarActor, FVector& OutLocation, FRotator& OutRotation, AActor* TargetActor)
+{
+	if (!AvatarActor) return;
+
+	OutLocation = AvatarActor->GetActorLocation();
+
+	// 1. 소켓 위치 가져오기 (캐릭터 vs 드론)
+	USceneComponent* AttachComponent = nullptr;
+	if (ARamdomItemDefenseCharacter* Character = Cast<ARamdomItemDefenseCharacter>(AvatarActor))
+	{
+		AttachComponent = Character->GetMesh();
+	}
+	else if (ASoldierDrone* Drone = Cast<ASoldierDrone>(AvatarActor))
+	{
+		AttachComponent = Drone->GetMesh();
+	}
+
+	// MuzzleSocketName을 사용 (자식 클래스에서 덮어쓴 이름이 있다면 그것 사용)
+	if (AttachComponent && MuzzleSocketName != NAME_None && AttachComponent->DoesSocketExist(MuzzleSocketName))
+	{
+		OutLocation = AttachComponent->GetSocketLocation(MuzzleSocketName);
+	}
+
+	// 2. 회전 계산 (Target이 있으면 LookAt, 없으면 ActorRotation)
+	if (TargetActor)
+	{
+		OutRotation = UKismetMathLibrary::FindLookAtRotation(OutLocation, TargetActor->GetActorLocation());
+	}
+	else
+	{
+		OutRotation = AvatarActor->GetActorRotation();
+	}
+}
+
+FGameplayEffectSpecHandle UGA_BaseSkill::MakeDamageEffectSpec(const FGameplayAbilityActorInfo* ActorInfo, float InBaseDmg, float InCoeff, float& OutFinalDamage, bool& OutDidCrit)
+{
+	OutFinalDamage = 0.0f;
+	OutDidCrit = false;
+
+	UAbilitySystemComponent* SourceASC = ActorInfo->AbilitySystemComponent.Get();
+	if (!SourceASC || !DamageEffectClass) return FGameplayEffectSpecHandle();
+
+	const UMyAttributeSet* AS = Cast<const UMyAttributeSet>(SourceASC->GetAttributeSet(UMyAttributeSet::StaticClass()));
+	if (!AS) return FGameplayEffectSpecHandle();
+
+	// 1. 기본 데미지 계산
+	const float OwnerAttackDamage = AS->GetAttackDamage();
+	const float RawDamage = InBaseDmg + (OwnerAttackDamage * InCoeff);
+
+	// 2. 치명타 계산 (시전자 스탯 기반)
+	OutDidCrit = URID_DamageStatics::CheckForCrit(SourceASC, true);
+	OutFinalDamage = RawDamage;
+
+	if (OutDidCrit)
+	{
+		OutFinalDamage = RawDamage * URID_DamageStatics::GetCritMultiplier(SourceASC);
+	}
+
+	// 3. Spec 생성 및 값 설정
+	FGameplayEffectContextHandle Context = SourceASC->MakeEffectContext();
+	FGameplayEffectSpecHandle SpecHandle = SourceASC->MakeOutgoingSpec(DamageEffectClass, 1.0f, Context);
+
+	if (SpecHandle.IsValid() && DamageByCallerTag.IsValid())
+	{
+		SpecHandle.Data.Get()->SetSetByCallerMagnitude(DamageByCallerTag, -OutFinalDamage);
+	}
+
+	return SpecHandle;
+}
+
+bool UGA_BaseSkill::ApplyDamageToTarget(const FGameplayAbilityActorInfo* ActorInfo, AActor* Target, float InBaseDmg, float InCoeff)
+{
+	if (!Target) return false;
+
+	UAbilitySystemComponent* SourceASC = ActorInfo->AbilitySystemComponent.Get();
+	UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Target);
+	if (!SourceASC || !TargetASC || !DamageEffectClass) return false;
+
+	const UMyAttributeSet* AS = Cast<const UMyAttributeSet>(SourceASC->GetAttributeSet(UMyAttributeSet::StaticClass()));
+	if (!AS) return false;
+
+	// 1. 데미지 계산 (타겟 정보 포함하여 치명타 계산)
+	const float BaseVal = InBaseDmg + (AS->GetAttackDamage() * InCoeff);
+	const float FinalDamage = URID_DamageStatics::ApplyCritDamage(BaseVal, SourceASC, Target, true);
+
+	// 2. Spec 생성 및 적용
+	FGameplayEffectSpecHandle SpecHandle = SourceASC->MakeOutgoingSpec(DamageEffectClass, 1.0f, SourceASC->MakeEffectContext());
+	if (SpecHandle.IsValid() && DamageByCallerTag.IsValid())
+	{
+		SpecHandle.Data.Get()->SetSetByCallerMagnitude(DamageByCallerTag, -FinalDamage);
+		SourceASC->ApplyGameplayEffectSpecToTarget(*SpecHandle.Data.Get(), TargetASC);
+		return true;
+	}
+
+	return false;
 }

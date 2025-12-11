@@ -1,4 +1,4 @@
-// Private/AttackComponent.cpp (수정)
+// Source/RamdomItemDefense/Private/AttackComponent.cpp
 
 #include "AttackComponent.h"
 #include "RamdomItemDefenseCharacter.h"
@@ -29,7 +29,6 @@ void UAttackComponent::BeginPlay()
 	OwnerCharacter = Cast<ARamdomItemDefenseCharacter>(GetOwner());
 	if (OwnerCharacter)
 	{
-		// [ ★★★ UE_LOG 추가 ★★★ ]
 		UE_LOG(LogRamdomItemDefense, Log, TEXT("AttackComponent [%s]: Initializing for CHARACTER."), *GetNameSafe(GetOwner()));
 		Initialize(OwnerCharacter->GetAbilitySystemComponent(), OwnerCharacter->GetAttributeSet());
 	}
@@ -40,7 +39,6 @@ void UAttackComponent::Initialize(UAbilitySystemComponent* InASC, const UMyAttri
 	AbilitySystemComponent = InASC;
 	AttributeSet = InAttributeSet;
 
-	// [ ★★★ UE_LOG 추가 ★★★ ]
 	UE_LOG(LogRamdomItemDefense, Log, TEXT("AttackComponent [%s]: Initialize called."), *GetNameSafe(GetOwner()));
 
 	if (AbilitySystemComponent)
@@ -53,7 +51,6 @@ void UAttackComponent::Initialize(UAbilitySystemComponent* InASC, const UMyAttri
 		const float CurrentAttackSpeed = AttributeSet->GetAttackSpeed();
 		const float TimerInterval = CurrentAttackSpeed > 0 ? 1.0f / CurrentAttackSpeed : 1.0f;
 
-		// [ ★★★ UE_LOG 추가 ★★★ ]
 		UE_LOG(LogRamdomItemDefense, Log, TEXT("AttackComponent [%s]: Starting timers. AtkSpeed: %.2f (Interval: %.2fs)"), *GetNameSafe(GetOwner()), CurrentAttackSpeed, TimerInterval);
 
 		GetWorld()->GetTimerManager().SetTimer(FindTargetTimerHandle, this, &UAttackComponent::FindTarget, 0.1f, true);
@@ -61,7 +58,6 @@ void UAttackComponent::Initialize(UAbilitySystemComponent* InASC, const UMyAttri
 	}
 	else
 	{
-		// [ ★★★ UE_LOG 추가 ★★★ ]
 		UE_LOG(LogRamdomItemDefense, Warning, TEXT("AttackComponent [%s]: FAILED to start timers. (IsAuthority: %d, HasAttributeSet: %d)"),
 			*GetNameSafe(GetOwner()),
 			GetOwner() ? GetOwner()->HasAuthority() : -1,
@@ -84,7 +80,6 @@ void UAttackComponent::OnAttackSpeedChanged(const FOnAttributeChangeData& Data)
 			GetWorld()->GetTimerManager().SetTimer(PerformAttackTimerHandle, this, &UAttackComponent::PerformAttack, NewInterval, true);
 		}
 
-		// [ ★★★ UE_LOG 수정 ★★★ ]
 		UE_LOG(LogRamdomItemDefense, Log, TEXT("AttackComponent [%s]: AttackSpeed changed to: %.2f. Timer rescheduled."), *GetNameSafe(GetOwner()), NewAttackSpeed);
 	}
 }
@@ -131,7 +126,6 @@ void UAttackComponent::FindTarget()
 
 	const float CurrentAttackRange = AttributeSet->GetAttackRange();
 
-	// [ ★★★ UE_LOG 추가 (핵심) ★★★ ]
 	if (CurrentAttackRange <= 0.0f)
 	{
 		UE_LOG(LogRamdomItemDefense, Warning, TEXT("AttackComponent [%s]: FindTarget FAILED. CurrentAttackRange is ZERO."), *GetNameSafe(MyOwner));
@@ -179,6 +173,7 @@ void UAttackComponent::PerformAttack()
 	AActor* MyOwner = GetOwner();
 	if (!MyOwner || !MyOwner->HasAuthority()) return;
 
+	// 궁극기 사용 중이면 공격 중단
 	if (AbilitySystemComponent && AbilitySystemComponent->HasMatchingGameplayTag(FGameplayTag::RequestGameplayTag(FName("State.Player.IsUsingUltimate"))))
 	{
 		return;
@@ -198,7 +193,6 @@ void UAttackComponent::PerformAttack()
 
 		if (!AttributeSet)
 		{
-			// [ ★★★ UE_LOG 수정 ★★★ ]
 			UE_LOG(LogRamdomItemDefense, Error, TEXT("AttackComponent [%s]: PerformAttack FAILED. AttributeSet is NULL!"), *GetNameSafe(MyOwner));
 			return;
 		}
@@ -209,6 +203,7 @@ void UAttackComponent::PerformAttack()
 		APawn* OwnerPawn = Cast<APawn>(MyOwner);
 		AController* MyController = OwnerPawn ? OwnerPawn->GetController() : nullptr;
 
+		// 1. 사거리 밖이면 이동
 		if (DistanceToTarget > CurrentAttackRange)
 		{
 			if (TargetToAttack == ManualTarget && MyController && OwnerCharacter)
@@ -223,10 +218,12 @@ void UAttackComponent::PerformAttack()
 			}
 			else
 			{
+				// 자동 타겟인데 사거리 밖이면 타겟 해제 (다음 FindTarget에서 다시 찾음)
 				AutoTarget = nullptr;
 			}
 			return;
 		}
+		// 2. 사거리 안이면 공격 실행
 		else
 		{
 			if (MyController)
@@ -234,48 +231,58 @@ void UAttackComponent::PerformAttack()
 				MyController->StopMovement();
 			}
 
-			if (OwnerCharacter)
+			// [리팩토링] 공격 실행 로직 분리 호출
+			ExecuteAttackLogic(TargetToAttack);
+		}
+	}
+}
+
+/** [리팩토링] 분리된 공격 실행 함수 */
+void UAttackComponent::ExecuteAttackLogic(AActor* TargetActor)
+{
+	if (!TargetActor || !GetOwner()) return;
+
+	// 1. 캐릭터 회전 및 애니메이션 (시각 효과)
+	if (OwnerCharacter)
+	{
+		if (OwnerCharacter->GetVelocity().Size() > 1.0f)
+		{
+			return; // 움직이는 중이면 스킵
+		}
+
+		// Z축 회전(Yaw)만 적용하여 타겟 바라보기
+		FRotator LookAtRotation = UKismetMathLibrary::FindLookAtRotation(OwnerCharacter->GetActorLocation(), TargetActor->GetActorLocation());
+		LookAtRotation.Pitch = 0.0f;
+		LookAtRotation.Roll = 0.0f;
+
+		// (서버에서도 회전 적용 - 싱크를 위해)
+		OwnerCharacter->SetActorRotation(LookAtRotation);
+
+		UAnimMontage* MontageToPlay = OwnerCharacter->GetRandomAttackMontage();
+		if (MontageToPlay)
+		{
+			OwnerCharacter->Multicast_PlayAttack(MontageToPlay, LookAtRotation);
+		}
+	}
+
+	// 2. GAS 이벤트 전송 (실제 데미지 로직 트리거)
+	if (AbilitySystemComponent)
+	{
+		UE_LOG(LogRamdomItemDefense, Log, TEXT("AttackComponent [%s]: Sending 'Event.Attack.Perform' to SELF targeting %s"), *GetNameSafe(GetOwner()), *GetNameSafe(TargetActor));
+
+		FGameplayEventData Payload;
+		Payload.Target = TargetActor;
+		FGameplayTag EventTag = FGameplayTag::RequestGameplayTag(FName("Event.Attack.Perform"));
+
+		UAbilitySystemBlueprintLibrary::SendGameplayEventToActor(GetOwner(), EventTag, Payload);
+
+		// 궁극기 게이지 충전
+		if (OwnerCharacter)
+		{
+			AMyPlayerState* PS = OwnerCharacter->GetPlayerState<AMyPlayerState>();
+			if (PS)
 			{
-				if (OwnerCharacter->GetVelocity().Size() > 1.0f)
-				{
-					return;
-				}
-
-				// 1. 바라볼 회전값 계산 (서버에서 계산)
-				FRotator LookAtRotation = UKismetMathLibrary::FindLookAtRotation(OwnerCharacter->GetActorLocation(), TargetToAttack->GetActorLocation());
-
-				// Z축 회전(Yaw)만 남기고 나머지는 0으로 (기울어짐 방지)
-				LookAtRotation.Pitch = 0.0f;
-				LookAtRotation.Roll = 0.0f;
-
-				// (서버에서도 회전 적용 - 싱크를 위해)
-				OwnerCharacter->SetActorRotation(LookAtRotation);
-
-				UAnimMontage* MontageToPlay = OwnerCharacter->GetRandomAttackMontage();
-				if (MontageToPlay)
-				{
-					OwnerCharacter->Multicast_PlayAttack(MontageToPlay, LookAtRotation);
-				}
-			}
-
-			if (AbilitySystemComponent)
-			{
-				// [ ★★★ UE_LOG 추가 (핵심) ★★★ ]
-				UE_LOG(LogRamdomItemDefense, Log, TEXT("AttackComponent [%s]: Sending 'Event.Attack.Perform' to SELF targeting %s"), *GetNameSafe(MyOwner), *GetNameSafe(TargetToAttack));
-
-				FGameplayEventData Payload;
-				Payload.Target = TargetToAttack;
-				FGameplayTag EventTag = FGameplayTag::RequestGameplayTag(FName("Event.Attack.Perform"));
-				UAbilitySystemBlueprintLibrary::SendGameplayEventToActor(MyOwner, EventTag, Payload);
-
-				if (OwnerCharacter)
-				{
-					AMyPlayerState* PS = OwnerCharacter->GetPlayerState<AMyPlayerState>();
-					if (PS)
-					{
-						PS->AddUltimateCharge(1);
-					}
-				}
+				PS->AddUltimateCharge(1);
 			}
 		}
 	}

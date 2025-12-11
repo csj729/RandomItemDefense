@@ -1,5 +1,3 @@
-// Source/RamdomItemDefense/Public/GA_AttackSelector.h (수정)
-
 #pragma once
 
 #include "RamdomItemDefense.h"
@@ -19,24 +17,16 @@ public:
 	UGA_AttackSelector();
 
 protected:
-	/** 어빌리티 활성화 시 (Event.Attack.Perform 수신 시) */
+	// --- [ Overrides ] ---
 	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
 
-	/**
-	 * @brief (블루프린트 구현용) 확률에 따라 실행할 공격 유형 태그를 결정합니다.
-	 * @param TriggerEventData 공격 대상 등의 정보 전달용
-	 * @param OwnerASC (추가됨) 태그 확인을 위한 시전자의 ASC
-	 * @return 선택된 공격 실행 태그 (예: Event.Attack.Execute.Basic)
-	 */
+	// --- [ Blueprint Logic ] ---
+	/** 확률에 따라 실행할 공격 태그 결정 (BP 구현) */
 	UFUNCTION(BlueprintImplementableEvent, Category = "Attack Selection")
 	FGameplayTag SelectAttackType(const FGameplayEventData& TriggerEventData, UAbilitySystemComponent* OwnerASC);
 
-	/**
-	 * @brief (블루프린트 구현용) 결정된 공격 태그로 Gameplay Event를 전송합니다.
-	 * @param TargetActor 공격 대상
-	 * @param ExecuteTag 전송할 이벤트 태그
-	 */
+	// --- [ Helper Functions ] ---
+	/** 결정된 공격 태그로 이벤트 전송 */
 	UFUNCTION(BlueprintCallable, Category = "Attack Selection")
 	void SendExecuteAttackEvent(AActor* TargetActor, FGameplayTag ExecuteTag);
-
 };

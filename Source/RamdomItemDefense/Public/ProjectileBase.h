@@ -1,8 +1,5 @@
-// Source/RamdomItemDefense/Public/ProjectileBase.h (»õ ÆÄÀÏ)
-
 #pragma once
 
-#include "RamdomItemDefense.h"
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "ProjectileBase.generated.h"
@@ -10,8 +7,6 @@
 class USphereComponent;
 class UProjectileMovementComponent;
 class UParticleSystemComponent;
-class UParticleSystem;
-
 
 UCLASS()
 class RAMDOMITEMDEFENSE_API AProjectileBase : public AActor
@@ -28,7 +23,6 @@ protected:
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaTime) override;
 
-protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<USphereComponent> SphereComponent;
 
@@ -37,5 +31,4 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, Category = "Config")
 	float ArrivalTolerance;
-
 };

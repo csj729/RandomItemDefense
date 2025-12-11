@@ -4,6 +4,9 @@
 #include "AIController.h"
 #include "MonsterAIController.generated.h"
 
+class UBehaviorTree;
+class UBlackboardComponent;
+
 UCLASS()
 class RAMDOMITEMDEFENSE_API AMonsterAIController : public AAIController
 {
@@ -12,17 +15,16 @@ class RAMDOMITEMDEFENSE_API AMonsterAIController : public AAIController
 public:
 	AMonsterAIController();
 
+	/** 패트롤 경로 액터 설정 */
 	void SetPatrolPath(AActor* PathActor);
 
 protected:
 	virtual void OnPossess(APawn* InPawn) override;
 
 private:
-	// 비헤이비어 트리 에셋을 저장할 변수
 	UPROPERTY(EditDefaultsOnly, Category = "AI")
-	TObjectPtr<class UBehaviorTree> BehaviorTree;
+	TObjectPtr<UBehaviorTree> BehaviorTree;
 
-	// 블랙보드 컴포넌트
 	UPROPERTY(VisibleAnywhere, Category = "AI")
-	TObjectPtr<class UBlackboardComponent> BlackboardComponent;
+	TObjectPtr<UBlackboardComponent> BlackboardComponent;
 };
