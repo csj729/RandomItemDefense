@@ -53,15 +53,10 @@ AMonsterBaseCharacter::AMonsterBaseCharacter()
 	bReplicates = true;
 	SetReplicateMovement(true);
 
-	// [수정] True로 설정했던 것을 다시 False로 끕니다! (대역폭 폭발 방지)
+	// 네트워크 컬링 거리 최적화
 	bAlwaysRelevant = false;
+	NetCullDistanceSquared = 4500000000.0f;
 
-	// [대안] 대신 "네트워크 컬링 거리"를 크게 늘립니다. 
-	// 기본값은 약 15,000인데, 이를 22,500,000 (거리 4500의 제곱) 정도로 늘려줍니다.
-	// 맵 끝에서 끝까지 보일 정도로 충분히 크면 됩니다. (필요 시 더 늘리세요)
-	NetCullDistanceSquared = 4500000000.0f; // 예: 맵이 매우 크다면 더 큰 값 입력
-
-	// [유지] 중요하므로 업데이트 빈도는 높게 유지
 	NetUpdateFrequency = 100.0f;
 	MinNetUpdateFrequency = 33.0f;
 }
@@ -99,15 +94,9 @@ void AMonsterBaseCharacter::PossessedBy(AController* NewController)
 			{
 				const float CurrentSpeedMultiplier = AttributeSet->GetMoveSpeed();
 				GetCharacterMovement()->MaxWalkSpeed = BaseMoveSpeed * CurrentSpeedMultiplier;
-				/*RID_LOG(FColor::Green, TEXT("%s PossessedBy. Initial MaxWalkSpeed set to: %.1f (Base: %.1f * Multi: %.2f)"),
-					*GetName(),
-					GetCharacterMovement()->MaxWalkSpeed,
-					BaseMoveSpeed,
-					CurrentSpeedMultiplier);*/
 			}
 			URID_DamageStatics::OnCritDamageOccurred.AddDynamic(this, &AMonsterBaseCharacter::OnCritDamageOccurred);
 		}
-		//RID_LOG(FColor::Green, TEXT("%s PossessedBy. All ASC Delegates Bound."), *GetName());
 	}
 }
 
@@ -150,16 +139,13 @@ void AMonsterBaseCharacter::BeginPlay()
 	{
 		OnRep_WaveMaterial();
 	}
+}
 
-	if (HasAuthority())
+void AMonsterBaseCharacter::Multicast_PlaySpawnEffect_Implementation()
+{
+	if (SpawnEffect)
 	{
-		// 서버가 생성함
-		// RID_LOG(FColor::Red, TEXT("[Server] Monster Spawned at: %s"), *GetActorLocation().ToString());
-	}
-	else
-	{
-		// 클라이언트가 서버로부터 몬스터 정보를 받음! (이 로그가 안 뜨면 컬링/네트워크 문제)
-		//RID_LOG(FColor::Green, TEXT("[Client] Monster Replicated at: %s"), *GetActorLocation().ToString());
+		UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), SpawnEffect, GetActorLocation());
 	}
 }
 
@@ -179,27 +165,40 @@ void AMonsterBaseCharacter::SetSpawner(AMonsterSpawner* InSpawner)
 {
 	MySpawner = InSpawner;
 
-	FString PathName = (InSpawner && InSpawner->PatrolPathActor) ? InSpawner->PatrolPathActor->GetName() : TEXT("NULL");
-	// [추가] 스포너에 설정된 경로를 AI 컨트롤러에게 전달
-	if (InSpawner && InSpawner->PatrolPathActor)
+	if (MySpawner)
 	{
-		// 1. AI 컨트롤러 캐싱 확인 (혹시 null일 경우 대비)
-		if (!MonsterAIController.IsValid())
-		{
-			MonsterAIController = Cast<AMonsterAIController>(GetController());
-		}
+		// [디버그 1] SetSpawner 호출 확인
+		RID_LOG(FColor::Yellow, TEXT("[Debug] SetSpawner Called for %s. Binding Delegate..."), *GetName());
 
-		// 2. AI 컨트롤러에게 경로 주입
-		if (MonsterAIController.IsValid())
+		// 델리게이트 바인딩 (이미 바인딩된 경우 중복 방지)
+		MySpawner->OnBossStateChanged.RemoveDynamic(this, &AMonsterBaseCharacter::OnBossStateChanged);
+		MySpawner->OnBossStateChanged.AddDynamic(this, &AMonsterBaseCharacter::OnBossStateChanged);
+
+		// 이미 보스가 살아있는지 확인하여 수동 호출
+		if (MySpawner->IsBossAlive())
 		{
-			MonsterAIController->SetPatrolPath(InSpawner->PatrolPathActor);
+			RID_LOG(FColor::Yellow, TEXT("[Debug] Boss is already alive. Manually calling OnBossStateChanged."));
+			OnBossStateChanged(true);
 		}
 	}
+	else
+	{
+		RID_LOG(FColor::Red, TEXT("[Error] SetSpawner called with NULL Spawner!"));
+	}
+
+	if (!MonsterAIController.IsValid())
+	{
+		MonsterAIController = Cast<AMonsterAIController>(GetController());
+	}
+	if (MonsterAIController.IsValid() && MySpawner->PatrolPathActor)
+	{
+		MonsterAIController->SetPatrolPath(MySpawner->PatrolPathActor);
+	}
+
 }
 
 void AMonsterBaseCharacter::Multicast_PlayMontage_Implementation(UAnimMontage* MontageToPlay)
 {
-	// 서버와 모든 클라이언트에서 실행됨
 	if (MontageToPlay)
 	{
 		PlayAnimMontage(MontageToPlay);
@@ -211,18 +210,17 @@ void AMonsterBaseCharacter::Die(AActor* Killer)
 	if (bIsDying) { return; }
 	bIsDying = true;
 
-	if (MySpawner) { MySpawner->OnMonsterKilled(); }
+	if (MySpawner) { MySpawner->OnMonsterKilled(IsBoss()); }
 
 	OnStunStateChanged(false);
 	OnSlowStateChanged(false);
 	OnArmorShredStateChanged(false);
-	// AI 컨트롤러의 빙의를 해제 (요청하신 사항)
+
 	if (MonsterAIController.IsValid())
 	{
 		MonsterAIController->UnPossess();
 	}
 
-	// (추가) 캐릭터 이동을 즉시 멈추고 비활성화합니다.
 	if (GetCharacterMovement())
 	{
 		GetCharacterMovement()->StopMovementImmediately();
@@ -231,72 +229,55 @@ void AMonsterBaseCharacter::Die(AActor* Killer)
 
 	if (HasAuthority())
 	{
-		// 파티클 템플릿 인자는 제거 시 필요 없으므로 nullptr 전달
 		SetStatusEffectState(FGameplayTag::RequestGameplayTag(FName("State.Slow")), false, nullptr);
 		SetStatusEffectState(FGameplayTag::RequestGameplayTag(FName("State.ArmorShred")), false, nullptr);
 	}
 
-	// 캡슐 콜리전 비활성화 (트레이스, 물리 모두)
 	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
-	// --- [ ★★★ 수정된 타이머 로직 ★★★ ] --- (기존 파일 내용)
-
-	// 랙돌 전환까지의 기본 지연 시간 (몽타주가 없을 경우)
 	float RagdollDelay = 0.1f;
 
 	if (DeathMontage)
 	{
 		Multicast_PlayMontage(DeathMontage);
 
-		const float DeathAnimLength = DeathMontage->GetPlayLength(); // 몽타주 길이 직접 조회
+		const float DeathAnimLength = DeathMontage->GetPlayLength();
 		const float BlendOutTime = DeathMontage->BlendOut.GetBlendTime();
 		RagdollDelay = FMath::Max(0.01f, DeathAnimLength - BlendOutTime - 0.05f);
 	}
 
-	// 랙돌 로직을 LifeSpan 대신 보정된 'RagdollDelay' 타이머로 실행합니다.
 	GetWorldTimerManager().SetTimer(
 		RagdollTimerHandle,
 		this,
 		&AMonsterBaseCharacter::GoRagdoll,
-		RagdollDelay, // 보정된 지연 시간 사용
+		RagdollDelay,
 		false
 	);
-	// --- [ ★★★ 수정 끝 ★★★ ] ---
 }
 
 void AMonsterBaseCharacter::GoRagdoll()
 {
-	// 1. 모든 클라이언트(본인 포함)에게 랙돌 명령 전송
 	Multicast_GoRagdoll();
-
-	// 2. (서버 전용) 액터 소멸 타이머 설정 (랙돌 전환 2초 후 삭제)
 	SetLifeSpan(2.0f);
 }
 
-// [추가] 실제 랙돌 로직 (서버 + 모든 클라이언트 실행)
 void AMonsterBaseCharacter::Multicast_GoRagdoll_Implementation()
 {
-	// 1. 캡슐 콜리전 완전 제거 (시체에 길막힘 방지)
 	if (GetCapsuleComponent())
 	{
 		GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	}
 
-	// 2. 메쉬 물리 시뮬레이션 활성화
 	if (GetMesh())
 	{
-		// 랙돌용 콜리전 프로필 설정 (PhysicsBody 등)
 		GetMesh()->SetCollisionProfileName(TEXT("Ragdoll"));
-		// 물리 시뮬레이션 켜기
 		GetMesh()->SetSimulatePhysics(true);
-		// (선택) 애니메이션 인스턴스의 몽타주 강제 중지
 		if (GetMesh()->GetAnimInstance())
 		{
 			GetMesh()->GetAnimInstance()->StopAllMontages(0.0f);
 		}
 	}
 
-	// 3. 무브먼트 컴포넌트 정지 (혹시 모를 이동 방지)
 	if (GetCharacterMovement())
 	{
 		GetCharacterMovement()->StopMovementImmediately();
@@ -305,7 +286,6 @@ void AMonsterBaseCharacter::Multicast_GoRagdoll_Implementation()
 }
 
 void AMonsterBaseCharacter::SetWaveMaterial(UMaterialInterface* WaveMaterial)
-// ... (이하 SetWaveMaterial, OnRep_WaveMaterial, PlayHitEffect, Multicast_PlayHitEffect, OnStunTagChanged, OnSlowTagChanged, OnCritDamageOccurred 함수는 모두 동일) ...
 {
 	if (HasAuthority())
 	{
@@ -357,10 +337,7 @@ void AMonsterBaseCharacter::Multicast_PlayHitEffect_Implementation(const FGamepl
 
 void AMonsterBaseCharacter::OnStunTagChanged(const FGameplayTag Tag, int32 NewCount)
 {
-	if (bIsDying)
-	{
-		return;
-	}
+	if (bIsDying) return;
 	bool bIsStunned = NewCount > 0;
 	if (MonsterAIController.IsValid())
 	{
@@ -368,15 +345,9 @@ void AMonsterBaseCharacter::OnStunTagChanged(const FGameplayTag Tag, int32 NewCo
 		if (Brain)
 		{
 			if (bIsStunned)
-			{
 				Brain->PauseLogic(TEXT("Stunned"));
-				//RID_LOG(FColor::Red, TEXT("%s AI PAUSED (Stun)"), *GetName());
-			}
 			else
-			{
 				Brain->ResumeLogic(TEXT("StunEnded"));
-				//RID_LOG(FColor::Green, TEXT("%s AI RESUMED (Stun End)"), *GetName());
-			}
 		}
 	}
 	OnStunStateChanged(bIsStunned);
@@ -384,15 +355,11 @@ void AMonsterBaseCharacter::OnStunTagChanged(const FGameplayTag Tag, int32 NewCo
 
 void AMonsterBaseCharacter::OnCritDamageOccurred(AActor* TargetActor, float CritDamageAmount)
 {
-	if (TargetActor != this || !DamageTextWidgetClass)
-	{
-		return;
-	}
+	if (TargetActor != this || !DamageTextWidgetClass) return;
+
 	APlayerController* PC = UGameplayStatics::GetPlayerController(GetWorld(), 0);
-	if (!PC)
-	{
-		return;
-	}
+	if (!PC) return;
+
 	UDamageTextWidget* DamageWidget = CreateWidget<UDamageTextWidget>(PC, DamageTextWidgetClass);
 	if (DamageWidget)
 	{
@@ -404,28 +371,24 @@ void AMonsterBaseCharacter::OnCritDamageOccurred(AActor* TargetActor, float Crit
 			DamageWidget->SetPositionInViewport(ScreenPosition);
 			DamageWidget->AddToViewport();
 			DamageWidget->PlayRiseAndFade();
-			UE_LOG(LogTemp, Warning, TEXT("CritDam Ocurred"));
 		}
 	}
 }
 
-// 1. 멀티캐스트 함수 구현 (나이아가라 버전)
 void AMonsterBaseCharacter::SetStatusEffectState(FGameplayTag StatusTag, bool bIsActive, UNiagaraSystem* EffectTemplate)
 {
 	if (bIsActive)
 	{
-		// [켜기] 이미 켜져있지 않다면 이펙트 생성
 		if (!ActiveStatusParticles.Contains(StatusTag) && EffectTemplate && GetMesh())
 		{
-			// 나이아가라 스폰 (bAutoDestroy = false)
 			UNiagaraComponent* NC = UNiagaraFunctionLibrary::SpawnSystemAttached(
 				EffectTemplate,
 				GetMesh(),
-				NAME_None, // 필요시 소켓 이름 지정 (예: "Root")
+				NAME_None,
 				FVector::ZeroVector,
 				FRotator::ZeroRotator,
 				EAttachLocation::SnapToTarget,
-				false // bAutoDestroy = false (지속 이펙트이므로 수동 관리)
+				false
 			);
 
 			if (NC)
@@ -436,7 +399,6 @@ void AMonsterBaseCharacter::SetStatusEffectState(FGameplayTag StatusTag, bool bI
 	}
 	else
 	{
-		// [끄기] 맵에 있다면 찾아서 제거
 		if (TObjectPtr<UNiagaraComponent>* FoundNC = ActiveStatusParticles.Find(StatusTag))
 		{
 			UNiagaraComponent* NC = *FoundNC;
@@ -450,35 +412,74 @@ void AMonsterBaseCharacter::SetStatusEffectState(FGameplayTag StatusTag, bool bI
 	}
 }
 
-// 2. OnSlowTagChanged 수정
 void AMonsterBaseCharacter::OnSlowTagChanged(const FGameplayTag Tag, int32 NewCount)
 {
 	if (bIsDying) return;
-
 	bool bIsSlowed = NewCount > 0;
-
-	// [서버] 멀티캐스트 호출
 	if (HasAuthority())
 	{
 		SetStatusEffectState(Tag, bIsSlowed, SlowEffectTemplate);
 	}
-
 	OnSlowStateChanged(bIsSlowed);
 }
 
-// 3. OnArmorShredTagChanged 수정
 void AMonsterBaseCharacter::OnArmorShredTagChanged(const FGameplayTag Tag, int32 NewCount)
 {
 	if (bIsDying) return;
-
 	bool bIsShredded = NewCount > 0;
-
-	// [서버] 멀티캐스트 호출
 	if (HasAuthority())
 	{
 		SetStatusEffectState(Tag, bIsShredded, ArmorShredEffectTemplate);
 	}
-
 	OnArmorShredStateChanged(bIsShredded);
 }
 
+void AMonsterBaseCharacter::OnBossStateChanged(bool bIsBossAlive)
+{
+	if (IsBoss() || !AttributeSet)
+	{
+		return;
+	}
+
+	if (bIsBossAlive)
+	{
+		if (CurrentBossBuffArmor == 0.0f)
+		{
+			int32 CurrentWave = GetSpawnWaveIndex();
+
+			// [수정] 테스트를 위해 10웨이브 미만도 1스테이지로 강제 설정
+			int32 BossStage = (CurrentWave < 10) ? 1 : (CurrentWave / 10);
+
+			if (BossStage > 0)
+			{
+				float BonusArmor = (float)BossStage * 30.0f;
+				float OldArmor = AttributeSet->GetArmor();
+				float NewArmor = OldArmor + BonusArmor;
+
+				AttributeSet->SetArmor(NewArmor);
+				CurrentBossBuffArmor = BonusArmor;
+
+				//RID_LOG(FColor::Cyan, TEXT("[Buff Applied] %s : Armor +%.1f (%.1f -> %.1f)"),
+				//	*GetName(), BonusArmor, OldArmor, NewArmor);
+			}
+			else
+			{
+				/*RID_LOG(FColor::Orange, TEXT("[Debug] BossStage is 0. No Buff applied."));*/
+			}
+		}
+	}
+	else
+	{
+		if (CurrentBossBuffArmor > 0.0f)
+		{
+			float OldArmor = AttributeSet->GetArmor();
+			float NewArmor = OldArmor - CurrentBossBuffArmor;
+
+			AttributeSet->SetArmor(NewArmor);
+			CurrentBossBuffArmor = 0.0f;
+
+			//RID_LOG(FColor::Cyan, TEXT("[Buff Removed] %s : Armor Reverted (%.1f -> %.1f)"),
+			//	*GetName(), OldArmor, NewArmor);
+		}
+	}
+}

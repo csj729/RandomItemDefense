@@ -1,3 +1,5 @@
+// Source/RamdomItemDefense/Public/MonsterBaseCharacter.h
+
 #pragma once
 
 #include "RamdomItemDefense.h"
@@ -50,6 +52,7 @@ public:
 
 	// --- [ Public API : Spawning & Setup ] ---
 	void SetSpawner(AMonsterSpawner* InSpawner);
+	AMonsterSpawner* GetSpawner() const { return MySpawner; }
 	void SetSpawnWaveIndex(int32 InWaveIndex) { SpawnWaveIndex = InWaveIndex; }
 	int32 GetSpawnWaveIndex() const { return SpawnWaveIndex; }
 
@@ -74,6 +77,14 @@ public:
 
 	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlayMontage(UAnimMontage* MontageToPlay);
+
+	/** (BP 설정) 몬스터가 스폰될 때 재생할 이펙트 (Smoke 등) */
+	UPROPERTY(EditDefaultsOnly, Category = "Visuals|Effects")
+	TObjectPtr<UParticleSystem> SpawnEffect;
+
+	/** (서버->모든 클라) 스폰 이펙트를 재생합니다. */
+	UFUNCTION(NetMulticast, Unreliable)
+	void Multicast_PlaySpawnEffect();
 
 	// --- [ Public Config ] ---
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Stats")
@@ -110,7 +121,7 @@ protected:
 	void OnSlowTagChanged(const FGameplayTag Tag, int32 NewCount);
 	void OnArmorShredTagChanged(const FGameplayTag Tag, int32 NewCount);
 
-	/** 치명타 발생 시 호출되는 콜백 */
+	/** 치명타 발생 시 호출되는 함수 */
 	UFUNCTION()
 	void OnCritDamageOccurred(AActor* TargetActor, float CritDamageAmount);
 
@@ -169,6 +180,11 @@ protected:
 
 	UFUNCTION(BlueprintImplementableEvent, Category = "Animation")
 	void OnArmorShredStateChanged(bool bIsShredded);
+
+	float CurrentBossBuffArmor = 0.0f;
+
+	UFUNCTION()
+	void OnBossStateChanged(bool bIsBossAlive);
 
 private:
 	// --- [ Ragdoll Logic ] ---

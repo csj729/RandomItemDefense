@@ -14,25 +14,24 @@ void UCommonItemChoiceWidget::NativeConstruct()
 	BindDataSources();
 }
 
-// [수정] 재귀적 바인딩 함수
 void UCommonItemChoiceWidget::BindDataSources()
 {
-	// 1. PlayerState 바인딩 시도
+	// 1. PlayerState 포인터 확보 시도
 	if (!MyPlayerState)
 	{
 		MyPlayerState = GetOwningPlayerState<AMyPlayerState>();
-		if (MyPlayerState)
+	}
+
+	// 2. [핵심 수정] PlayerState가 유효하면 항상 바인딩 체크 (포인터가 있어도 바인딩이 풀려있을 수 있음)
+	if (MyPlayerState)
+	{
+		if (!MyPlayerState->OnCommonItemChoiceCountChangedDelegate.IsAlreadyBound(this, &UCommonItemChoiceWidget::HandleCommonItemChoiceCountChanged))
 		{
-			if (!MyPlayerState->OnCommonItemChoiceCountChangedDelegate.IsAlreadyBound(this, &UCommonItemChoiceWidget::HandleCommonItemChoiceCountChanged))
-			{
-				MyPlayerState->OnCommonItemChoiceCountChangedDelegate.AddDynamic(this, &UCommonItemChoiceWidget::HandleCommonItemChoiceCountChanged);
-			}
-			// [1차 시도] 텍스트 갱신 (만약 인벤토리가 아직 없으면 슬롯 생성은 실패함)
-			HandleCommonItemChoiceCountChanged(MyPlayerState->GetCommonItemChoiceCount());
+			MyPlayerState->OnCommonItemChoiceCountChangedDelegate.AddDynamic(this, &UCommonItemChoiceWidget::HandleCommonItemChoiceCountChanged);
 		}
 	}
 
-	// 2. InventoryComponent 바인딩 시도
+	// 3. InventoryComponent 확보 시도
 	if (!InventoryComp.IsValid())
 	{
 		if (ARamdomItemDefenseCharacter* Character = GetOwningPlayerPawn<ARamdomItemDefenseCharacter>())
@@ -41,21 +40,15 @@ void UCommonItemChoiceWidget::BindDataSources()
 		}
 	}
 
-	// 3. 하나라도 준비되지 않았다면 다음 틱에 재시도
+	// 4. 하나라도 준비되지 않았다면 다음 틱에 재시도
 	if (!MyPlayerState || !InventoryComp.IsValid())
 	{
 		GetWorld()->GetTimerManager().SetTimerForNextTick(this, &UCommonItemChoiceWidget::BindDataSources);
 	}
 	else
 	{
-		UE_LOG(LogRamdomItemDefense, Log, TEXT("CommonItemChoiceWidget: All Data Sources Bound Successfully!"));
-
-		// 모든 데이터 소스가 연결된 시점에 UI를 강제로 다시 갱신합니다.
-		// (1차 시도에서 InventoryComp가 없어 슬롯 생성이 실패했을 경우를 복구)
-		if (MyPlayerState)
-		{
-			HandleCommonItemChoiceCountChanged(MyPlayerState->GetCommonItemChoiceCount());
-		}
+		// (Delegate 바인딩 직후 초기값을 화면에 표시하기 위함)
+		HandleCommonItemChoiceCountChanged(MyPlayerState->GetCommonItemChoiceCount());
 	}
 }
 
@@ -63,6 +56,7 @@ void UCommonItemChoiceWidget::NativeDestruct()
 {
 	Super::NativeDestruct();
 
+	// 위젯이 제거될 때 델리게이트 해제
 	if (MyPlayerState)
 	{
 		MyPlayerState->OnCommonItemChoiceCountChangedDelegate.RemoveDynamic(this, &UCommonItemChoiceWidget::HandleCommonItemChoiceCountChanged);
@@ -78,6 +72,7 @@ void UCommonItemChoiceWidget::HandleCommonItemChoiceCountChanged(int32 NewCount)
 		ChoiceCountText->SetText(FText::Format(FText::FromString(TEXT("남은 선택 횟수: {Count}")), Args));
 	}
 
+	// 횟수가 있으면 목록 갱신, 없으면 숨김 요청
 	if (NewCount > 0)
 	{
 		PopulateChoices();
@@ -93,9 +88,7 @@ void UCommonItemChoiceWidget::PopulateChoices()
 	// 인벤토리 컴포넌트 유효성 체크
 	if (!InventoryComp.IsValid())
 	{
-		// 이 로그가 뜨면 바인딩 순서 문제임 (위의 수정으로 해결됨)
-		
-		(FColor::Red, TEXT("CommonItemChoiceWidget: InventoryComp is invalid!"));
+		// BindDataSources의 재시도 로직 덕분에 여기 도달할 확률은 낮음
 		return;
 	}
 
@@ -104,7 +97,6 @@ void UCommonItemChoiceWidget::PopulateChoices()
 
 	if (ItemIDs.Num() == 0)
 	{
-		RID_LOG(FColor::Yellow, TEXT("CommonItemChoiceWidget: No common items found in DataTable."));
 		return;
 	}
 
@@ -120,7 +112,7 @@ void UCommonItemChoiceWidget::PopulateChoices()
 		}
 	}
 
-	// 3. BP에 UI 표시 요청
+	// 3. BP에 UI 표시 요청 (아이템 데이터 배열 전달)
 	OnShowChoices(ItemChoices);
 }
 

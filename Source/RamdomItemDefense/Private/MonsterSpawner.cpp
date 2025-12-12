@@ -19,11 +19,7 @@ AMonsterSpawner::AMonsterSpawner()
 {
 	PrimaryActorTick.bCanEverTick = false;
 	bReplicates = true;
-
-	// 게임 로직에 필수적인 관리자 액터이므로 Culling되면 안 됩니다.
 	bAlwaysRelevant = true;
-
-	// 스포너 상태가 자주 바뀌지 않는다면 기본값도 괜찮지만, 디버깅을 위해 명시합니다.
 	NetUpdateFrequency = 100.0f;
 
 	TotalToSpawn = 0;
@@ -31,6 +27,8 @@ AMonsterSpawner::AMonsterSpawner()
 	bEnableDebug = true;
 	CurrentMonsterCount = 0;
 	bIsGameOver = false;
+
+	ActiveBossCount = 0;
 }
 
 void AMonsterSpawner::BeginPlay()
@@ -158,14 +156,25 @@ void AMonsterSpawner::SpawnCounterAttackMonster(TSubclassOf<AMonsterBaseCharacte
 	}
 }
 
+/** [리팩토링] 스폰된 몬스터의 공통 초기화 함수 */
 void AMonsterSpawner::InitSpawnedMonster(AMonsterBaseCharacter* SpawnedMonster, int32 WaveIndex)
 {
 	if (!SpawnedMonster) return;
 
+	if (SpawnedMonster->IsBoss())
+	{
+		ActiveBossCount++;
+
+		if (ActiveBossCount == 1)
+		{
+			OnBossStateChanged.Broadcast(true);
+		}
+	}
+
 	// 1. 스포너 및 웨이브 정보 설정
 	// (SetSpawner 내부에서 AIController에게 PatrolPath도 같이 전달합니다)
-	SpawnedMonster->SetSpawner(this);
 	SpawnedMonster->SetSpawnWaveIndex(WaveIndex);
+	SpawnedMonster->SetSpawner(this);
 
 	// 2. 관리 카운트 증가 및 UI 갱신
 	CurrentMonsterCount++;
@@ -173,10 +182,24 @@ void AMonsterSpawner::InitSpawnedMonster(AMonsterBaseCharacter* SpawnedMonster, 
 
 	// 3. 스탯 및 외형 적용
 	ApplyMonsterStatsByWave(SpawnedMonster, WaveIndex);
+
+	// 4. 스폰 이펙트 재생 (멀티캐스트)
+	SpawnedMonster->Multicast_PlaySpawnEffect();
 }
 
-void AMonsterSpawner::OnMonsterKilled()
+void AMonsterSpawner::OnMonsterKilled(bool bIsBoss)
 {
+	if (bIsBoss)
+	{
+		ActiveBossCount--;
+		if (ActiveBossCount <= 0)
+		{
+			ActiveBossCount = 0;
+			// 마지막 보스가 죽었다면 'False' 방송
+			OnBossStateChanged.Broadcast(false);
+		}
+	}
+
 	if (CurrentMonsterCount > 0)
 	{
 		CurrentMonsterCount--;
@@ -213,7 +236,7 @@ void AMonsterSpawner::ApplyMonsterStatsByWave(AMonsterBaseCharacter* Monster, in
 				const int32 BossStage = WaveIndex / 10;
 				float FinalHP = 0.f;
 
-				// [체력 계산] 보스 웨이브인지 확인 (10, 20, 30...)
+				// [체력 계산 수정] 보스 웨이브인지 확인 (10, 20, 30...)
 				if (WaveIndex > 0 && WaveIndex % 10 == 0)
 				{
 					float BaseBossHP = 50000.0f;
