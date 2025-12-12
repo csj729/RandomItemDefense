@@ -129,7 +129,14 @@ void ACharacterSelectPlayerController::SetPlayerReady(bool bReady)
 {
 	bIsPlayerReady = bReady;
 
-	UE_LOG(LogTemp, Log, TEXT("Player Ready State Changed: %s"), bReady ? TEXT("READY") : TEXT("NOT READY"));
+	if (bIsPlayerReady && CurrentTarget)
+	{
+		if (CurrentTarget->ReadySound)
+		{
+			UGameplayStatics::PlaySound2D(this, CurrentTarget->ReadySound);
+		}
+	}
+
 }
 
 void ACharacterSelectPlayerController::ResetView()

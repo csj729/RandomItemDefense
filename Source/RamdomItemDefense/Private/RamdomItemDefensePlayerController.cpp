@@ -25,6 +25,8 @@
 #include "AbilitySystemBlueprintLibrary.h" // [ ★★★ 코드 추가 ★★★ ]
 #include "GameplayTagContainer.h"
 #include "DamageTextWidget.h"
+#include "Components/AudioComponent.h"
+#include "Sound/SoundBase.h"
 
 
 DEFINE_LOG_CATEGORY(LogTemplateCharacter);
@@ -51,6 +53,21 @@ void ARamdomItemDefensePlayerController::BeginPlay()
 			Subsystem->AddMappingContext(DefaultMappingContext, 0);
 		}
 		// ------------------------------------
+
+		if (!AlarmAudioComponent)
+		{
+			// 오디오 컴포넌트 동적 생성
+			AlarmAudioComponent = NewObject<UAudioComponent>(this);
+			AlarmAudioComponent->RegisterComponent();
+
+			// 사운드가 설정되어 있다면 할당
+			if (WarningAlarmSound)
+			{
+				AlarmAudioComponent->SetSound(WarningAlarmSound);
+			}
+
+			AlarmAudioComponent->bAutoActivate = false; // 자동 재생 끄기
+		}
 
 		// --- UI 생성 (기존과 동일) ---
 		UWorld* World = GetWorld();
@@ -585,6 +602,28 @@ void ARamdomItemDefensePlayerController::Client_ShowDamageText_Implementation(fl
 			DamageWidget->SetPositionInViewport(ScreenPosition);
 			DamageWidget->AddToViewport();
 			DamageWidget->PlayRiseAndFade();
+		}
+	}
+}
+
+void ARamdomItemDefensePlayerController::Client_SetWarningAlarm_Implementation(bool bTurnOn)
+{
+	if (!AlarmAudioComponent) return;
+
+	// 켜야 하는데 현재 꺼져 있다면 -> 재생
+	if (bTurnOn)
+	{
+		if (!AlarmAudioComponent->IsPlaying())
+		{
+			AlarmAudioComponent->Play();
+		}
+	}
+	// 꺼야 하는데 켜져 있다면 -> 정지
+	else
+	{
+		if (AlarmAudioComponent->IsPlaying())
+		{
+			AlarmAudioComponent->Stop();
 		}
 	}
 }

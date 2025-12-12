@@ -46,6 +46,13 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Config", meta = (MultiLine = true))
 	FText CharacterDescription;
 
+	/* 선택 시 재생할 캐릭터 사운드 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound")
+	USoundBase* SelectSound;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound")
+	USoundBase* ReadySound;
+
 	// --- [ State ] ---
 	bool bIsSelected;
 

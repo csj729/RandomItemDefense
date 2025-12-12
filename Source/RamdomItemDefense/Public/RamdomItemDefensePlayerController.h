@@ -81,6 +81,14 @@ public:
 	// --- [ Public Callbacks ] ---
 	void OnButtonActionResult(bool bWasSuccess, int32 RewardIndex);
 
+	/** 에디터에서 지정할 경고음 */
+	UPROPERTY(EditDefaultsOnly, Category = "Sound")
+	TObjectPtr<USoundBase> WarningAlarmSound;
+
+	/** 경고음 켜기/끄기 */
+	UFUNCTION(Client, Reliable)
+	void Client_SetWarningAlarm(bool bTurnOn);
+
 protected:
 	// --- [ Lifecycle & Setup ] ---
 	virtual void BeginPlay() override;
@@ -140,6 +148,9 @@ protected:
 
 	UPROPERTY()
 	TObjectPtr<AMyPlayerState> MyPlayerStateRef;
+
+	UPROPERTY()
+	TObjectPtr<UAudioComponent> AlarmAudioComponent;
 
 	uint32 bMoveToMouseCursor : 1;
 

@@ -82,8 +82,16 @@ void ASelectableCharacter::NotifyActorOnClicked(FKey ButtonPressed)
 
 	// --- [Case 2] 새로운 캐릭터 선택 -> 집중 모드 (나머지 숨김) ---
 
+	if (SelectSound && !SelectPC->GetIsPlayerReady())
+	{
+		UGameplayStatics::PlaySound2D(this, SelectSound);
+	}
+
 	// 1. 카메라 줌 인 (나에게로)
-	if (SelectPC) SelectPC->SetTargetCharacter(this);
+	if (SelectPC)
+	{
+		SelectPC->SetTargetCharacter(this);
+	}
 
 	// 2. 캐릭터들 순회
 	TArray<AActor*> AllChars;

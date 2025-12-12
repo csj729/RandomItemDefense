@@ -264,19 +264,40 @@ void ARamdomItemDefenseGameMode::StartNextWave()
 
 void ARamdomItemDefenseGameMode::CheckGameOver()
 {
+	// 게임이 시작되지 않았으면 로직을 수행하지 않음
 	if (!bGameStarted) return;
+
+	// [설정] 경고가 울리기 시작할 몬스터 수 (예: 80 - 10 = 70마리)
+	const int32 WarningThreshold = GameoverMonsterNum - 10;
 
 	for (AMonsterSpawner* Spawner : MonsterSpawners)
 	{
-		if (Spawner && !Spawner->IsGameOver() && Spawner->GetCurrentMonsterCount() > GameoverMonsterNum)
+		// 스포너가 유효하지 않으면 건너뜀
+		if (!Spawner) continue;
+
+		// 현재 몬스터 수 확인
+		int32 CurrentCount = Spawner->GetCurrentMonsterCount();
+
+		// 이 스포너의 주인(플레이어 컨트롤러) 찾기
+		APlayerController* TargetPC = GetControllerForSpawner(Spawner);
+		ARamdomItemDefensePlayerController* RIDPC = Cast<ARamdomItemDefensePlayerController>(TargetPC);
+
+		// -----------------------------------------------------------------
+		// 1. 게임 오버 조건 체크 (제한 수 초과)
+		// -----------------------------------------------------------------
+		if (!Spawner->IsGameOver() && CurrentCount > GameoverMonsterNum)
 		{
 			Spawner->SetGameOver();
 
-			// 패배자 & 승리자 찾기
-			APlayerController* LoserPC = GetControllerForSpawner(Spawner);
+			// [중요] 게임이 끝났으므로 경고음 끄기 (승리/패배 BGM과 겹치지 않게)
+			if (RIDPC)
+			{
+				RIDPC->Client_SetWarningAlarm(false);
+			}
+
+			APlayerController* LoserPC = TargetPC;
 			APlayerController* WinnerPC = nullptr;
 
-			// (2인 게임 기준) 패배자가 아닌 사람이 승리자
 			for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
 			{
 				APlayerController* PC = It->Get();
@@ -287,33 +308,32 @@ void ARamdomItemDefenseGameMode::CheckGameOver()
 				}
 			}
 
-			// 승리자 이름 가져오기
-			FString WinnerName = TEXT("Player");
-			if (WinnerPC && WinnerPC->PlayerState)
-			{
-				WinnerName = WinnerPC->PlayerState->GetPlayerName();
-			}
-
 			// [패배 처리]
 			if (LoserPC)
 			{
-				ARamdomItemDefensePlayerController* PC = Cast<ARamdomItemDefensePlayerController>(LoserPC);
-				if (PC) PC->Client_ShowDefeatUI(); // 패배 UI 호출
+				ARamdomItemDefensePlayerController* LoserRIDPC = Cast<ARamdomItemDefensePlayerController>(LoserPC);
+				if (LoserRIDPC) LoserRIDPC->Client_ShowDefeatUI(); // 패배 UI 호출
 			}
-				
+
 			// [승리 처리]
 			if (WinnerPC)
 			{
-				ARamdomItemDefensePlayerController* PC = Cast<ARamdomItemDefensePlayerController>(WinnerPC);
-				if (PC) PC->Client_ShowVictoryUI(); // 승리 UI 호출
+				ARamdomItemDefensePlayerController* WinnerRIDPC = Cast<ARamdomItemDefensePlayerController>(WinnerPC);
+				if (WinnerRIDPC) WinnerRIDPC->Client_ShowVictoryUI(); // 승리 UI 호출
 			}
 
-			// 게임 종료 처리
+			// 게임 종료 상태로 변경
 			bGameStarted = false;
+		}
+		// 게임 오버는 아니지만, 플레이어 컨트롤러가 있고 게임 진행 중일 때
+		else if (RIDPC && !Spawner->IsGameOver())
+		{
+			bool bShouldAlert = (CurrentCount >= WarningThreshold);
+
+			RIDPC->Client_SetWarningAlarm(bShouldAlert);
 		}
 	}
 }
-
 /** 스포너 -> 컨트롤러 찾기 헬퍼 함수 */
 APlayerController* ARamdomItemDefenseGameMode::GetControllerForSpawner(AMonsterSpawner* Spawner) const
 {
