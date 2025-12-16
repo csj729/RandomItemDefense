@@ -37,7 +37,6 @@ public:
     ATTRIBUTE_ACCESSORS(UMonsterAttributeSet, MoveSpeed);
 
     // --- [ Public Helpers ] ---
-    /** 방어력 수치를 기반으로 감소된 데미지 반환 */
     UFUNCTION(BlueprintPure, Category = "Attributes|Calculation")
     float CalculateReducedDamage(float IncomingDamage) const;
 

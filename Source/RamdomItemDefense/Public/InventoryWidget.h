@@ -12,7 +12,6 @@ class RAMDOMITEMDEFENSE_API UInventoryWidget : public UUserWidget
 	GENERATED_BODY()
 
 public:
-	// --- [ Blueprint Implementable Events ] ---
 	UFUNCTION(BlueprintImplementableEvent, Category = "UI Events")
 	void OnInventoryUpdated();
 

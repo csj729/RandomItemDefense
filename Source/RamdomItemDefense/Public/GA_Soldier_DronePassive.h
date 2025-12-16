@@ -73,8 +73,4 @@ private:
 	virtual void OnAvatarSet(const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilitySpec& Spec) override;
 	void OnOwnerStatChanged(const struct FOnAttributeChangeData& Data);
 	UFUNCTION() void UpdateDroneStats();
-
-	void CheckAndFire();
-	void FireAtTarget(class ASoldierDrone* Drone, AActor* Target);
-	void ApplyDamageTo(AActor* Target);
 };

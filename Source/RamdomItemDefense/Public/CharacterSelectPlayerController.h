@@ -35,11 +35,9 @@ public:
 	void ResetView();
 
 	// --- [ UI Config ] ---
-	/** (에디터 설정) 캐릭터 선택 위젯 클래스 */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI")
 	TSubclassOf<UUserWidget> CharacterSelectWidgetClass;
 
-	/** 실제 생성된 위젯 인스턴스 */
 	UPROPERTY(BlueprintReadOnly, Category = "UI")
 	TObjectPtr<UUserWidget> CharacterSelectWidgetInstance;
 

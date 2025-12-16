@@ -16,7 +16,6 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Damage Text")
 	void SetDamageText(const FText& InText);
 
-	/** (BP 구현) 애니메이션 재생 */
 	UFUNCTION(BlueprintImplementableEvent, Category = "Damage Text")
 	void PlayRiseAndFade();
 

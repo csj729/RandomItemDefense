@@ -54,11 +54,9 @@ public:
 	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_SpawnParticleAttached(UParticleSystem* EmitterTemplate, FName SocketName, FVector LocationOffset = FVector::ZeroVector, FRotator RotationOffset = FRotator::ZeroRotator, FVector Scale = FVector(1.0f));
 
-	/** (서버->모든 클라) 특정 태그와 연결된 지속 이펙트를 생성하고 부착합니다. */
 	UFUNCTION(NetMulticast, Reliable)
 	void Multicast_AddBuffEffect(FGameplayTag BuffTag, UParticleSystem* EmitterTemplate, FName SocketName, FVector LocationOffset = FVector::ZeroVector, FVector Scale = FVector(1.0f));
 
-	/** (서버->모든 클라) 특정 태그와 연결된 지속 이펙트를 제거합니다. */
 	UFUNCTION(NetMulticast, Reliable)
 	void Multicast_RemoveBuffEffect(FGameplayTag BuffTag);
 

@@ -17,9 +17,8 @@ class ARamdomItemDefenseGameMode : public AGameModeBase
 public:
 	ARamdomItemDefenseGameMode();
 
-	// --- [ Public API ] ---
-	/** 상대방에게 반격 몬스터를 보냅니다. */
 	void SendCounterAttackMonster(APlayerState* KillerPlayerState, TSubclassOf<AMonsterBaseCharacter> MonsterClassToSpawn, int32 MonsterWaveIndex);
+	void CheckReadyAndStart();
 
 	// --- [ Overrides ] ---
 	virtual AActor* ChoosePlayerStart_Implementation(AController* Player) override;

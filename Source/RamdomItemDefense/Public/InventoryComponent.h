@@ -55,7 +55,6 @@ public:
 	void AddRandomItem();
 
 	// --- [ Public API : Combination ] ---
-	/** 결과 아이템 ID로 조합 시도 */
 	UFUNCTION(BlueprintCallable, Category = "Inventory|Combine")
 	bool CombineItemByResultID(FName ResultItemID);
 
@@ -70,7 +69,6 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Inventory")
 	FItemData GetItemData(FName ItemID, bool& bSuccess) const;
 
-	/** 모든 '흔함' 등급 아이템 ID 반환 */
 	UFUNCTION(BlueprintPure, Category = "Inventory")
 	TArray<FName> GetAllCommonItemIDs() const;
 

@@ -13,7 +13,6 @@ public:
 	UBTTask_FindPatrolPos();
 
 	// --- [ Configuration : Blackboard Keys ] ---
-	/** 'PathToFollow' Ű */
 	UPROPERTY(EditAnywhere, Category = "Blackboard")
 	FBlackboardKeySelector PathActorKey;
 

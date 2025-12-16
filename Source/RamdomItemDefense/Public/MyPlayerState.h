@@ -135,6 +135,14 @@ public:
 	UFUNCTION(Client, Reliable)
 	void Client_NotifyButtonActionResult(bool bWasSuccess, int32 RewardIndex = -1);
 
+	// =========================================================================
+	//  Client Ready Check
+	// =========================================================================
+	UFUNCTION(Server, Reliable)
+	void Server_SetReadyToPlay();
+
+	bool IsReadyToPlay() const { return bIsReadyToPlay; }
+
 protected:
 	// --- [ Replication & Notify ] ---
 	UPROPERTY(ReplicatedUsing = OnRep_Gold)
@@ -191,4 +199,7 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, Category = "Button Action")
 	TArray<TSubclassOf<UGameplayEffect>> ButtonActionRewardBuffs;
+
+	// --- [ Client Ready Check ] ---
+	bool bIsReadyToPlay = false;
 };

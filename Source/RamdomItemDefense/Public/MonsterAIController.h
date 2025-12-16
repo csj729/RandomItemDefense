@@ -15,7 +15,6 @@ class RAMDOMITEMDEFENSE_API AMonsterAIController : public AAIController
 public:
 	AMonsterAIController();
 
-	/** 패트롤 경로 액터 설정 */
 	void SetPatrolPath(AActor* PathActor);
 
 protected:

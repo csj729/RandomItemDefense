@@ -56,7 +56,6 @@ public:
 	void SetSpawnWaveIndex(int32 InWaveIndex) { SpawnWaveIndex = InWaveIndex; }
 	int32 GetSpawnWaveIndex() const { return SpawnWaveIndex; }
 
-	/** PVP 반격 몬스터 설정 */
 	void SetIsCounterAttackMonster(bool bInValue) { bIsCounterAttackMonster = bInValue; }
 	bool IsCounterAttackMonster() const { return bIsCounterAttackMonster; }
 
@@ -72,21 +71,17 @@ public:
 
 	virtual void PlayHitEffect(const FGameplayTagContainer& EffectTags);
 
-	/** 상태 이상(슬로우 등) 이펙트 켜기/끄기 (서버->멀티캐스트) */
 	void SetStatusEffectState(FGameplayTag StatusTag, bool bIsActive, UNiagaraSystem* EffectTemplate);
 
 	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlayMontage(UAnimMontage* MontageToPlay);
 
-	/** (BP 설정) 몬스터가 스폰될 때 재생할 이펙트 (Smoke 등) */
 	UPROPERTY(EditDefaultsOnly, Category = "Visuals|Effects")
 	TObjectPtr<UParticleSystem> SpawnEffect;
 
-	/** (서버->모든 클라) 스폰 이펙트를 재생합니다. */
 	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlaySpawnEffect();
 
-	// --- [ Public Config ] ---
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Stats")
 	float MaxHealth = 100.0f;
 

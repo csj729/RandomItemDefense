@@ -48,7 +48,6 @@ protected:
 	void PopulateChoices();
 
 	// --- [ Blueprint Implementable Events ] ---
-	/** BP에서 3개 아이템 버튼을 채우도록 요청 */
 	UFUNCTION(BlueprintImplementableEvent, Category = "UI")
 	void OnShowChoices(const TArray<FItemData>& ItemChoices);
 

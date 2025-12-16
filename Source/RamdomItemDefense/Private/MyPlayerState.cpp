@@ -681,3 +681,17 @@ void AMyPlayerState::OnRep_IsReady()
 {
 	OnIsReadyChangedDelegate.Broadcast(bIsReady);
 }
+
+void AMyPlayerState::Server_SetReadyToPlay_Implementation()
+{
+	bIsReadyToPlay = true;
+
+	// 서버(GameMode)에 "나 준비됐으니, 다 준비됐는지 확인해봐"라고 요청
+	if (UWorld* World = GetWorld())
+	{
+		if (ARamdomItemDefenseGameMode* GM = Cast<ARamdomItemDefenseGameMode>(World->GetAuthGameMode()))
+		{
+			GM->CheckReadyAndStart();
+		}
+	}
+}

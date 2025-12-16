@@ -133,6 +133,8 @@ void ARamdomItemDefensePlayerController::TryBindPlayerState()
 			OnPlayerCommonChoiceCountChanged(MyPlayerStateRef->GetCommonItemChoiceCount());
 		}
 
+		MyPlayerStateRef->Server_SetReadyToPlay();
+
 		UE_LOG(LogRamdomItemDefense, Log, TEXT("PlayerController: PlayerState Bound Successfully!"));
 	}
 	else

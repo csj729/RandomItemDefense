@@ -89,41 +89,15 @@ void ARamdomItemDefenseGameMode::CheckPlayerCountAndStart()
 	if (bGameStarted) return;
 
 	int32 CurrentPlayers = GetNumPlayers();
-	RID_LOG(FColor::Green, TEXT("Player Num = %d"), CurrentPlayers);
-	// 1. 현재 접속한 모든 플레이어에게 "대기 중" UI 띄우기 (아직 시작 안 했으므로)
+
+	// 모든 플레이어에게 대기 UI 띄우기
 	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
 	{
 		ARamdomItemDefensePlayerController* PC = Cast<ARamdomItemDefensePlayerController>(It->Get());
-		if (PC && CurrentPlayers < 2)
+		if (PC)
 		{
-			// 2명 미만이면 대기 UI 표시
+			// 준비가 덜 되었으므로 무조건 대기 UI 표시
 			PC->Client_ShowWaitingUI();
-		}
-	}
-
-	if (CurrentPlayers >= 2)
-	{
-		bGameStarted = true;
-		RID_LOG(FColor::Green, TEXT("!!! GAME START !!!"));
-
-		// 2. 게임 시작! 모든 플레이어의 대기 UI 끄기
-		for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
-		{
-			ARamdomItemDefensePlayerController* PC = Cast<ARamdomItemDefensePlayerController>(It->Get());
-			if (PC)
-			{
-				PC->Client_HideWaitingUI();
-			}
-		}
-
-		AMyGameState* MyGameState = GetGameState<AMyGameState>();
-		if (MyGameState)
-		{
-			MyGameState->MaxMonsterLimit = GameoverMonsterNum;
-
-			// 현재 시간 + 3초 뒤에 첫 웨이브가 시작되도록 설정
-			MyGameState->WaveEndTime = GetWorld()->GetTimeSeconds() + 3.0f;
-			MyGameState->OnRep_WaveEndTime(); // 클라이언트 UI 업데이트
 		}
 	}
 }
@@ -576,5 +550,48 @@ void ARamdomItemDefenseGameMode::AssignSpawnerToPlayer(AController* NewPlayer)
 	else
 	{
 		UE_LOG(LogTemp, Warning, TEXT("AssignSpawnerToPlayer: Failed to find Spawner with tag %s"), *TargetSpawnerTag.ToString());
+	}
+}
+
+void ARamdomItemDefenseGameMode::CheckReadyAndStart()
+{
+	if (bGameStarted) return;
+
+	// 1. 최소 인원 확인 (2명 미만이면 시작 불가)
+	if (GetNumPlayers() < 2) return;
+
+	AMyGameState* MyGameState = GetGameState<AMyGameState>();
+	if (!MyGameState) return;
+
+	// 2. 모든 플레이어가 준비되었는지 검사
+	for (APlayerState* PS : MyGameState->PlayerArray)
+	{
+		AMyPlayerState* MyPS = Cast<AMyPlayerState>(PS);
+		if (!MyPS || !MyPS->IsReadyToPlay())
+		{
+			return;
+		}
+	}
+
+	// 3. 모두 준비됨
+	bGameStarted = true;
+	RID_LOG(FColor::Green, TEXT("!!! ALL PLAYERS READY -> GAME START in 3 Seconds !!!"));
+
+	// 대기 UI 끄기
+	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+	{
+		ARamdomItemDefensePlayerController* PC = Cast<ARamdomItemDefensePlayerController>(It->Get());
+		if (PC)
+		{
+			PC->Client_HideWaitingUI();
+		}
+	}
+
+	// 3초 뒤 웨이브 시작 설정
+	if (MyGameState)
+	{
+		MyGameState->MaxMonsterLimit = GameoverMonsterNum;
+		MyGameState->WaveEndTime = GetWorld()->GetTimeSeconds() + 3.0f; // 모두 로딩 끝났으니 3초면 충분
+		MyGameState->OnRep_WaveEndTime();
 	}
 }
