@@ -86,7 +86,6 @@ void AMonsterSpawner::SpawnMonster()
 			FTransform SpawnTransform(GetActorRotation(), GetActorLocation());
 
 			// 1. 지연 스폰 시작
-			// 이 시점에는 아직 BeginPlay와 AIController 빙의(Possess)가 실행되지 않습니다.
 			AMonsterBaseCharacter* SpawnedMonster = World->SpawnActorDeferred<AMonsterBaseCharacter>(
 				MonsterClassToSpawn,
 				SpawnTransform,
@@ -103,12 +102,11 @@ void AMonsterSpawner::SpawnMonster()
 				{
 					CurrentWave = MyGameState->GetCurrentWave();
 				}
-
 				// 2. 지연 스폰 마무리 (BeginPlay 실행됨)
 				UGameplayStatics::FinishSpawningActor(SpawnedMonster, SpawnTransform);
 
-				// 3. [리팩토링] 공통 초기화 로직 호출
 				InitSpawnedMonster(SpawnedMonster, CurrentWave);
+
 			}
 
 			// 스폰 카운트 증가

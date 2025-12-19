@@ -167,9 +167,6 @@ void AMonsterBaseCharacter::SetSpawner(AMonsterSpawner* InSpawner)
 
 	if (MySpawner)
 	{
-		// [디버그 1] SetSpawner 호출 확인
-		RID_LOG(FColor::Yellow, TEXT("[Debug] SetSpawner Called for %s. Binding Delegate..."), *GetName());
-
 		// 델리게이트 바인딩 (이미 바인딩된 경우 중복 방지)
 		MySpawner->OnBossStateChanged.RemoveDynamic(this, &AMonsterBaseCharacter::OnBossStateChanged);
 		MySpawner->OnBossStateChanged.AddDynamic(this, &AMonsterBaseCharacter::OnBossStateChanged);

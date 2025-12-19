@@ -6,7 +6,6 @@
 #include "Abilities/GameplayAbility.h"
 #include "ItemTypes.generated.h"
 
-// --- [ Delegates ] ---
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnIntChangedDelegate, int32, NewValue);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnFloatChangedDelegate, float, NewValue);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnInventoryUpdatedDelegate);

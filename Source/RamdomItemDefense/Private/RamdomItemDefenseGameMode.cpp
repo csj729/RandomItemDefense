@@ -218,8 +218,6 @@ void ARamdomItemDefenseGameMode::StartNextWave()
 		{
 			TSubclassOf<AMonsterBaseCharacter> MonsterClass = WaveData->MonstersToSpawn[0];
 
-			RID_LOG(FColor::Cyan, TEXT("Found %d Spawners. Issuing spawn command..."), MonsterSpawners.Num());
-
 			for (AMonsterSpawner* Spawner : MonsterSpawners)
 			{
 				if (Spawner)
@@ -361,8 +359,6 @@ void ARamdomItemDefenseGameMode::SendCounterAttackMonster(APlayerState* KillerPl
 		{
 			// [수정] 웨이브 인덱스도 함께 전달
 			TargetSpawner->SpawnCounterAttackMonster(MonsterClassToSpawn, MonsterWaveIndex);
-
-			RID_LOG(FColor::Red, TEXT("PVP: Player(Spawner Index %d) sent monster(Wave %d) to Index %d!"), KillerSpawnerIndex, MonsterWaveIndex, TargetIndex);
 		}
 	}
 }

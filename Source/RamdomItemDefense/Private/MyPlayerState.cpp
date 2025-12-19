@@ -148,10 +148,9 @@ void AMyPlayerState::OnRep_ChoiceCount()
  */
 void AMyPlayerState::Server_UseRoundChoice_Implementation(bool bChoseItemGacha)
 {
-	// (서버에서 실행됨)
 	if (ChoiceCount <= 0)
 	{
-		return; // 선택 횟수가 없으면 무시
+		return;
 	}
 
 	ChoiceCount--;
@@ -159,12 +158,9 @@ void AMyPlayerState::Server_UseRoundChoice_Implementation(bool bChoseItemGacha)
 
 	if (bChoseItemGacha)
 	{
-		// 이 PlayerState가 소유한 폰(캐릭터)을 가져옵니다.
 		ARamdomItemDefenseCharacter* Character = GetPawn<ARamdomItemDefenseCharacter>();
 		if (Character && Character->GetInventoryComponent())
 		{
-			// 캐릭터의 인벤토리 컴포넌트에게 무작위 아이템을 추가하라고 명령합니다.
-			// [주의] AddRandomItem은 이제 '흔함' 등급만 뽑습니다. 기획 의도 확인 필요.
 			Character->GetInventoryComponent()->AddRandomItem();
 		}
 

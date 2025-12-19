@@ -27,12 +27,7 @@ void UInventoryComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& 
 
 void UInventoryComponent::OnRep_InventoryItems()
 {
-	// 클라이언트 UI에게 "데이터 바꼈으니 다시 그려!"라고 알림
-	UE_LOG(LogRamdomItemDefense, Warning, TEXT("OnRep_InventoryItems Called! Item Count: %d"), InventoryItems.Num());
 	OnInventoryUpdated.Broadcast();
-
-	// 로그 확인용
-	// LOG_INVENTORY(FColor::Green, TEXT("Client Inventory Updated! Count: %d"), InventoryItems.Num());
 }
 
 void UInventoryComponent::Initialize(UAbilitySystemComponent* InASC)
@@ -124,15 +119,13 @@ void UInventoryComponent::AddItem(FName ItemID)
 			}
 			FActiveGameplayEffectHandle ActiveHandle = AbilitySystemComponent->ApplyGameplayEffectSpecToSelf(*SpecHandle.Data.Get());
 
-			// --- [디버그 로그 추가] ---
 			if (ActiveHandle.IsValid())
 			{
-				// --- [코드 수정] TMap::Add -> TArray::Add ---
 				ActiveStatEffects.Add({ ItemID, ActiveHandle });
-				// -----------------------------------------
 			}
 			else
 			{
+				// 디버그 코드
 			}
 		}
 	}
@@ -154,6 +147,7 @@ void UInventoryComponent::AddItem(FName ItemID)
 	}
 
 	InventoryItems.Add(ItemID);
+	RID_LOG(FColor::Yellow, TEXT("Inventory Updated: Added Item [%s]. Total Count: %d"), *ItemID.ToString(), InventoryItems.Num());
 	OnRep_InventoryItems();
 }
 
@@ -163,27 +157,20 @@ void UInventoryComponent::RemoveItem(FName ItemID)
 	if (!AbilitySystemComponent.IsValid()) return;
 	if (!GetOwner()->HasAuthority()) return;
 
-	// --- [코드 수정] TMap::Contains -> TArray::IndexOfByPredicate ---
-
 	// 1. 스탯 효과(GE) 제거
 	// ItemID와 일치하는 '첫 번째' 스탯 효과 항목을 배열에서 찾습니다.
 	int32 StatEffectIndex = ActiveStatEffects.IndexOfByPredicate(
 		[ItemID](const FActiveItemStatEffect& Effect) { return Effect.ItemID == ItemID; }
 	);
 
-	// 항목을 찾았다면
 	if (StatEffectIndex != INDEX_NONE)
 	{
-		// 핸들을 가져옵니다.
 		FActiveGameplayEffectHandle HandleToRemove = ActiveStatEffects[StatEffectIndex].Handle;
 		if (HandleToRemove.IsValid())
 		{
-			// ASC에서 GE를 제거합니다.
 			bool bRemoved = AbilitySystemComponent->RemoveActiveGameplayEffect(HandleToRemove);
-
 		}
 
-		// '반드시' 추적 배열에서 이 항목을 제거합니다. (다음 RemoveItem 호출 시 그 다음 항목을 찾도록)
 		ActiveStatEffects.RemoveAt(StatEffectIndex);
 	}
 	// 2. 고유 능력(GA) 제거
@@ -351,13 +338,10 @@ bool UInventoryComponent::CombineItemByResultID(FName ResultItemID)
 		return false;
 	}
 
-	// 3. 재료 아이템들을 인벤토리에서 소모(제거)합니다.
-	// 안전하게 제거하기 위해, 제거 중 오류가 발생하는지 추적합니다.
 	bool bFailedToRemoveIngredient = false;
-	TArray<FName> TempInventoryForRemovalCheck = InventoryItems; // 현재 인벤토리 복사 (안전 체크용)
+	TArray<FName> TempInventoryForRemovalCheck = InventoryItems; // 현재 인벤토리 복사
 	for (const FName& IngredientID : RecipeData->Ingredients)
 	{
-		// 복사본에 해당 재료가 있는지 먼저 확인 (CanCombine 통과 후 변동 가능성 대비)
 		if (TempInventoryForRemovalCheck.Contains(IngredientID))
 		{
 			RemoveItem(IngredientID); // 실제 인벤토리에서 아이템 제거 및 효과 해제
@@ -365,13 +349,11 @@ bool UInventoryComponent::CombineItemByResultID(FName ResultItemID)
 		}
 		else
 		{
-			// 이 경우는 CanCombine() 로직이 잘못되었거나, 그 사이에 아이템이 사라진 경우입니다.
 			bFailedToRemoveIngredient = true;
 			break; // 재료 소모 중단
 		}
 	}
 
-	// 4. 모든 재료가 성공적으로 소모되었다면, 결과 아이템을 인벤토리에 추가합니다.
 	if (!bFailedToRemoveIngredient)
 	{
 		AddItem(RecipeData->ResultItemID); // 결과 아이템 추가 및 효과 적용
@@ -379,7 +361,6 @@ bool UInventoryComponent::CombineItemByResultID(FName ResultItemID)
 	}
 
 	// 재료 소모 중 오류가 발생했다면 실패를 반환합니다.
-	// (고급: 여기서 이미 소모된 재료를 다시 되돌리는 롤백 로직을 추가할 수 있습니다)
 	return false; // 조합 실패
 }
 
