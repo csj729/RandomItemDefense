@@ -204,11 +204,11 @@ bool AMyPlayerState::TryUpgradeStat(EItemStatType StatToUpgrade)
 ---
 
 ### 🛠️ 기술 스택
-* **Language:** C++
-* **Platform:** Windows Console (Win32 API for cursor/screen handling)
-* **Pattern:** OOP (Object-Oriented Programming), Manager Pattern
-* **Rendering:*** Double Buffering (Flicker-free console rendering)
-
+* **Engine** : Unreal Engine 5 (C++ & Blueprint)
+* **Framework** : Gameplay Ability System (GAS)
+* **Network** : Dedicated Server Architecture (Replication, RPCs)
+* **AI** : Behavior Tree & Blackboard
+* **UI** : UMG (MVVM Pattern)
 ---
 
 <div align="center">
